@@ -5,40 +5,27 @@
   <title>Grilled Meal Plan – 1,400 kcal/day</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; background: #f8f8f8; color: #222; margin: 0; padding: 0 0 40px 0; }
-    .container { max-width: 98vw; width: 100%; max-width: 760px; margin: 16px auto 36px auto; background: #fff; border-radius: 14px; box-shadow: 0 1px 16px #bce2bc5a; padding: 5vw 2.5vw 28px 2.5vw; }
-    h1, h2, h3 { margin-top: 1.1em; margin-bottom: 0.7em; }
+    body { font-family: Arial, sans-serif; background: #f8f8f8; color: #222; margin: 0; padding: 0 10px 40px 10px; }
+    .container { max-width: 760px; margin: 32px auto; background: #fff; border-radius: 14px; box-shadow: 0 1px 16px #bce2bc5a; padding: 28px; }
+    h1, h2, h3 { margin-top: 1.3em; margin-bottom: 0.7em; }
     h1 { font-size: 2em; }
-    .note { background: #e9ffe2; padding: 12px; border-radius: 7px; margin-bottom: 22px; font-size: 1.07em; }
+    table { width: 100%; border-collapse: collapse; margin: 18px 0; }
+    th, td { border: 1px solid #ddd; padding: 7px 10px; text-align: center; }
+    th { background: #f3f3f3; }
+    .note { background: #e9ffe2; padding: 12px; border-radius: 7px; margin-bottom: 22px; font-size: 1.1em; }
     .small { font-size: 0.97em; color: #666; }
     .macro { margin: 8px 0 18px 0; }
     .center { text-align: center; }
     .highlight { background: #e7f9e4; }
     .target-table th, .target-table td { text-align: right; }
     .target-table th:first-child, .target-table td:first-child { text-align: left; }
-    .checkbox-table input[type=checkbox] { transform: scale(1.3); margin-right: 7px; accent-color: #41b764; }
-    .prep-section { background: #f7fbe9; border-radius: 8px; padding: 18px 10px 12px 18px; margin-top: 18px; }
-    .prep-title { font-size: 1.15em; margin-bottom: 5px; }
+    .checkbox-table input[type=checkbox] { transform: scale(1.2); margin-right: 7px; }
+    .prep-section { background: #f7fbe9; border-radius: 8px; padding: 18px 18px 12px 28px; margin-top: 18px; }
+    .prep-title { font-size: 1.2em; margin-bottom: 6px; }
     .prep-food { font-weight: bold; color: #3a5c2a; margin-top: 12px; }
     .prep-steps { margin: 0 0 8px 0; padding-left: 0; }
     .prep-steps li { margin-bottom: 7px; text-align: left; }
     .emoji { font-size: 1.1em; margin-right: 2px; }
-    /* Responsive tables */
-    .table-scroll { width: 100%; overflow-x: auto; }
-    table { min-width: 480px; width: 100%; border-collapse: collapse; margin: 18px 0; }
-    th, td { border: 1px solid #ddd; padding: 8px 7px; text-align: center; font-size: 1em; }
-    th { background: #f3f3f3; }
-    @media (max-width: 600px) {
-      .container { padding: 2vw 1vw 20vw 1vw; }
-      h1 { font-size: 1.2em; }
-      h2 { font-size: 1.07em; }
-      th, td { padding: 6px 4px; font-size: 0.95em; }
-      .prep-section { padding: 12px 4vw 9px 4vw; }
-    }
-    @media (max-width: 400px) {
-      table { min-width: 370px; }
-      .container { padding: 0.2em 1vw 7vw 1vw; }
-    }
   </style>
 </head>
 <body>
@@ -53,7 +40,6 @@
     </div>
 
     <h2>Per Meal (Raw Weights)</h2>
-    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -76,10 +62,8 @@
         </tr>
       </tbody>
     </table>
-    </div>
 
     <h2>Per Day (x2 meals)</h2>
-    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -98,10 +82,8 @@
         </tr>
       </tbody>
     </table>
-    </div>
 
     <h2>Target Comparison</h2>
-    <div class="table-scroll">
     <table class="target-table">
       <thead>
         <tr>
@@ -117,11 +99,9 @@
         <tr><td>Fat</td><td>31g+</td><td>34.6g</td></tr>
       </tbody>
     </table>
-    </div>
 
     <h2>6-Day Shopping List</h2>
     <form>
-    <div class="table-scroll">
     <table class="checkbox-table">
       <thead>
         <tr>
@@ -170,11 +150,11 @@
         </tr>
       </tbody>
     </table>
-    </div>
     </form>
 
     <h2>How to Prep Like a Pro (and Have Fun Doing It!)</h2>
     <div class="prep-section">
+
       <div class="prep-food"><span class="emoji">🍗</span>Chicken Breast</div>
       <ol class="prep-steps">
         <li>Pat the chicken dry and pound it to even thickness (bonus: stress relief!).</li>
@@ -217,7 +197,7 @@
     </div>
 
     <hr>
-    <div class="small center">Eat more, live mas! – Mobile-ready meal plan by ChatGPT, June 2025</div>
+    <div class="small center">Eat more, live mas! – Meal plan magic by ChatGPT, June 2025</div>
   </div>
 </body>
 </html>
