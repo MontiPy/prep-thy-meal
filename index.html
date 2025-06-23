@@ -1,387 +1,223 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Grilled Meal Plan – 1,400 kcal/day</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: #f8f8f8;
-        color: #222;
-        margin: 0;
-        padding: 0 10px 40px 10px;
-      }
-      .container {
-        max-width: 760px;
-        margin: 32px auto;
-        background: #fff;
-        border-radius: 14px;
-        box-shadow: 0 1px 16px #bce2bc5a;
-        padding: 28px;
-      }
-      h1,
-      h2,
-      h3 {
-        margin-top: 1.3em;
-        margin-bottom: 0.7em;
-      }
-      h1 {
-        font-size: 2em;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 18px 0;
-      }
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 7px 10px;
-        text-align: center;
-      }
-      th {
-        background: #f3f3f3;
-      }
-      .note {
-        background: #e9ffe2;
-        padding: 12px;
-        border-radius: 7px;
-        margin-bottom: 22px;
-        font-size: 1.1em;
-      }
-      .small {
-        font-size: 0.97em;
-        color: #666;
-      }
-      .macro {
-        margin: 8px 0 18px 0;
-      }
-      .center {
-        text-align: center;
-      }
-      .highlight {
-        background: #e7f9e4;
-      }
-      .target-table th,
-      .target-table td {
-        text-align: right;
-      }
-      .target-table th:first-child,
-      .target-table td:first-child {
-        text-align: left;
-      }
-      .checkbox-table input[type="checkbox"] {
-        transform: scale(1.2);
-        margin-right: 7px;
-      }
-      .prep-section {
-        background: #f7fbe9;
-        border-radius: 8px;
-        padding: 18px 18px 12px 28px;
-        margin-top: 18px;
-      }
-      .prep-title {
-        font-size: 1.2em;
-        margin-bottom: 6px;
-      }
-      .prep-food {
-        font-weight: bold;
-        color: #3a5c2a;
-        margin-top: 12px;
-      }
-      .prep-steps {
-        margin: 0 0 8px 0;
-        padding-left: 0;
-      }
-      .prep-steps li {
-        margin-bottom: 7px;
-        text-align: left;
-      }
-      .emoji {
-        font-size: 1.1em;
-        margin-right: 2px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <h1 class="center">🥗 Grilled Meal Plan – 1,400 kcal/day Target</h1>
-      <div class="note">
-        <b>Simple. Delicious. Healthy.</b><br />
-        Eat the same meal for lunch & dinner (2 × 690 kcal), all raw weights.<br />
-        Grill everything except rice (that’s a stovetop classic).<br />
-        Macros are high-protein, with white rice and healthy fats every day.<br />
-        <span style="color: #44a455">Let's eat more, live mas!</span>
-      </div>
-
-      <h2>Per Meal (Raw Weights)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th>Grams</th>
-            <th>Calories</th>
-            <th>Protein (g)</th>
-            <th>Carbs (g)</th>
-            <th>Fat (g)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Chicken breast</td>
-            <td>200</td>
-            <td>240</td>
-            <td>45</td>
-            <td>0</td>
-            <td>5</td>
-          </tr>
-          <tr>
-            <td>Salmon</td>
-            <td>50</td>
-            <td>103</td>
-            <td>10.2</td>
-            <td>0</td>
-            <td>6.5</td>
-          </tr>
-          <tr>
-            <td>White rice</td>
-            <td>75</td>
-            <td>274</td>
-            <td>5</td>
-            <td>60</td>
-            <td>0.5</td>
-          </tr>
-          <tr>
-            <td>Broccoli</td>
-            <td>85</td>
-            <td>29</td>
-            <td>2.4</td>
-            <td>5.6</td>
-            <td>0.3</td>
-          </tr>
-          <tr>
-            <td>Olive oil</td>
-            <td>5</td>
-            <td>44</td>
-            <td>0</td>
-            <td>0</td>
-            <td>5</td>
-          </tr>
-          <tr class="highlight" style="font-weight: bold">
-            <td>Total/meal</td>
-            <td>—</td>
-            <td>690</td>
-            <td>62.6</td>
-            <td>65.6</td>
-            <td>17.3</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2>Per Day (x2 meals)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Calories</th>
-            <th>Protein (g)</th>
-            <th>Carbs (g)</th>
-            <th>Fat (g)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>1,380</td>
-            <td>125.2</td>
-            <td>131.2</td>
-            <td>34.6</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2>Target Comparison</h2>
-      <table class="target-table">
-        <thead>
-          <tr>
-            <th>Macro</th>
-            <th>Target</th>
-            <th>Actual</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Calories</td>
-            <td>1,400</td>
-            <td>1,380</td>
-          </tr>
-          <tr>
-            <td>Protein</td>
-            <td>140g</td>
-            <td>125.2g</td>
-          </tr>
-          <tr>
-            <td>Carbs</td>
-            <td>~120g</td>
-            <td>131.2g</td>
-          </tr>
-          <tr>
-            <td>Fat</td>
-            <td>31g+</td>
-            <td>34.6g</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h2>6-Day Shopping List</h2>
-      <form>
-        <table class="checkbox-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Ingredient</th>
-              <th>Per Day (g)</th>
-              <th>6 Days (g)</th>
-              <th>6 Days (lb)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><input type="checkbox" /></td>
-              <td>Chicken breast</td>
-              <td>400</td>
-              <td>2,400</td>
-              <td>5.29</td>
-            </tr>
-            <tr>
-              <td><input type="checkbox" /></td>
-              <td>Salmon</td>
-              <td>100</td>
-              <td>600</td>
-              <td>1.32</td>
-            </tr>
-            <tr>
-              <td><input type="checkbox" /></td>
-              <td>White rice</td>
-              <td>150</td>
-              <td>900</td>
-              <td>1.98</td>
-            </tr>
-            <tr>
-              <td><input type="checkbox" /></td>
-              <td>Broccoli</td>
-              <td>170</td>
-              <td>1,020</td>
-              <td>2.25</td>
-            </tr>
-            <tr>
-              <td><input type="checkbox" /></td>
-              <td>Olive oil</td>
-              <td>10</td>
-              <td>60</td>
-              <td>0.13</td>
-            </tr>
-          </tbody>
-        </table>
-      </form>
-
-      <h2>How to Prep Like a Pro (and Have Fun Doing It!)</h2>
-      <div class="prep-section">
-        <div class="prep-food"><span class="emoji">🍗</span>Chicken Breast</div>
-        <ol class="prep-steps">
-          <li>
-            Pat the chicken dry and pound it to even thickness (bonus: stress
-            relief!).
-          </li>
-          <li>
-            Rub with half your olive oil, then season with salt, pepper, garlic
-            powder, and your favorite herbs.
-          </li>
-          <li>
-            Grill over medium-high (400&deg;F / 205&deg;C) for 6–7 min per side,
-            lid closed. Flip once.
-          </li>
-          <li>
-            Check with a thermometer: you want 165&deg;F (74&deg;C) and clear
-            juices.
-          </li>
-          <li>
-            Let it rest 2–3 min so it stays juicy. Slice and celebrate your
-            grill skills!
-          </li>
-        </ol>
-
-        <div class="prep-food"><span class="emoji">🐟</span>Salmon</div>
-        <ol class="prep-steps">
-          <li>Pat salmon dry, brush with the rest of your olive oil.</li>
-          <li>
-            Season with salt, pepper, and a sprinkle of lemon zest or dill if
-            you’re feeling fancy.
-          </li>
-          <li>
-            Grill skin-side down (or on foil/grill mat) over medium-high for 3–4
-            min per side.
-          </li>
-          <li>
-            Fish is done when it flakes easily and hits 145&deg;F (63&deg;C).
-          </li>
-          <li>
-            Squeeze fresh lemon over the top and bask in your omega-3 glow!
-          </li>
-        </ol>
-
-        <div class="prep-food"><span class="emoji">🥦</span>Broccoli</div>
-        <ol class="prep-steps">
-          <li>
-            Toss florets with olive oil, salt, and pepper. Optional: chili
-            flakes or lemon juice for kick.
-          </li>
-          <li>
-            Grill in a basket or on foil over medium-high for 7–10 min, turning
-            a couple times.
-          </li>
-          <li>
-            You want char and tender-crisp vibes. Snack a piece right off the
-            grill—chef’s privilege!
-          </li>
-        </ol>
-
-        <div class="prep-food"><span class="emoji">🍚</span>Rice</div>
-        <ol class="prep-steps">
-          <li>
-            Rinse rice in cold water until it runs clear (seriously, don’t skip
-            this).
-          </li>
-          <li>
-            Cook with 2:1 water to rice (150g dry = ~0.8 cup, so use 1.6 cups
-            water for a day).
-          </li>
-          <li>
-            Bring to boil, cover, simmer 15–18 min. Don’t peek. Let rest 5 min,
-            then fluff with a fork.
-          </li>
-          <li>Rice doesn’t need to be grilled to be awesome.</li>
-        </ol>
-
-        <div class="prep-food">
-          <span class="emoji">🥗</span>Meal Prep for the Win
-        </div>
-        <ol class="prep-steps">
-          <li>Weigh everything raw and portion for the day or week.</li>
-          <li>
-            Grill, cook, and portion meals into containers—lunch and dinner,
-            sorted!
-          </li>
-          <li>
-            Repeat daily. High fives and muscle gains are optional (but
-            recommended).
-          </li>
-        </ol>
-      </div>
-
-      <hr />
-      <div class="small center">
-        Eat more, live mas! – Meal plan magic by ChatGPT, June 2025
-      </div>
+<head>
+  <meta charset="UTF-8">
+  <title>Grilled Meal Plan – 1,400 kcal/day</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; background: #f8f8f8; color: #222; margin: 0; padding: 0 0 40px 0; }
+    .container { max-width: 98vw; width: 100%; max-width: 760px; margin: 16px auto 36px auto; background: #fff; border-radius: 14px; box-shadow: 0 1px 16px #bce2bc5a; padding: 5vw 2.5vw 28px 2.5vw; }
+    h1, h2, h3 { margin-top: 1.1em; margin-bottom: 0.7em; }
+    h1 { font-size: 2em; }
+    .note { background: #e9ffe2; padding: 12px; border-radius: 7px; margin-bottom: 22px; font-size: 1.07em; }
+    .small { font-size: 0.97em; color: #666; }
+    .macro { margin: 8px 0 18px 0; }
+    .center { text-align: center; }
+    .highlight { background: #e7f9e4; }
+    .target-table th, .target-table td { text-align: right; }
+    .target-table th:first-child, .target-table td:first-child { text-align: left; }
+    .checkbox-table input[type=checkbox] { transform: scale(1.3); margin-right: 7px; accent-color: #41b764; }
+    .prep-section { background: #f7fbe9; border-radius: 8px; padding: 18px 10px 12px 18px; margin-top: 18px; }
+    .prep-title { font-size: 1.15em; margin-bottom: 5px; }
+    .prep-food { font-weight: bold; color: #3a5c2a; margin-top: 12px; }
+    .prep-steps { margin: 0 0 8px 0; padding-left: 0; }
+    .prep-steps li { margin-bottom: 7px; text-align: left; }
+    .emoji { font-size: 1.1em; margin-right: 2px; }
+    /* Responsive tables */
+    .table-scroll { width: 100%; overflow-x: auto; }
+    table { min-width: 480px; width: 100%; border-collapse: collapse; margin: 18px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px 7px; text-align: center; font-size: 1em; }
+    th { background: #f3f3f3; }
+    @media (max-width: 600px) {
+      .container { padding: 2vw 1vw 20vw 1vw; }
+      h1 { font-size: 1.2em; }
+      h2 { font-size: 1.07em; }
+      th, td { padding: 6px 4px; font-size: 0.95em; }
+      .prep-section { padding: 12px 4vw 9px 4vw; }
+    }
+    @media (max-width: 400px) {
+      table { min-width: 370px; }
+      .container { padding: 0.2em 1vw 7vw 1vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="center">🥗 Grilled Meal Plan – 1,400 kcal/day Target</h1>
+    <div class="note">
+      <b>Simple. Delicious. Healthy.</b><br>
+      Eat the same meal for lunch & dinner (2 × 690 kcal), all raw weights.<br>
+      Grill everything except rice (that’s a stovetop classic).<br>
+      Macros are high-protein, with white rice and healthy fats every day.<br>
+      <span style="color:#44a455">Let's eat more, live mas!</span>
     </div>
-  </body>
+
+    <h2>Per Meal (Raw Weights)</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Ingredient</th>
+          <th>Grams</th>
+          <th>Calories</th>
+          <th>Protein (g)</th>
+          <th>Carbs (g)</th>
+          <th>Fat (g)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Chicken breast</td><td>200</td><td>240</td><td>45</td><td>0</td><td>5</td></tr>
+        <tr><td>Salmon</td><td>50</td><td>103</td><td>10.2</td><td>0</td><td>6.5</td></tr>
+        <tr><td>White rice</td><td>75</td><td>274</td><td>5</td><td>60</td><td>0.5</td></tr>
+        <tr><td>Broccoli</td><td>85</td><td>29</td><td>2.4</td><td>5.6</td><td>0.3</td></tr>
+        <tr><td>Olive oil</td><td>5</td><td>44</td><td>0</td><td>0</td><td>5</td></tr>
+        <tr class="highlight" style="font-weight:bold;">
+          <td>Total/meal</td><td>—</td><td>690</td><td>62.6</td><td>65.6</td><td>17.3</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2>Per Day (x2 meals)</h2>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Calories</th>
+          <th>Protein (g)</th>
+          <th>Carbs (g)</th>
+          <th>Fat (g)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1,380</td>
+          <td>125.2</td>
+          <td>131.2</td>
+          <td>34.6</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2>Target Comparison</h2>
+    <div class="table-scroll">
+    <table class="target-table">
+      <thead>
+        <tr>
+          <th>Macro</th>
+          <th>Target</th>
+          <th>Actual</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Calories</td><td>1,400</td><td>1,380</td></tr>
+        <tr><td>Protein</td><td>140g</td><td>125.2g</td></tr>
+        <tr><td>Carbs</td><td>~120g</td><td>131.2g</td></tr>
+        <tr><td>Fat</td><td>31g+</td><td>34.6g</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h2>6-Day Shopping List</h2>
+    <form>
+    <div class="table-scroll">
+    <table class="checkbox-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Ingredient</th>
+          <th>Per Day (g)</th>
+          <th>6 Days (g)</th>
+          <th>6 Days (lb)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>Chicken breast</td>
+          <td>400</td>
+          <td>2,400</td>
+          <td>5.29</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>Salmon</td>
+          <td>100</td>
+          <td>600</td>
+          <td>1.32</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>White rice</td>
+          <td>150</td>
+          <td>900</td>
+          <td>1.98</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>Broccoli</td>
+          <td>170</td>
+          <td>1,020</td>
+          <td>2.25</td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td>Olive oil</td>
+          <td>10</td>
+          <td>60</td>
+          <td>0.13</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    </form>
+
+    <h2>How to Prep Like a Pro (and Have Fun Doing It!)</h2>
+    <div class="prep-section">
+      <div class="prep-food"><span class="emoji">🍗</span>Chicken Breast</div>
+      <ol class="prep-steps">
+        <li>Pat the chicken dry and pound it to even thickness (bonus: stress relief!).</li>
+        <li>Rub with half your olive oil, then season with salt, pepper, garlic powder, and your favorite herbs.</li>
+        <li>Grill over medium-high (400&deg;F / 205&deg;C) for 6–7 min per side, lid closed. Flip once.</li>
+        <li>Check with a thermometer: you want 165&deg;F (74&deg;C) and clear juices.</li>
+        <li>Let it rest 2–3 min so it stays juicy. Slice and celebrate your grill skills!</li>
+      </ol>
+
+      <div class="prep-food"><span class="emoji">🐟</span>Salmon</div>
+      <ol class="prep-steps">
+        <li>Pat salmon dry, brush with the rest of your olive oil.</li>
+        <li>Season with salt, pepper, and a sprinkle of lemon zest or dill if you’re feeling fancy.</li>
+        <li>Grill skin-side down (or on foil/grill mat) over medium-high for 3–4 min per side.</li>
+        <li>Fish is done when it flakes easily and hits 145&deg;F (63&deg;C).</li>
+        <li>Squeeze fresh lemon over the top and bask in your omega-3 glow!</li>
+      </ol>
+
+      <div class="prep-food"><span class="emoji">🥦</span>Broccoli</div>
+      <ol class="prep-steps">
+        <li>Toss florets with olive oil, salt, and pepper. Optional: chili flakes or lemon juice for kick.</li>
+        <li>Grill in a basket or on foil over medium-high for 7–10 min, turning a couple times.</li>
+        <li>You want char and tender-crisp vibes. Snack a piece right off the grill—chef’s privilege!</li>
+      </ol>
+
+      <div class="prep-food"><span class="emoji">🍚</span>Rice</div>
+      <ol class="prep-steps">
+        <li>Rinse rice in cold water until it runs clear (seriously, don’t skip this).</li>
+        <li>Cook with 2:1 water to rice (150g dry = ~0.8 cup, so use 1.6 cups water for a day).</li>
+        <li>Bring to boil, cover, simmer 15–18 min. Don’t peek. Let rest 5 min, then fluff with a fork.</li>
+        <li>Rice doesn’t need to be grilled to be awesome.</li>
+      </ol>
+
+      <div class="prep-food"><span class="emoji">🥗</span>Meal Prep for the Win</div>
+      <ol class="prep-steps">
+        <li>Weigh everything raw and portion for the day or week.</li>
+        <li>Grill, cook, and portion meals into containers—lunch and dinner, sorted!</li>
+        <li>Repeat daily. High fives and muscle gains are optional (but recommended).</li>
+      </ol>
+    </div>
+
+    <hr>
+    <div class="small center">Eat more, live mas! – Mobile-ready meal plan by ChatGPT, June 2025</div>
+  </div>
+</body>
 </html>
