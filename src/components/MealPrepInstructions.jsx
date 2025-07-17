@@ -2,17 +2,17 @@
 import React from "react";
 
 const MealPrepInstructions = () => (
-  <div className="bg-green-50 border border-green-200 rounded-lg p-6 mt-8">
+  <div className="instruction-box mt-8">
     <h2 className="text-2xl font-bold text-gray-800 mb-6">
       How to Prep Like a Pro (and Have Fun Doing It!)
     </h2>
 
     {/* Chicken Breast */}
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green-700">
+      <h3 className="text-lg font-semibold text-green">
         🍗 Chicken Breast
       </h3>
-      <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
+      <ul className="list">
         <li>
           Pat the chicken dry and pound it to even thickness (bonus: stress
           relief!).
@@ -37,8 +37,8 @@ const MealPrepInstructions = () => (
 
     {/* Salmon */}
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green-700">🐟 Salmon</h3>
-      <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
+      <h3 className="text-lg font-semibold text-green">🐟 Salmon</h3>
+      <ul className="list">
         <li>Pat salmon dry, brush with the rest of your olive oil.</li>
         <li>
           Season with salt, pepper, and a sprinkle of lemon zest or dill if
@@ -55,8 +55,8 @@ const MealPrepInstructions = () => (
 
     {/* Broccoli */}
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green-700">🥦 Broccoli</h3>
-      <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
+      <h3 className="text-lg font-semibold text-green">🥦 Broccoli</h3>
+      <ul className="list">
         <li>
           Toss florets with olive oil, salt, and pepper. Optional: chili flakes
           or lemon juice for kick.
@@ -74,8 +74,8 @@ const MealPrepInstructions = () => (
 
     {/* Rice */}
     <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green-700">🍚 Rice</h3>
-      <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
+      <h3 className="text-lg font-semibold text-green">🍚 Rice</h3>
+      <ul className="list">
         <li>
           Rinse rice in cold water until it runs clear (seriously, don’t skip
           this).
@@ -94,10 +94,10 @@ const MealPrepInstructions = () => (
 
     {/* Meal Prep Summary */}
     <div>
-      <h3 className="text-lg font-semibold text-green-700">
+      <h3 className="text-lg font-semibold text-green">
         🥗 Meal Prep for the Win
       </h3>
-      <ul className="list-disc list-inside text-gray-700 space-y-1 mt-2">
+      <ul className="list">
         <li>Weigh everything raw and portion for the day or week.</li>
         <li>
           Grill, cook, and portion meals into containers—lunch and dinner,

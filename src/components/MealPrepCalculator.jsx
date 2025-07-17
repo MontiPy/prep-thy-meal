@@ -171,10 +171,10 @@ const MealPrepCalculator = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-gradient-to-br from-green-50 to-blue-50 min-h-screen">
-      <div className="bg-white rounded-xl shadow-lg p-8">
+    <div className="calculator">
+      <div className="card">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             🥗 Interactive Grilled Meal Plan
           </h1>
@@ -220,7 +220,7 @@ const MealPrepCalculator = () => {
           </div>
 
           {/* Macro Targets */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 max-w-2xl mx-auto">
+          <div className="panel-blue mb-4 max-w-2xl mx-auto">
             <h3 className="text-lg font-semibold text-gray-800 mb-3">
               Macro Targets
             </h3>
@@ -342,7 +342,7 @@ const MealPrepCalculator = () => {
         </div>
 
         {/* Instructions */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="panel-yellow mb-6">
           <p className="text-sm text-yellow-800">
             <strong>Instructions:</strong> Eat the same meal for lunch & dinner
             (2 × {Math.round(mealTotals.calories)} kcal), all raw weights. Grill
@@ -463,7 +463,7 @@ const MealPrepCalculator = () => {
 
         {/* Daily Totals */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-gradient-to-r from-blue-100 to-blue-200 rounded-lg p-6">
+          <div className="panel-blue-gradient">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Per Day (x2 meals)
             </h3>
@@ -507,7 +507,7 @@ const MealPrepCalculator = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-green-100 to-green-200 rounded-lg p-6">
+          <div className="panel-green-gradient">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Target Comparison
             </h3>
@@ -580,7 +580,7 @@ const MealPrepCalculator = () => {
         </div>
 
         {/* Shopping List */}
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className="panel-gray">
           <h3 className="text-xl font-bold text-gray-800 mb-4">
             6-Day Shopping List
           </h3>

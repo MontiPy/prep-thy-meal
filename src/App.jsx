@@ -4,7 +4,7 @@ import MealPrep from "./components/MealPrep";
 
 const App = () => {
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main>
       <MealPrep />
     </main>
   );
