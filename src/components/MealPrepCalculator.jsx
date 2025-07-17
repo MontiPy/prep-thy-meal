@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { Plus, Minus, Target, Edit2, Check, X } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, Minus, Edit2, Check, X } from "lucide-react";
+import defaultIngredients from "../data/ingredientDefaults";
+import { calculateNutrition } from "../utils/nutritionHelpers";
 
 const MealPrepCalculator = () => {
   const [calorieTarget, setCalorieTarget] = useState(1400);
@@ -18,91 +20,10 @@ const MealPrepCalculator = () => {
     fat: 22.5,
   });
 
-  const [ingredients, setIngredients] = useState([
-    {
-      id: 1,
-      name: "Chicken breast",
-      grams: 200,
-      calories: 240,
-      protein: 45,
-      carbs: 0,
-      fat: 5,
-    },
-    {
-      id: 2,
-      name: "Salmon",
-      grams: 50,
-      calories: 103,
-      protein: 10.2,
-      carbs: 0,
-      fat: 6.5,
-    },
-    {
-      id: 3,
-      name: "White rice",
-      grams: 75,
-      calories: 274,
-      protein: 5,
-      carbs: 60,
-      fat: 0.5,
-    },
-    {
-      id: 4,
-      name: "Broccoli",
-      grams: 85,
-      calories: 29,
-      protein: 2.4,
-      carbs: 5.6,
-      fat: 0.3,
-    },
-    {
-      id: 5,
-      name: "Olive oil",
-      grams: 5,
-      calories: 44,
-      protein: 0,
-      carbs: 0,
-      fat: 5,
-    },
-  ]);
+  const [ingredients, setIngredients] = useState(
+    defaultIngredients.map((ingredient) => ({ ...ingredient }))
+  );
 
-  // Calculate nutritional values based on current amounts
-  const calculateNutrition = (ingredient) => {
-    const ratio = ingredient.grams / getOriginalGrams(ingredient.id);
-    return {
-      calories:
-        Math.round(getOriginalCalories(ingredient.id) * ratio * 10) / 10,
-      protein: Math.round(getOriginalProtein(ingredient.id) * ratio * 10) / 10,
-      carbs: Math.round(getOriginalCarbs(ingredient.id) * ratio * 10) / 10,
-      fat: Math.round(getOriginalFat(ingredient.id) * ratio * 10) / 10,
-    };
-  };
-
-  // Original values for calculation ratios
-  const getOriginalGrams = (id) => {
-    const originals = { 1: 200, 2: 50, 3: 75, 4: 85, 5: 5 };
-    return originals[id];
-  };
-
-  const getOriginalCalories = (id) => {
-    const originals = { 1: 240, 2: 103, 3: 274, 4: 29, 5: 44 };
-    return originals[id];
-  };
-
-  const getOriginalProtein = (id) => {
-    const originals = { 1: 45, 2: 10.2, 3: 5, 4: 2.4, 5: 0 };
-    return originals[id];
-  };
-
-  const getOriginalCarbs = (id) => {
-    const originals = { 1: 0, 2: 0, 3: 60, 4: 5.6, 5: 0 };
-    return originals[id];
-  };
-
-  const getOriginalFat = (id) => {
-    const originals = { 1: 5, 2: 6.5, 3: 0.5, 4: 0.3, 5: 5 };
-    return originals[id];
-  };
 
   const updateIngredientAmount = (id, newGrams) => {
     setIngredients(

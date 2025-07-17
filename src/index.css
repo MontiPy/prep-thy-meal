@@ -113,7 +113,6 @@ input[type="number"] {
 .hover\:bg-gray-50:hover { background-color: #f9fafb; }
 .font-bold { font-weight: 700; }
 .font-medium { font-weight: 500; }
-*** End Patch
 .bg-white { background-color: #ffffff; }
 .bg-gray-100 { background-color: #f3f4f6; }
 .bg-blue-50 { background-color: #eff6ff; }
