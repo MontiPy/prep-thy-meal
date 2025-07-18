@@ -81,8 +81,8 @@ const MealPrepInstructions = () => (
           this).
         </li>
         <li>
-          Cook with 2:1 water to rice (150g dry = ~0.8 cup, so use 1.6 cups
-          water for a day).
+          Cook with a 2:1 water to rice ratio. Starting with 100g of dry rice
+          is about half a cup, so use roughly 1 cup of water per batch.
         </li>
         <li>
           Bring to boil, cover, simmer 15–18 min. Don’t peek. Let rest 5 min,
