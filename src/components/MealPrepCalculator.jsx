@@ -5,8 +5,10 @@ import autoTable from "jspdf-autotable";
 import defaultIngredients from "../data/ingredientDefaults";
 import { calculateNutrition } from "../utils/nutritionHelpers";
 import { loadPlans, addPlan, removePlan } from "../utils/storage";
+import { useUser } from "../context/UserContext.jsx";
 
 const MealPrepCalculator = () => {
+  const { user } = useUser();
   const [calorieTarget, setCalorieTarget] = useState(1400);
   const [editingTarget, setEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState(1400);
@@ -32,8 +34,9 @@ const MealPrepCalculator = () => {
   const [planName, setPlanName] = useState("");
 
   useEffect(() => {
-    setSavedPlans(loadPlans());
-  }, []);
+    if (!user) return;
+    loadPlans(user.uid).then(setSavedPlans);
+  }, [user]);
 
 
   const updateIngredientAmount = (id, newGrams) => {
@@ -46,16 +49,16 @@ const MealPrepCalculator = () => {
     );
   };
 
-  const handleSavePlan = () => {
-    if (!planName.trim()) return;
+  const handleSavePlan = async () => {
+    if (!planName.trim() || !user) return;
     const newPlan = {
-      id: Date.now(),
       name: planName.trim(),
       calorieTarget,
       targetPercentages,
       ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
     };
-    setSavedPlans(addPlan(newPlan));
+    const plans = await addPlan(user.uid, newPlan);
+    setSavedPlans(plans);
     setPlanName("");
   };
 
@@ -74,8 +77,10 @@ const MealPrepCalculator = () => {
     );
   };
 
-  const handleDeletePlan = (id) => {
-    setSavedPlans(removePlan(id));
+  const handleDeletePlan = async (id) => {
+    if (!user) return;
+    const plans = await removePlan(user.uid, id);
+    setSavedPlans(plans);
   };
 
   const handleExportPDF = () => {

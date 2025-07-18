@@ -1,26 +1,13 @@
-const STORAGE_KEY = 'mealPlans';
+import { loadPlans as apiLoad, addPlan as apiAdd, removePlan as apiRemove } from './api.js';
 
-export const loadPlans = () => {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch {
-    return [];
-  }
+export const loadPlans = async (uid) => {
+  return apiLoad(uid);
 };
 
-export const savePlans = (plans) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
+export const addPlan = async (uid, plan) => {
+  return apiAdd(uid, plan);
 };
 
-export const addPlan = (plan) => {
-  const plans = loadPlans();
-  plans.push(plan);
-  savePlans(plans);
-  return plans;
-};
-
-export const removePlan = (id) => {
-  const plans = loadPlans().filter((p) => p.id !== id);
-  savePlans(plans);
-  return plans;
+export const removePlan = async (uid, id) => {
+  return apiRemove(uid, id);
 };
