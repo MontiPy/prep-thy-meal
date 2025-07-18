@@ -1,7 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import defaultIngredients from "../data/ingredientDefaults";
 import { calculateNutrition } from "../utils/nutritionHelpers";
+import { loadPlans, addPlan, removePlan } from "../utils/storage";
 
 const MealPrepCalculator = () => {
   const [calorieTarget, setCalorieTarget] = useState(1400);
@@ -24,6 +27,14 @@ const MealPrepCalculator = () => {
     defaultIngredients.map((ingredient) => ({ ...ingredient }))
   );
 
+  // Saved plans
+  const [savedPlans, setSavedPlans] = useState([]);
+  const [planName, setPlanName] = useState("");
+
+  useEffect(() => {
+    setSavedPlans(loadPlans());
+  }, []);
+
 
   const updateIngredientAmount = (id, newGrams) => {
     setIngredients(
@@ -33,6 +44,80 @@ const MealPrepCalculator = () => {
           : ingredient
       )
     );
+  };
+
+  const handleSavePlan = () => {
+    if (!planName.trim()) return;
+    const newPlan = {
+      id: Date.now(),
+      name: planName.trim(),
+      calorieTarget,
+      targetPercentages,
+      ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
+    };
+    setSavedPlans(addPlan(newPlan));
+    setPlanName("");
+  };
+
+  const loadPlan = (id) => {
+    const plan = savedPlans.find((p) => p.id === id);
+    if (!plan) return;
+    setCalorieTarget(plan.calorieTarget);
+    setTempTarget(plan.calorieTarget);
+    setTargetPercentages(plan.targetPercentages);
+    setTempPercentages(plan.targetPercentages);
+    setIngredients(
+      defaultIngredients.map((ingredient) => {
+        const saved = plan.ingredients.find((i) => i.id === ingredient.id);
+        return saved ? { ...ingredient, grams: saved.grams } : { ...ingredient };
+      })
+    );
+  };
+
+  const handleDeletePlan = (id) => {
+    setSavedPlans(removePlan(id));
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const title = planName || "Meal Plan";
+
+    doc.setFontSize(16);
+    doc.text(title, 10, 10);
+    doc.setFontSize(12);
+    doc.text(`Calories: ${calorieTarget}`, 10, 20);
+    doc.text(
+      `Protein: ${targetPercentages.protein}%  Carbs: ${targetPercentages.carbs}%  Fat: ${targetPercentages.fat}%`,
+      10,
+      28
+    );
+
+    const rows = ingredients.map((ing) => {
+      const n = calculateNutrition(ing);
+      return [
+        ing.name,
+        ing.grams,
+        n.calories,
+        n.protein,
+        n.carbs,
+        n.fat,
+      ];
+    });
+
+    autoTable(doc, {
+      head: [[
+        "Ingredient",
+        "Grams",
+        "Calories",
+        "Protein",
+        "Carbs",
+        "Fat",
+      ]],
+      body: rows,
+      startY: 35,
+    });
+
+    doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
   };
 
   // Calculate totals per meal
@@ -260,6 +345,57 @@ const MealPrepCalculator = () => {
             Simple. Delicious. Healthy. Adjust portions below to customize your
             meal prep!
           </p>
+        </div>
+
+        {/* Plan Manager */}
+        <div className="panel-gray mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="text"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              placeholder="Plan name"
+              className="w-full px-2 py-1 border border-gray-300 rounded"
+            />
+            <button
+              onClick={handleSavePlan}
+              className="text-blue-600 hover:text-gray-800 p-1 font-medium"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="text-blue-600 hover:text-gray-800 p-1 font-medium"
+            >
+              Export PDF
+            </button>
+          </div>
+          {savedPlans.length > 0 && (
+            <div className="space-y-2">
+              {savedPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className="flex justify-between items-center border rounded p-1"
+                >
+                  <span className="font-medium">{plan.name}</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => loadPlan(plan.id)}
+                      className="text-green-600 hover:text-green-800 p-1"
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => handleDeletePlan(plan.id)}
+                      className="text-red-600 hover:text-red-800 p-1"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Instructions */}
