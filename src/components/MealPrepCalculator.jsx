@@ -36,6 +36,9 @@ const MealPrepCalculator = () => {
     defaultIngredients.map((ingredient) => ({ ...ingredient }))
   );
 
+  const [cheer, setCheer] = useState("");
+  const [showConfetti, setShowConfetti] = useState(false);
+
   // Saved plans
   const [savedPlans, setSavedPlans] = useState([]);
   const [planName, setPlanName] = useState("");
@@ -60,13 +63,16 @@ const MealPrepCalculator = () => {
   }, [user]);
 
   const updateIngredientAmount = (id, newGrams) => {
-    setIngredients(
-      ingredients.map((ingredient) =>
-        ingredient.id === id
-          ? { ...ingredient, grams: Math.max(0, newGrams) }
-          : ingredient
-      )
-    );
+    setIngredients((prev) => {
+      return prev.map((ingredient) => {
+        if (ingredient.id !== id) return ingredient;
+        if (ingredient.name === "Broccoli" && newGrams > ingredient.grams) {
+          setCheer("You broc my world!");
+          setTimeout(() => setCheer(""), 2000);
+        }
+        return { ...ingredient, grams: Math.max(0, newGrams) };
+      });
+    });
   };
 
   const handleSavePlan = async () => {
@@ -86,6 +92,8 @@ const MealPrepCalculator = () => {
     setSavedPlans(plans);
     setPlanName("");
     setCurrentPlanId(null);
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 2000);
   };
 
 const loadPlan = (id) => {
@@ -209,11 +217,13 @@ const loadPlan = (id) => {
 
   return (
     <div className="calculator">
+      {showConfetti && <div className="confetti">🎉🎉🎉</div>}
+      {cheer && <div className="cheer">{cheer}</div>}
       <div className="card">
         {/* Header */}
         <div className="center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            🥗 Interactive Grilled Meal Plan
+            <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
           </h1>
           <div className="flex items-center justify-center gap-2 mb-4">
             {editingTarget ? (
@@ -492,7 +502,7 @@ const loadPlan = (id) => {
                             }
                             className="text-red-600 hover:text-red-800 p-1 rounded"
                           >
-                            <Minus size={16} />
+                          <Minus size={16} className="wiggle" />
                           </button>
                           <input
                             type="number"
@@ -515,7 +525,7 @@ const loadPlan = (id) => {
                             }
                             className="text-green-600 hover:text-green-800 p-1 rounded"
                           >
-                            <Plus size={16} />
+                          <Plus size={16} className="wiggle" />
                           </button>
                         </div>
                       </td>
