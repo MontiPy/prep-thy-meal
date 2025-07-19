@@ -1,44 +1,30 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../utils/firebase.js';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../utils/firebase.js';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = async () => {
+  const handleGoogleLogin = async () => {
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch {
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch (err) {
-        setError('Login failed');
-      }
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      setError('Login failed');
     }
   };
 
   return (
-    <div className="flex flex-col items-center mt-10">
-      <input
-        className="border p-2 mb-2"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        className="border p-2 mb-4"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
-      <button className="btn-green" onClick={handleLogin}>
-        Login / Sign Up
-      </button>
+    <div className="calculator flex items-center justify-center">
+      <div className="card w-full max-w-sm">
+        <div className="center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Sign In</h2>
+        </div>
+        {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+        <button className="btn-green w-full" onClick={handleGoogleLogin}>
+          Sign in with Google
+        </button>
+      </div>
     </div>
   );
 };

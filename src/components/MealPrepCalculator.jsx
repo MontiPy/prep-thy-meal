@@ -11,18 +11,18 @@ const MealPrepCalculator = () => {
   const { user } = useUser();
   const [calorieTarget, setCalorieTarget] = useState(1400);
   const [editingTarget, setEditingTarget] = useState(false);
-  const [tempTarget, setTempTarget] = useState(1400);
+  const [tempTarget, setTempTarget] = useState(2000);
 
   const [targetPercentages, setTargetPercentages] = useState({
     protein: 40,
-    carbs: 37.5,
-    fat: 22.5,
+    carbs: 35,
+    fat: 25,
   });
   const [editingPercentages, setEditingPercentages] = useState(false);
   const [tempPercentages, setTempPercentages] = useState({
     protein: 40,
-    carbs: 37.5,
-    fat: 22.5,
+    carbs: 35,
+    fat: 25,
   });
 
   const [ingredients, setIngredients] = useState(
@@ -37,7 +37,6 @@ const MealPrepCalculator = () => {
     if (!user) return;
     loadPlans(user.uid).then(setSavedPlans);
   }, [user]);
-
 
   const updateIngredientAmount = (id, newGrams) => {
     setIngredients(
@@ -72,7 +71,9 @@ const MealPrepCalculator = () => {
     setIngredients(
       defaultIngredients.map((ingredient) => {
         const saved = plan.ingredients.find((i) => i.id === ingredient.id);
-        return saved ? { ...ingredient, grams: saved.grams } : { ...ingredient };
+        return saved
+          ? { ...ingredient, grams: saved.grams }
+          : { ...ingredient };
       })
     );
   };
@@ -99,25 +100,11 @@ const MealPrepCalculator = () => {
 
     const rows = ingredients.map((ing) => {
       const n = calculateNutrition(ing);
-      return [
-        ing.name,
-        ing.grams,
-        n.calories,
-        n.protein,
-        n.carbs,
-        n.fat,
-      ];
+      return [ing.name, ing.grams, n.calories, n.protein, n.carbs, n.fat];
     });
 
     autoTable(doc, {
-      head: [[
-        "Ingredient",
-        "Grams",
-        "Calories",
-        "Protein",
-        "Carbs",
-        "Fat",
-      ]],
+      head: [["Ingredient", "Grams", "Calories", "Protein", "Carbs", "Fat"]],
       body: rows,
       startY: 35,
     });
