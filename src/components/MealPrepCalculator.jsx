@@ -22,14 +22,14 @@ const MealPrepCalculator = () => {
 
   const [targetPercentages, setTargetPercentages] = useState({
     protein: 40,
-    carbs: 35,
     fat: 25,
+    carbs: 35,
   });
   const [editingPercentages, setEditingPercentages] = useState(false);
   const [tempPercentages, setTempPercentages] = useState({
     protein: 40,
-    carbs: 35,
     fat: 25,
+    carbs: 35,
   });
 
   const [ingredients, setIngredients] = useState(
@@ -52,8 +52,14 @@ const MealPrepCalculator = () => {
       if (!baseline) return;
       setCalorieTarget(baseline.calorieTarget);
       setTempTarget(baseline.calorieTarget);
-      setTargetPercentages(baseline.targetPercentages);
-      setTempPercentages(baseline.targetPercentages);
+      const basePerc = {
+        protein: baseline.targetPercentages.protein,
+        fat: baseline.targetPercentages.fat,
+        carbs:
+          100 - baseline.targetPercentages.protein - baseline.targetPercentages.fat,
+      };
+      setTargetPercentages(basePerc);
+      setTempPercentages(basePerc);
       setIngredients(
         defaultIngredients.map((ingredient) => {
           const saved = baseline.ingredients.find((i) => i.id === ingredient.id);
@@ -81,7 +87,11 @@ const MealPrepCalculator = () => {
     const newPlan = {
       name: planName.trim(),
       calorieTarget,
-      targetPercentages,
+      targetPercentages: {
+        protein: targetPercentages.protein,
+        fat: targetPercentages.fat,
+        carbs: 100 - targetPercentages.protein - targetPercentages.fat,
+      },
       ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
     };
     let plans;
@@ -104,8 +114,13 @@ const loadPlan = (id) => {
   setPlanName(plan.name);
   setCalorieTarget(plan.calorieTarget);
   setTempTarget(plan.calorieTarget);
-  setTargetPercentages(plan.targetPercentages);
-  setTempPercentages(plan.targetPercentages);
+  const planPerc = {
+    protein: plan.targetPercentages.protein,
+    fat: plan.targetPercentages.fat,
+    carbs: 100 - plan.targetPercentages.protein - plan.targetPercentages.fat,
+  };
+  setTargetPercentages(planPerc);
+  setTempPercentages(planPerc);
   setIngredients(
     defaultIngredients.map((ingredient) => {
       const saved = plan.ingredients.find((i) => i.id === ingredient.id);
@@ -154,7 +169,11 @@ const loadPlan = (id) => {
     if (!user) return;
     const baseline = {
       calorieTarget,
-      targetPercentages,
+      targetPercentages: {
+        protein: targetPercentages.protein,
+        fat: targetPercentages.fat,
+        carbs: 100 - targetPercentages.protein - targetPercentages.fat,
+      },
       ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
     };
     await saveBaseline(user.uid, baseline);
@@ -199,9 +218,9 @@ const loadPlan = (id) => {
   };
 
   const withinRange =
-    Math.abs(dailyTotals.calories - calorieTarget) <= 50 &&
-    Math.abs(dailyTotals.protein - targetMacros.protein) <= 10 &&
-    Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 10 &&
+    Math.abs(dailyTotals.calories - calorieTarget) <= 25 &&
+    Math.abs(dailyTotals.protein - targetMacros.protein) <= 5 &&
+    Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5 &&
     Math.abs(dailyTotals.fat - targetMacros.fat) <= 5;
 
   const lastRange = useRef(false);
@@ -225,7 +244,13 @@ const loadPlan = (id) => {
   };
 
   const handlePercentageEdit = () => {
-    setTargetPercentages(tempPercentages);
+    const cleaned = {
+      protein: tempPercentages.protein,
+      fat: tempPercentages.fat,
+      carbs: Math.max(0, 100 - tempPercentages.protein - tempPercentages.fat),
+    };
+    setTargetPercentages(cleaned);
+    setTempPercentages(cleaned);
     setEditingPercentages(false);
   };
 
@@ -235,8 +260,12 @@ const loadPlan = (id) => {
   };
 
   const updateTempPercentage = (macro, value) => {
-    const newPercentages = { ...tempPercentages, [macro]: value };
-    setTempPercentages(newPercentages);
+    let protein = macro === "protein" ? value : tempPercentages.protein;
+    let fat = macro === "fat" ? value : tempPercentages.fat;
+    protein = Math.max(0, Math.min(100, protein));
+    fat = Math.max(0, Math.min(100 - protein, fat));
+    const carbs = Math.max(0, 100 - protein - fat);
+    setTempPercentages({ protein, fat, carbs });
   };
 
   return (
@@ -321,23 +350,9 @@ const loadPlan = (id) => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Carbs:</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={tempPercentages.carbs}
-                      onChange={(e) =>
-                        updateTempPercentage(
-                          "carbs",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                    />
-                    <span>%</span>
-                  </div>
+                  <span className="font-semibold">
+                    {tempPercentages.carbs.toFixed(1)}%
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Fat:</span>
@@ -360,15 +375,7 @@ const loadPlan = (id) => {
                   </div>
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className="text-sm text-gray-600">
-                    Total:{" "}
-                    {(
-                      tempPercentages.protein +
-                      tempPercentages.carbs +
-                      tempPercentages.fat
-                    ).toFixed(1)}
-                    %
-                  </span>
+                  <span className="text-sm text-gray-600">Total: 100%</span>
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <button
@@ -647,7 +654,7 @@ const loadPlan = (id) => {
                   <span className="font-medium">Calories:</span>
                   <span
                     className={`font-bold ${
-                      Math.abs(dailyTotals.calories - calorieTarget) <= 50
+                      Math.abs(dailyTotals.calories - calorieTarget) <= 25
                         ? "text-green-600"
                         : "text-red-600"
                     }`}
@@ -667,7 +674,7 @@ const loadPlan = (id) => {
                   <span className="font-medium">Protein:</span>
                   <span
                     className={`font-bold ${
-                      Math.abs(dailyTotals.protein - targetMacros.protein) <= 10
+                      Math.abs(dailyTotals.protein - targetMacros.protein) <= 5
                         ? "text-green-600"
                         : "text-red-600"
                     }`}
@@ -691,7 +698,7 @@ const loadPlan = (id) => {
                   <span className="font-medium">Carbs:</span>
                   <span
                     className={`font-bold ${
-                      Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 10
+                      Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5
                         ? "text-green-600"
                         : "text-red-600"
                     }`}
