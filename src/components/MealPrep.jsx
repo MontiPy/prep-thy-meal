@@ -34,11 +34,13 @@ const MealPrep = () => {
         </button>
       </nav>
 
-      {activeTab === TABS.CALCULATOR ? (
-        <MealPrepCalculator />
-      ) : (
-        <MealPrepInstructions />
-      )}
+      <div key={activeTab} className="tab-content">
+        {activeTab === TABS.CALCULATOR ? (
+          <MealPrepCalculator />
+        ) : (
+          <MealPrepInstructions />
+        )}
+      </div>
     </div>
   );
 };
