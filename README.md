@@ -20,3 +20,4 @@ If you are developing a production application, we recommend using TypeScript wi
    npm install
    npm run dev
    ```
+3. In your Firebase console, open **Authentication** → **Sign-in method** and enable the **Google** provider.
