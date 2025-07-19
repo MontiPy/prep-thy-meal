@@ -4,7 +4,14 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import defaultIngredients from "../data/ingredientDefaults";
 import { calculateNutrition } from "../utils/nutritionHelpers";
-import { loadPlans, addPlan, removePlan } from "../utils/storage";
+import {
+  loadPlans,
+  addPlan,
+  removePlan,
+  updatePlan,
+  loadBaseline,
+  saveBaseline,
+} from "../utils/storage";
 import { useUser } from "../context/UserContext.jsx";
 
 const MealPrepCalculator = () => {
@@ -32,10 +39,24 @@ const MealPrepCalculator = () => {
   // Saved plans
   const [savedPlans, setSavedPlans] = useState([]);
   const [planName, setPlanName] = useState("");
+  const [currentPlanId, setCurrentPlanId] = useState(null);
 
   useEffect(() => {
     if (!user) return;
     loadPlans(user.uid).then(setSavedPlans);
+    loadBaseline(user.uid).then((baseline) => {
+      if (!baseline) return;
+      setCalorieTarget(baseline.calorieTarget);
+      setTempTarget(baseline.calorieTarget);
+      setTargetPercentages(baseline.targetPercentages);
+      setTempPercentages(baseline.targetPercentages);
+      setIngredients(
+        defaultIngredients.map((ingredient) => {
+          const saved = baseline.ingredients.find((i) => i.id === ingredient.id);
+          return saved ? { ...ingredient, grams: saved.grams } : { ...ingredient };
+        })
+      );
+    });
   }, [user]);
 
   const updateIngredientAmount = (id, newGrams) => {
@@ -56,27 +77,35 @@ const MealPrepCalculator = () => {
       targetPercentages,
       ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
     };
-    const plans = await addPlan(user.uid, newPlan);
+    let plans;
+    if (currentPlanId) {
+      plans = await updatePlan(user.uid, currentPlanId, newPlan);
+    } else {
+      plans = await addPlan(user.uid, newPlan);
+    }
     setSavedPlans(plans);
     setPlanName("");
+    setCurrentPlanId(null);
   };
 
-  const loadPlan = (id) => {
-    const plan = savedPlans.find((p) => p.id === id);
-    if (!plan) return;
-    setCalorieTarget(plan.calorieTarget);
-    setTempTarget(plan.calorieTarget);
-    setTargetPercentages(plan.targetPercentages);
-    setTempPercentages(plan.targetPercentages);
-    setIngredients(
-      defaultIngredients.map((ingredient) => {
-        const saved = plan.ingredients.find((i) => i.id === ingredient.id);
-        return saved
-          ? { ...ingredient, grams: saved.grams }
-          : { ...ingredient };
-      })
-    );
-  };
+const loadPlan = (id) => {
+  const plan = savedPlans.find((p) => p.id === id);
+  if (!plan) return;
+  setCurrentPlanId(plan.id);
+  setPlanName(plan.name);
+  setCalorieTarget(plan.calorieTarget);
+  setTempTarget(plan.calorieTarget);
+  setTargetPercentages(plan.targetPercentages);
+  setTempPercentages(plan.targetPercentages);
+  setIngredients(
+    defaultIngredients.map((ingredient) => {
+      const saved = plan.ingredients.find((i) => i.id === ingredient.id);
+      return saved
+        ? { ...ingredient, grams: saved.grams }
+        : { ...ingredient };
+    })
+  );
+};
 
   const handleDeletePlan = async (id) => {
     if (!user) return;
@@ -110,6 +139,16 @@ const MealPrepCalculator = () => {
     });
 
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
+  };
+
+  const handleSaveBaseline = async () => {
+    if (!user) return;
+    const baseline = {
+      calorieTarget,
+      targetPercentages,
+      ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
+    };
+    await saveBaseline(user.uid, baseline);
   };
 
   // Calculate totals per meal
@@ -354,6 +393,12 @@ const MealPrepCalculator = () => {
               className="text-blue-600 hover:text-gray-800 p-1 font-medium"
             >
               Save
+            </button>
+            <button
+              onClick={handleSaveBaseline}
+              className="text-blue-600 hover:text-gray-800 p-1 font-medium"
+            >
+              Set Baseline
             </button>
             <button
               onClick={handleExportPDF}
