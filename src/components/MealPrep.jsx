@@ -1,9 +1,11 @@
 // src/components/MealPrep.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MealPrepCalculator from "./MealPrepCalculator";
 import MealPrepInstructions from "./MealPrepInstructions";
 import IngredientManager from "./IngredientManager";
 import { getAllBaseIngredients } from "../utils/nutritionHelpers";
+import { syncFromRemote } from "../utils/ingredientStorage";
+import { useUser } from "../context/UserContext.jsx";
 
 const TABS = {
   CALCULATOR: "calculator",
@@ -12,12 +14,23 @@ const TABS = {
 };
 
 const MealPrep = () => {
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
   const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
 
   const handleIngredientChange = (list) => {
     setAllIngredients(list);
   };
+
+  useEffect(() => {
+    if (user) {
+      syncFromRemote(user.uid).then(() =>
+        setAllIngredients(getAllBaseIngredients())
+      );
+    } else {
+      setAllIngredients(getAllBaseIngredients());
+    }
+  }, [user]);
 
   return (
     <div className="app-container">

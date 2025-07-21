@@ -182,6 +182,42 @@ const loadPlan = (id) => {
       body: rows,
       startY: 35,
     });
+    autoTable(doc, {
+      head: [["Daily Totals", "Calories", "Protein", "Carbs", "Fat"]],
+      body: [["", dailyTotals.calories, dailyTotals.protein, dailyTotals.carbs, dailyTotals.fat]],
+      startY: doc.lastAutoTable.finalY + 5,
+    });
+
+    autoTable(doc, {
+      head: [["Target", "Actual", "Difference"]],
+      body: [
+        [
+          "Calories",
+          calorieTarget,
+          dailyTotals.calories,
+          dailyTotals.calories - calorieTarget,
+        ],
+        [
+          "Protein (g)",
+          targetMacros.protein,
+          dailyTotals.protein,
+          (dailyTotals.protein - targetMacros.protein).toFixed(1),
+        ],
+        [
+          "Carbs (g)",
+          targetMacros.carbs,
+          dailyTotals.carbs,
+          (dailyTotals.carbs - targetMacros.carbs).toFixed(1),
+        ],
+        [
+          "Fat (g)",
+          targetMacros.fat,
+          dailyTotals.fat,
+          (dailyTotals.fat - targetMacros.fat).toFixed(1),
+        ],
+      ],
+      startY: doc.lastAutoTable.finalY + 5,
+    });
 
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
   };
