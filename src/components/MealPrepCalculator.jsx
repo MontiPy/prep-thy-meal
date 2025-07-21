@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import defaultIngredients from "../data/ingredientDefaults";
 import { calculateNutrition } from "../utils/nutritionHelpers";
 import {
   loadPlans,
@@ -14,7 +13,7 @@ import {
 } from "../utils/storage";
 import { useUser } from "../context/UserContext.jsx";
 
-const MealPrepCalculator = () => {
+const MealPrepCalculator = ({ allIngredients }) => {
   const { user } = useUser();
   const [calorieTarget, setCalorieTarget] = useState(1400);
   const [editingTarget, setEditingTarget] = useState(false);
@@ -33,8 +32,9 @@ const MealPrepCalculator = () => {
   });
 
   const [ingredients, setIngredients] = useState(
-    defaultIngredients.map((ingredient) => ({ ...ingredient }))
+    allIngredients.map((ingredient) => ({ ...ingredient }))
   );
+  const [selectedId, setSelectedId] = useState("");
 
   const [cheer, setCheer] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
@@ -61,13 +61,22 @@ const MealPrepCalculator = () => {
       setTargetPercentages(basePerc);
       setTempPercentages(basePerc);
       setIngredients(
-        defaultIngredients.map((ingredient) => {
+        allIngredients.map((ingredient) => {
           const saved = baseline.ingredients.find((i) => i.id === ingredient.id);
           return saved ? { ...ingredient, grams: saved.grams } : { ...ingredient };
         })
       );
     });
-  }, [user]);
+  }, [user, allIngredients]);
+
+  useEffect(() => {
+    setIngredients((prev) =>
+      allIngredients.map((ing) => {
+        const existing = prev.find((p) => p.id === ing.id);
+        return existing ? { ...existing, ...ing } : { ...ing };
+      })
+    );
+  }, [allIngredients]);
 
   const updateIngredientAmount = (id, newGrams) => {
     setIngredients((prev) => {
@@ -80,6 +89,18 @@ const MealPrepCalculator = () => {
         return { ...ingredient, grams: Math.max(0, newGrams) };
       });
     });
+  };
+
+  const removeIngredient = (id) => {
+    setIngredients((prev) => prev.filter((ing) => ing.id !== id));
+  };
+
+  const handleAddIngredient = () => {
+    const id = parseInt(selectedId);
+    const item = allIngredients.find((i) => i.id === id);
+    if (!item) return;
+    setIngredients((prev) => [...prev, { ...item }]);
+    setSelectedId("");
   };
 
   const handleSavePlan = async () => {
@@ -122,7 +143,7 @@ const loadPlan = (id) => {
   setTargetPercentages(planPerc);
   setTempPercentages(planPerc);
   setIngredients(
-    defaultIngredients.map((ingredient) => {
+    allIngredients.map((ingredient) => {
       const saved = plan.ingredients.find((i) => i.id === ingredient.id);
       return saved
         ? { ...ingredient, grams: saved.grams }
@@ -492,6 +513,27 @@ const loadPlan = (id) => {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Per Meal (Raw Weights)
           </h2>
+          <div className="flex items-center gap-2 mb-2">
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="border px-2 py-1"
+            >
+              <option value="">Select ingredient</option>
+              {allIngredients
+                .filter((i) => !ingredients.some((p) => p.id === i.id))
+                .map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+            </select>
+            <button className="btn-green" onClick={handleAddIngredient}
+              disabled={!selectedId}
+            >
+              Add
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse border border-gray-300 rounded-lg">
               <thead>
@@ -514,6 +556,7 @@ const loadPlan = (id) => {
                   <th className="border border-gray-300 p-3 text-center">
                     Fat (g)
                   </th>
+                  <th className="border border-gray-300 p-3 text-center">-</th>
                 </tr>
               </thead>
               <tbody>
@@ -574,6 +617,14 @@ const loadPlan = (id) => {
                       <td className="border border-gray-300 p-3 text-center">
                         {nutrition.fat}
                       </td>
+                      <td className="border border-gray-300 p-3 text-center">
+                        <button
+                          className="text-red-600"
+                          onClick={() => removeIngredient(ingredient.id)}
+                        >
+                          x
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -592,6 +643,7 @@ const loadPlan = (id) => {
                   <td className="border border-gray-300 p-3 text-center">
                     {Math.round(mealTotals.fat * 10) / 10}
                   </td>
+                  <td className="border border-gray-300 p-3 text-center">-</td>
                 </tr>
               </tbody>
             </table>

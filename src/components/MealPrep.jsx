@@ -2,14 +2,22 @@
 import React, { useState } from "react";
 import MealPrepCalculator from "./MealPrepCalculator";
 import MealPrepInstructions from "./MealPrepInstructions";
+import IngredientManager from "./IngredientManager";
+import { getAllBaseIngredients } from "../utils/nutritionHelpers";
 
 const TABS = {
   CALCULATOR: "calculator",
   INSTRUCTIONS: "instructions",
+  INGREDIENTS: "ingredients",
 };
 
 const MealPrep = () => {
   const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
+  const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
+
+  const handleIngredientChange = (list) => {
+    setAllIngredients(list);
+  };
 
   return (
     <div className="app-container">
@@ -32,13 +40,23 @@ const MealPrep = () => {
         >
           Instructions
         </button>
+        <button
+          className={
+            activeTab === TABS.INGREDIENTS ? "nav-button active" : "nav-button"
+          }
+          onClick={() => setActiveTab(TABS.INGREDIENTS)}
+        >
+          Ingredients
+        </button>
       </nav>
 
       <div key={activeTab} className="tab-content">
         {activeTab === TABS.CALCULATOR ? (
-          <MealPrepCalculator />
-        ) : (
+          <MealPrepCalculator allIngredients={allIngredients} />
+        ) : activeTab === TABS.INSTRUCTIONS ? (
           <MealPrepInstructions />
+        ) : (
+          <IngredientManager onChange={handleIngredientChange} />
         )}
       </div>
     </div>

@@ -1,8 +1,22 @@
 // src/utils/nutritionHelpers.js
 import defaultIngredients from "../data/ingredientDefaults";
+import { loadCustomIngredients } from "./ingredientStorage";
+
+export const getAllBaseIngredients = () => {
+  const combined = [...defaultIngredients];
+  loadCustomIngredients().forEach((item) => {
+    const idx = combined.findIndex((d) => d.id === item.id);
+    if (idx >= 0) {
+      combined[idx] = item;
+    } else {
+      combined.push(item);
+    }
+  });
+  return combined;
+};
 
 const getOriginal = (id) => {
-  return defaultIngredients.find((item) => item.id === id);
+  return getAllBaseIngredients().find((item) => item.id === id);
 };
 
 export const getOriginalGrams = (id) => getOriginal(id)?.grams || 0;
