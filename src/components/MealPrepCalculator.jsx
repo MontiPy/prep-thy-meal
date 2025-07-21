@@ -219,6 +219,16 @@ const loadPlan = (id) => {
       startY: doc.lastAutoTable.finalY + 5,
     });
 
+    autoTable(doc, {
+      head: [["Shopping List (6 days)", "Grams", "Pounds"]],
+      body: ingredients.map((ing) => {
+        const totalGrams = ing.grams * 12;
+        const pounds = (totalGrams / 453.592).toFixed(2);
+        return [ing.name, totalGrams, pounds];
+      }),
+      startY: doc.lastAutoTable.finalY + 5,
+    });
+
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
   };
 
