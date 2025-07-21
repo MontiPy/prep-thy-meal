@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -22,19 +22,23 @@ const MealPrepCalculator = () => {
 
   const [targetPercentages, setTargetPercentages] = useState({
     protein: 40,
-    carbs: 35,
     fat: 25,
+    carbs: 35,
   });
   const [editingPercentages, setEditingPercentages] = useState(false);
   const [tempPercentages, setTempPercentages] = useState({
     protein: 40,
-    carbs: 35,
     fat: 25,
+    carbs: 35,
   });
 
   const [ingredients, setIngredients] = useState(
     defaultIngredients.map((ingredient) => ({ ...ingredient }))
   );
+
+  const [cheer, setCheer] = useState("");
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [goalConfetti, setGoalConfetti] = useState(false);
 
   // Saved plans
   const [savedPlans, setSavedPlans] = useState([]);
@@ -48,8 +52,14 @@ const MealPrepCalculator = () => {
       if (!baseline) return;
       setCalorieTarget(baseline.calorieTarget);
       setTempTarget(baseline.calorieTarget);
-      setTargetPercentages(baseline.targetPercentages);
-      setTempPercentages(baseline.targetPercentages);
+      const basePerc = {
+        protein: baseline.targetPercentages.protein,
+        fat: baseline.targetPercentages.fat,
+        carbs:
+          100 - baseline.targetPercentages.protein - baseline.targetPercentages.fat,
+      };
+      setTargetPercentages(basePerc);
+      setTempPercentages(basePerc);
       setIngredients(
         defaultIngredients.map((ingredient) => {
           const saved = baseline.ingredients.find((i) => i.id === ingredient.id);
@@ -60,13 +70,16 @@ const MealPrepCalculator = () => {
   }, [user]);
 
   const updateIngredientAmount = (id, newGrams) => {
-    setIngredients(
-      ingredients.map((ingredient) =>
-        ingredient.id === id
-          ? { ...ingredient, grams: Math.max(0, newGrams) }
-          : ingredient
-      )
-    );
+    setIngredients((prev) => {
+      return prev.map((ingredient) => {
+        if (ingredient.id !== id) return ingredient;
+        if (ingredient.name === "Broccoli" && newGrams > ingredient.grams) {
+          setCheer("You broc my world!");
+          setTimeout(() => setCheer(""), 2000);
+        }
+        return { ...ingredient, grams: Math.max(0, newGrams) };
+      });
+    });
   };
 
   const handleSavePlan = async () => {
@@ -74,7 +87,11 @@ const MealPrepCalculator = () => {
     const newPlan = {
       name: planName.trim(),
       calorieTarget,
-      targetPercentages,
+      targetPercentages: {
+        protein: targetPercentages.protein,
+        fat: targetPercentages.fat,
+        carbs: 100 - targetPercentages.protein - targetPercentages.fat,
+      },
       ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
     };
     let plans;
@@ -86,6 +103,8 @@ const MealPrepCalculator = () => {
     setSavedPlans(plans);
     setPlanName("");
     setCurrentPlanId(null);
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 2000);
   };
 
 const loadPlan = (id) => {
@@ -95,8 +114,13 @@ const loadPlan = (id) => {
   setPlanName(plan.name);
   setCalorieTarget(plan.calorieTarget);
   setTempTarget(plan.calorieTarget);
-  setTargetPercentages(plan.targetPercentages);
-  setTempPercentages(plan.targetPercentages);
+  const planPerc = {
+    protein: plan.targetPercentages.protein,
+    fat: plan.targetPercentages.fat,
+    carbs: 100 - plan.targetPercentages.protein - plan.targetPercentages.fat,
+  };
+  setTargetPercentages(planPerc);
+  setTempPercentages(planPerc);
   setIngredients(
     defaultIngredients.map((ingredient) => {
       const saved = plan.ingredients.find((i) => i.id === ingredient.id);
@@ -145,7 +169,11 @@ const loadPlan = (id) => {
     if (!user) return;
     const baseline = {
       calorieTarget,
-      targetPercentages,
+      targetPercentages: {
+        protein: targetPercentages.protein,
+        fat: targetPercentages.fat,
+        carbs: 100 - targetPercentages.protein - targetPercentages.fat,
+      },
       ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
     };
     await saveBaseline(user.uid, baseline);
@@ -182,6 +210,29 @@ const loadPlan = (id) => {
     fat: Math.round((calorieTarget * (targetPercentages.fat / 100)) / 9),
   };
 
+  const progress = {
+    calories: Math.min(100, Math.round((dailyTotals.calories / calorieTarget) * 100)),
+    protein: Math.min(100, Math.round((dailyTotals.protein / targetMacros.protein) * 100)),
+    carbs: Math.min(100, Math.round((dailyTotals.carbs / targetMacros.carbs) * 100)),
+    fat: Math.min(100, Math.round((dailyTotals.fat / targetMacros.fat) * 100)),
+  };
+
+  const withinRange =
+    Math.abs(dailyTotals.calories - calorieTarget) <= 25 &&
+    Math.abs(dailyTotals.protein - targetMacros.protein) <= 5 &&
+    Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5 &&
+    Math.abs(dailyTotals.fat - targetMacros.fat) <= 5;
+
+  const lastRange = useRef(false);
+
+  useEffect(() => {
+    if (withinRange && !lastRange.current) {
+      setGoalConfetti(true);
+      setTimeout(() => setGoalConfetti(false), 1500);
+    }
+    lastRange.current = withinRange;
+  }, [withinRange]);
+
   const handleTargetEdit = () => {
     setCalorieTarget(tempTarget);
     setEditingTarget(false);
@@ -193,7 +244,13 @@ const loadPlan = (id) => {
   };
 
   const handlePercentageEdit = () => {
-    setTargetPercentages(tempPercentages);
+    const cleaned = {
+      protein: tempPercentages.protein,
+      fat: tempPercentages.fat,
+      carbs: Math.max(0, 100 - tempPercentages.protein - tempPercentages.fat),
+    };
+    setTargetPercentages(cleaned);
+    setTempPercentages(cleaned);
     setEditingPercentages(false);
   };
 
@@ -203,17 +260,25 @@ const loadPlan = (id) => {
   };
 
   const updateTempPercentage = (macro, value) => {
-    const newPercentages = { ...tempPercentages, [macro]: value };
-    setTempPercentages(newPercentages);
+    let protein = macro === "protein" ? value : tempPercentages.protein;
+    let fat = macro === "fat" ? value : tempPercentages.fat;
+    protein = Math.max(0, Math.min(100, protein));
+    fat = Math.max(0, Math.min(100 - protein, fat));
+    const carbs = Math.max(0, 100 - protein - fat);
+    setTempPercentages({ protein, fat, carbs });
   };
 
   return (
     <div className="calculator">
+      {(showConfetti || goalConfetti) && (
+        <div className="confetti">🎉🎉🎉</div>
+      )}
+      {cheer && <div className="cheer">{cheer}</div>}
       <div className="card">
         {/* Header */}
         <div className="center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            🥗 Interactive Grilled Meal Plan
+            <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
           </h1>
           <div className="flex items-center justify-center gap-2 mb-4">
             {editingTarget ? (
@@ -285,23 +350,9 @@ const loadPlan = (id) => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Carbs:</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={tempPercentages.carbs}
-                      onChange={(e) =>
-                        updateTempPercentage(
-                          "carbs",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                    />
-                    <span>%</span>
-                  </div>
+                  <span className="font-semibold">
+                    {tempPercentages.carbs.toFixed(1)}%
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Fat:</span>
@@ -324,15 +375,7 @@ const loadPlan = (id) => {
                   </div>
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className="text-sm text-gray-600">
-                    Total:{" "}
-                    {(
-                      tempPercentages.protein +
-                      tempPercentages.carbs +
-                      tempPercentages.fat
-                    ).toFixed(1)}
-                    %
-                  </span>
+                  <span className="text-sm text-gray-600">Total: 100%</span>
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <button
@@ -492,7 +535,7 @@ const loadPlan = (id) => {
                             }
                             className="text-red-600 hover:text-red-800 p-1 rounded"
                           >
-                            <Minus size={16} />
+                          <Minus size={16} className="wiggle" />
                           </button>
                           <input
                             type="number"
@@ -515,7 +558,7 @@ const loadPlan = (id) => {
                             }
                             className="text-green-600 hover:text-green-800 p-1 rounded"
                           >
-                            <Plus size={16} />
+                          <Plus size={16} className="wiggle" />
                           </button>
                         </div>
                       </td>
@@ -605,70 +648,104 @@ const loadPlan = (id) => {
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Target Comparison
             </h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="font-medium">Calories:</span>
-                <span
-                  className={`font-bold ${
-                    Math.abs(dailyTotals.calories - calorieTarget) <= 50
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {calorieTarget} → {dailyTotals.calories}
-                </span>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Calories:</span>
+                  <span
+                    className={`font-bold ${
+                      Math.abs(dailyTotals.calories - calorieTarget) <= 25
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {calorieTarget} → {dailyTotals.calories}
+                  </span>
+                </div>
+                <div className="progress-wrapper mt-1">
+                  <div
+                    className="progress-bar"
+                    style={{ width: `${progress.calories}%` }}
+                  />
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Protein:</span>
-                <span
-                  className={`font-bold ${
-                    Math.abs(dailyTotals.protein - targetMacros.protein) <= 10
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {targetMacros.protein}g ({targetPercentages.protein}%) →{" "}
-                  {dailyTotals.protein}g (
-                  {Math.round(
-                    ((dailyTotals.protein * 4) / dailyTotals.calories) * 100
-                  )}
-                  %)
-                </span>
+              <div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Protein:</span>
+                  <span
+                    className={`font-bold ${
+                      Math.abs(dailyTotals.protein - targetMacros.protein) <= 5
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {targetMacros.protein}g ({targetPercentages.protein}%) → {dailyTotals.protein}g (
+                    {Math.round(
+                      ((dailyTotals.protein * 4) / dailyTotals.calories) * 100
+                    )}
+                    %)
+                  </span>
+                </div>
+                <div className="progress-wrapper mt-1">
+                  <div
+                    className="progress-bar"
+                    style={{ width: `${progress.protein}%` }}
+                  />
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Carbs:</span>
-                <span
-                  className={`font-bold ${
-                    Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 10
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {targetMacros.carbs}g ({targetPercentages.carbs}%) →{" "}
-                  {dailyTotals.carbs}g (
-                  {Math.round(
-                    ((dailyTotals.carbs * 4) / dailyTotals.calories) * 100
-                  )}
-                  %)
-                </span>
+              <div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Carbs:</span>
+                  <span
+                    className={`font-bold ${
+                      Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {targetMacros.carbs}g ({targetPercentages.carbs}%) → {dailyTotals.carbs}g (
+                    {Math.round(
+                      ((dailyTotals.carbs * 4) / dailyTotals.calories) * 100
+                    )}
+                    %)
+                  </span>
+                </div>
+                <div className="progress-wrapper mt-1">
+                  <div
+                    className="progress-bar"
+                    style={{ width: `${progress.carbs}%` }}
+                  />
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Fat:</span>
-                <span
-                  className={`font-bold ${
-                    Math.abs(dailyTotals.fat - targetMacros.fat) <= 5
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {targetMacros.fat}g ({targetPercentages.fat}%) →{" "}
-                  {dailyTotals.fat}g (
-                  {Math.round(
-                    ((dailyTotals.fat * 9) / dailyTotals.calories) * 100
-                  )}
-                  %)
-                </span>
+              <div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Fat:</span>
+                  <span
+                    className={`font-bold ${
+                      Math.abs(dailyTotals.fat - targetMacros.fat) <= 5
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {targetMacros.fat}g ({targetPercentages.fat}%) → {dailyTotals.fat}g (
+                    {Math.round(
+                      ((dailyTotals.fat * 9) / dailyTotals.calories) * 100
+                    )}
+                    %)
+                  </span>
+                </div>
+                <div className="progress-wrapper mt-1">
+                  <div
+                    className="progress-bar"
+                    style={{ width: `${progress.fat}%` }}
+                  />
+                </div>
               </div>
+              {withinRange && (
+                <p className="text-center text-green-600 font-medium mt-2">
+                  You nailed today's targets! 👍
+                </p>
+              )}
             </div>
           </div>
         </div>

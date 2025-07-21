@@ -1,8 +1,46 @@
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
-  background-color: #f9fafb;
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: #f8fafc;
   color: #1f2937;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Fredoka", sans-serif;
+}
+
+.app-container {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0fdf4, #eff6ff);
+}
+
+.nav-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.nav-button {
+  background: linear-gradient(135deg, #dbeafe, #bae6fd);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  color: #1f2937;
+  font-weight: 600;
+  transition: transform 0.1s;
+}
+
+.nav-button.active,
+.nav-button:hover {
+  background: linear-gradient(135deg, #bfdbfe, #c7d2fe);
+  color: #1e3a8a;
+  transform: scale(1.05);
 }
 
 .calculator {
@@ -306,4 +344,77 @@ input[type="number"] {
 }
 .md\:grid-cols-2 {
   grid-template-columns: repeat(2, 1fr);
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(15deg);
+  }
+}
+
+.wiggle:hover {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+@keyframes confetti {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -100%);
+  }
+}
+
+.confetti {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 3rem;
+  pointer-events: none;
+  animation: confetti 2s forwards;
+}
+
+.tab-content {
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.cheer {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #fef08a;
+  color: #854d0e;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  animation: confetti 2s forwards;
+}
+
+.progress-wrapper {
+  background-color: #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  height: 0.5rem;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(to right, #a5b4fc, #38bdf8);
 }
