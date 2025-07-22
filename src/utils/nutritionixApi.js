@@ -48,10 +48,18 @@ export const searchFoods = async (query) => {
     );
     const data = await res.json();
     if (!data.common) return [];
-    return data.common.slice(0, 5).map((f, idx) => ({
-      id: f.tag_id || idx,
-      name: f.food_name,
-    }));
+    const items = data.common.slice(0, 5);
+    const results = await Promise.all(
+      items.map(async (f, idx) => {
+        const details = await fetchNutritionByName(f.food_name);
+        return {
+          id: f.tag_id || idx,
+          name: f.food_name,
+          ...(details || {}),
+        };
+      })
+    );
+    return results;
   } catch {
     return [];
   }

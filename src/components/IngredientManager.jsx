@@ -32,10 +32,12 @@ const IngredientManager = ({ onChange }) => {
     setSearchResults(foods);
   };
 
-  const addFromApi = async (name) => {
-    const data = await fetchNutritionByName(name);
-    if (!data) return;
-    await addCustomIngredient({ name, ...data }, user?.uid);
+  const addFromApi = async (item) => {
+    const { name } = item;
+    const details =
+      item.grams !== undefined ? item : await fetchNutritionByName(name);
+    if (!details) return;
+    await addCustomIngredient({ name, ...details }, user?.uid);
     setSearchResults([]);
     setSearchQuery("");
     refresh();
@@ -101,11 +103,18 @@ const IngredientManager = ({ onChange }) => {
           <ul className="space-y-1">
             {searchResults.map((res) => (
               <li key={res.id} className="flex items-center gap-2">
-                <span className="capitalize flex-grow">{res.name}</span>
+                <div className="flex-grow">
+                  <div className="capitalize">{res.name}</div>
+                  {res.grams !== undefined && (
+                    <div className="text-sm text-gray-600">
+                      {res.grams}g, {res.calories} cal &bull; P {res.protein} C {res.carbs} F {res.fat}
+                    </div>
+                  )}
+                </div>
                 <button
                   className="btn-green"
                   type="button"
-                  onClick={() => addFromApi(res.name)}
+                  onClick={() => addFromApi(res)}
                 >
                   Add
                 </button>
