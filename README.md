@@ -22,6 +22,7 @@ If you are developing a production application, we recommend using TypeScript wi
    npm run dev
    ```
 3. In your Firebase console, open **Authentication** → **Sign-in method** and enable the **Google** provider.
+4. No ingredients are preloaded. Use the Ingredient Manager to search Nutritionix or enter your own items.
 
 ## Mobile Friendly
 

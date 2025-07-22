@@ -7,7 +7,7 @@ import {
 } from "../utils/ingredientStorage";
 import { useUser } from "../context/UserContext.jsx";
 import { getAllBaseIngredients } from "../utils/nutritionHelpers";
-import { fetchNutritionByName } from "../utils/nutritionixApi";
+import { fetchNutritionByName, searchFoods } from "../utils/nutritionixApi";
 
 const empty = {
   name: "",
@@ -24,11 +24,21 @@ const IngredientManager = ({ onChange }) => {
   const [newIngredient, setNewIngredient] = useState({ ...empty });
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({ ...empty });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
 
-  const handleFetchNutrition = async () => {
-    const data = await fetchNutritionByName(newIngredient.name);
+  const handleSearch = async () => {
+    const foods = await searchFoods(searchQuery.trim());
+    setSearchResults(foods);
+  };
+
+  const addFromApi = async (name) => {
+    const data = await fetchNutritionByName(name);
     if (!data) return;
-    setNewIngredient((prev) => ({ ...prev, ...data }));
+    await addCustomIngredient({ name, ...data }, user?.uid);
+    setSearchResults([]);
+    setSearchQuery("");
+    refresh();
   };
 
   const refresh = () => {
@@ -73,7 +83,41 @@ const IngredientManager = ({ onChange }) => {
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-4">Ingredient Manager</h2>
+      {/* API Search */}
       <div className="space-y-2 mb-6">
+        <h3 className="font-semibold">Add from Nutritionix</h3>
+        <div className="flex items-center gap-2">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search"
+            className="border px-2 py-1"
+          />
+          <button className="btn-blue" type="button" onClick={handleSearch}>
+            Search
+          </button>
+        </div>
+        {searchResults.length > 0 && (
+          <ul className="space-y-1">
+            {searchResults.map((res) => (
+              <li key={res.id} className="flex items-center gap-2">
+                <span className="capitalize flex-grow">{res.name}</span>
+                <button
+                  className="btn-green"
+                  type="button"
+                  onClick={() => addFromApi(res.name)}
+                >
+                  Add
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Manual Entry */}
+      <div className="space-y-2 mb-6">
+        <h3 className="font-semibold">Add Custom Ingredient</h3>
         <input
           name="name"
           value={newIngredient.name}
@@ -81,13 +125,6 @@ const IngredientManager = ({ onChange }) => {
           placeholder="Name"
           className="border px-2 py-1 mr-2"
         />
-        <button
-          type="button"
-          className="btn-blue mr-2"
-          onClick={handleFetchNutrition}
-        >
-          Fetch
-        </button>
         <input
           name="grams"
           type="number"

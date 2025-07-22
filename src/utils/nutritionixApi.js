@@ -31,3 +31,29 @@ export const fetchNutritionByName = async (name) => {
   }
 };
 
+export const searchFoods = async (query) => {
+  const APP_ID = import.meta.env.VITE_NUTRITIONIX_APP_ID;
+  const API_KEY = import.meta.env.VITE_NUTRITIONIX_API_KEY;
+  if (!APP_ID || !API_KEY || !query) return [];
+
+  try {
+    const res = await fetch(
+      `https://trackapi.nutritionix.com/v2/search/instant?query=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          'x-app-id': APP_ID,
+          'x-app-key': API_KEY,
+        },
+      }
+    );
+    const data = await res.json();
+    if (!data.common) return [];
+    return data.common.slice(0, 5).map((f, idx) => ({
+      id: f.tag_id || idx,
+      name: f.food_name,
+    }));
+  } catch {
+    return [];
+  }
+};
+
