@@ -61,20 +61,24 @@ const MealPrepCalculator = ({ allIngredients }) => {
       setTargetPercentages(basePerc);
       setTempPercentages(basePerc);
       setIngredients(
-        allIngredients.map((ingredient) => {
-          const saved = baseline.ingredients.find((i) => i.id === ingredient.id);
-          return saved ? { ...ingredient, grams: saved.grams } : { ...ingredient };
-        })
+        baseline.ingredients
+          .map(({ id, grams }) => {
+            const base = allIngredients.find((ing) => ing.id === id);
+            return base ? { ...base, grams } : null;
+          })
+          .filter(Boolean)
       );
     });
   }, [user, allIngredients]);
 
   useEffect(() => {
     setIngredients((prev) =>
-      allIngredients.map((ing) => {
-        const existing = prev.find((p) => p.id === ing.id);
-        return existing ? { ...existing, ...ing } : { ...ing };
-      })
+      prev
+        .map((ing) => {
+          const updated = allIngredients.find((i) => i.id === ing.id);
+          return updated ? { ...updated, grams: ing.grams } : ing;
+        })
+        .filter(Boolean)
     );
   }, [allIngredients]);
 
@@ -143,12 +147,12 @@ const loadPlan = (id) => {
   setTargetPercentages(planPerc);
   setTempPercentages(planPerc);
   setIngredients(
-    allIngredients.map((ingredient) => {
-      const saved = plan.ingredients.find((i) => i.id === ingredient.id);
-      return saved
-        ? { ...ingredient, grams: saved.grams }
-        : { ...ingredient };
-    })
+    plan.ingredients
+      .map(({ id, grams }) => {
+        const base = allIngredients.find((i) => i.id === id);
+        return base ? { ...base, grams } : null;
+      })
+      .filter(Boolean)
   );
 };
 
