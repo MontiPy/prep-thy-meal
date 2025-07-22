@@ -113,7 +113,8 @@ const IngredientManager = ({ onChange }) => {
           Add
         </button>
       </div>
-      <table className="w-full border-collapse border">
+      <div className="overflow-x-auto">
+      <table className="min-w-max w-full border-collapse border">
         <thead>
           <tr className="bg-gray-100">
             <th className="border p-1">Name</th>
@@ -225,6 +226,7 @@ const IngredientManager = ({ onChange }) => {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 };
