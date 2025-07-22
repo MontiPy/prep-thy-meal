@@ -45,3 +45,14 @@ export const saveBaseline = async (uid, baseline) => {
   await setDoc(doc(settingsRef, uid), { baseline }, { merge: true });
   return loadBaseline(uid);
 };
+
+// Custom Ingredients
+export const loadCustomIngredients = async (uid) => {
+  const snap = await getDoc(doc(settingsRef, uid));
+  return snap.exists() ? snap.data().customIngredients || [] : [];
+};
+
+export const saveCustomIngredients = async (uid, items) => {
+  await setDoc(doc(settingsRef, uid), { customIngredients: items }, { merge: true });
+  return loadCustomIngredients(uid);
+};

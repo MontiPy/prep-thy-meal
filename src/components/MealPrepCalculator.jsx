@@ -61,20 +61,24 @@ const MealPrepCalculator = ({ allIngredients }) => {
       setTargetPercentages(basePerc);
       setTempPercentages(basePerc);
       setIngredients(
-        allIngredients.map((ingredient) => {
-          const saved = baseline.ingredients.find((i) => i.id === ingredient.id);
-          return saved ? { ...ingredient, grams: saved.grams } : { ...ingredient };
-        })
+        baseline.ingredients
+          .map(({ id, grams }) => {
+            const base = allIngredients.find((ing) => ing.id === id);
+            return base ? { ...base, grams } : null;
+          })
+          .filter(Boolean)
       );
     });
   }, [user, allIngredients]);
 
   useEffect(() => {
     setIngredients((prev) =>
-      allIngredients.map((ing) => {
-        const existing = prev.find((p) => p.id === ing.id);
-        return existing ? { ...existing, ...ing } : { ...ing };
-      })
+      prev
+        .map((ing) => {
+          const updated = allIngredients.find((i) => i.id === ing.id);
+          return updated ? { ...updated, grams: ing.grams } : ing;
+        })
+        .filter(Boolean)
     );
   }, [allIngredients]);
 
@@ -143,12 +147,12 @@ const loadPlan = (id) => {
   setTargetPercentages(planPerc);
   setTempPercentages(planPerc);
   setIngredients(
-    allIngredients.map((ingredient) => {
-      const saved = plan.ingredients.find((i) => i.id === ingredient.id);
-      return saved
-        ? { ...ingredient, grams: saved.grams }
-        : { ...ingredient };
-    })
+    plan.ingredients
+      .map(({ id, grams }) => {
+        const base = allIngredients.find((i) => i.id === id);
+        return base ? { ...base, grams } : null;
+      })
+      .filter(Boolean)
   );
 };
 
@@ -181,6 +185,52 @@ const loadPlan = (id) => {
       head: [["Ingredient", "Grams", "Calories", "Protein", "Carbs", "Fat"]],
       body: rows,
       startY: 35,
+    });
+    autoTable(doc, {
+      head: [["Daily Totals", "Calories", "Protein", "Carbs", "Fat"]],
+      body: [["", dailyTotals.calories, dailyTotals.protein, dailyTotals.carbs, dailyTotals.fat]],
+      startY: doc.lastAutoTable.finalY + 5,
+    });
+
+    autoTable(doc, {
+      head: [["Target", "Actual", "Difference"]],
+      body: [
+        [
+          "Calories",
+          calorieTarget,
+          dailyTotals.calories,
+          dailyTotals.calories - calorieTarget,
+        ],
+        [
+          "Protein (g)",
+          targetMacros.protein,
+          dailyTotals.protein,
+          (dailyTotals.protein - targetMacros.protein).toFixed(1),
+        ],
+        [
+          "Carbs (g)",
+          targetMacros.carbs,
+          dailyTotals.carbs,
+          (dailyTotals.carbs - targetMacros.carbs).toFixed(1),
+        ],
+        [
+          "Fat (g)",
+          targetMacros.fat,
+          dailyTotals.fat,
+          (dailyTotals.fat - targetMacros.fat).toFixed(1),
+        ],
+      ],
+      startY: doc.lastAutoTable.finalY + 5,
+    });
+
+    autoTable(doc, {
+      head: [["Shopping List (6 days)", "Grams", "Pounds"]],
+      body: ingredients.map((ing) => {
+        const totalGrams = ing.grams * 12;
+        const pounds = (totalGrams / 453.592).toFixed(2);
+        return [ing.name, totalGrams, pounds];
+      }),
+      startY: doc.lastAutoTable.finalY + 5,
     });
 
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);

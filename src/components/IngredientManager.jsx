@@ -3,7 +3,9 @@ import {
   addCustomIngredient,
   removeCustomIngredient,
   upsertCustomIngredient,
+  syncFromRemote,
 } from "../utils/ingredientStorage";
+import { useUser } from "../context/UserContext.jsx";
 import { getAllBaseIngredients } from "../utils/nutritionHelpers";
 
 const empty = {
@@ -16,6 +18,7 @@ const empty = {
 };
 
 const IngredientManager = ({ onChange }) => {
+  const { user } = useUser();
   const [ingredients, setIngredients] = useState(getAllBaseIngredients());
   const [newIngredient, setNewIngredient] = useState({ ...empty });
   const [editingId, setEditingId] = useState(null);
@@ -27,12 +30,16 @@ const IngredientManager = ({ onChange }) => {
   };
 
   useEffect(() => {
-    refresh();
-  }, []);
+    if (user) {
+      syncFromRemote(user.uid).then(refresh);
+    } else {
+      refresh();
+    }
+  }, [user]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newIngredient.name.trim()) return;
-    addCustomIngredient({ ...newIngredient });
+    await addCustomIngredient({ ...newIngredient }, user?.uid);
     setNewIngredient({ ...empty });
     refresh();
   };
@@ -42,14 +49,14 @@ const IngredientManager = ({ onChange }) => {
     setEditData({ ...ing });
   };
 
-  const saveEdit = () => {
-    upsertCustomIngredient(editData);
+  const saveEdit = async () => {
+    await upsertCustomIngredient(editData, user?.uid);
     setEditingId(null);
     refresh();
   };
 
-  const handleRemove = (id) => {
-    removeCustomIngredient(id);
+  const handleRemove = async (id) => {
+    await removeCustomIngredient(id, user?.uid);
     refresh();
   };
 
