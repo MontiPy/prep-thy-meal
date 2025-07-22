@@ -7,6 +7,7 @@ import {
 } from "../utils/ingredientStorage";
 import { useUser } from "../context/UserContext.jsx";
 import { getAllBaseIngredients } from "../utils/nutritionHelpers";
+import { fetchNutritionByName } from "../utils/nutritionixApi";
 
 const empty = {
   name: "",
@@ -23,6 +24,12 @@ const IngredientManager = ({ onChange }) => {
   const [newIngredient, setNewIngredient] = useState({ ...empty });
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({ ...empty });
+
+  const handleFetchNutrition = async () => {
+    const data = await fetchNutritionByName(newIngredient.name);
+    if (!data) return;
+    setNewIngredient((prev) => ({ ...prev, ...data }));
+  };
 
   const refresh = () => {
     setIngredients(getAllBaseIngredients());
@@ -74,6 +81,13 @@ const IngredientManager = ({ onChange }) => {
           placeholder="Name"
           className="border px-2 py-1 mr-2"
         />
+        <button
+          type="button"
+          className="btn-blue mr-2"
+          onClick={handleFetchNutrition}
+        >
+          Fetch
+        </button>
         <input
           name="grams"
           type="number"

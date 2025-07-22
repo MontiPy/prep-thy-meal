@@ -13,7 +13,8 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## Getting Started
 
-1. Copy `.env.example` to `.env` and provide your Firebase configuration values.
+1. Copy `.env.example` to `.env` and provide your Firebase configuration values
+   along with your Nutritionix API credentials.
 2. Install dependencies and start the development server:
 
    ```bash
