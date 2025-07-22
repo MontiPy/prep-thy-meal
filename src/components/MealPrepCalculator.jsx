@@ -585,7 +585,7 @@ const loadPlan = (id) => {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-300 rounded-lg">
+            <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border border-gray-300 p-3 text-left">
@@ -857,7 +857,8 @@ const loadPlan = (id) => {
           <h3 className="text-xl font-bold text-gray-800 mb-4">
             6-Day Shopping List
           </h3>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="overflow-x-auto">
+          <div className="grid md:grid-cols-2 gap-4 min-w-max">
             {ingredients.map((ingredient) => {
               const totalGrams = ingredient.grams * 12;
               const pounds = (totalGrams / 453.592).toFixed(2);
@@ -880,6 +881,7 @@ const loadPlan = (id) => {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
 

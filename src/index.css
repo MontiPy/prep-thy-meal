@@ -200,6 +200,14 @@ input[type="number"] {
   background-color: #f9fafb;
 }
 
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
+.min-w-max {
+  min-width: max-content;
+}
+
 .shopping-item {
   display: flex;
   justify-content: space-between;

@@ -114,7 +114,7 @@ const IngredientManager = ({ onChange }) => {
         </button>
       </div>
       <div className="overflow-x-auto">
-      <table className="w-full border-collapse border">
+      <table className="min-w-max w-full border-collapse border">
         <thead>
           <tr className="bg-gray-100">
             <th className="border p-1">Name</th>
