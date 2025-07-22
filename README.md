@@ -21,3 +21,7 @@ If you are developing a production application, we recommend using TypeScript wi
    npm run dev
    ```
 3. In your Firebase console, open **Authentication** → **Sign-in method** and enable the **Google** provider.
+
+## Mobile Friendly
+
+The layout adjusts to small screens. Navigation buttons stack vertically and tables scroll horizontally when needed so the app works well on phones and desktops.
