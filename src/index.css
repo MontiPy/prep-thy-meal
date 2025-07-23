@@ -176,6 +176,16 @@ h3 {
   background-color: #15803d;
 }
 
+.btn-blue {
+  background-color: #2563eb;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+}
+.btn-blue:hover {
+  background-color: #1d4ed8;
+}
+
 input[type="number"] {
   border: 1px solid #d1d5db;
   border-radius: 0.25rem;
