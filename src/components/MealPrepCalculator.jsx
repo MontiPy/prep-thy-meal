@@ -41,10 +41,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
     snack: [],
   });
   const [selectedId, setSelectedId] = useState("");
-  const ingredients =
-    activeMeal === "dinner" && matchDinner
-      ? mealIngredients.lunch
-      : mealIngredients[activeMeal];
 
   const [cheer, setCheer] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
@@ -129,14 +125,14 @@ const MealPrepCalculator = ({ allIngredients }) => {
     });
   };
 
-  const handleAddIngredient = () => {
+  const handleAddIngredient = (meal) => {
     const id = parseInt(selectedId);
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
     setMealIngredients((prev) => {
-      const list = [...prev[activeMeal], { ...item }];
-      const updated = { ...prev, [activeMeal]: list };
-      if (activeMeal === "lunch" && matchDinner) {
+      const list = [...prev[meal], { ...item }];
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
         updated.dinner = list.map((i) => ({ ...i }));
       }
       return updated;
@@ -321,13 +317,6 @@ const loadPlan = (id) => {
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
 
-  const currentList =
-    activeMeal === "dinner" && matchDinner
-      ? mealIngredients.lunch
-      : mealIngredients[activeMeal];
-
-  // Totals for the displayed meal
-  const mealTotals = calcTotals(currentList);
 
   // Daily totals across all meals
   const dailyTotals = MEALS.reduce(
@@ -642,7 +631,7 @@ const loadPlan = (id) => {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Per Meal (Raw Weights)
           </h2>
-          <div className="flex gap-4 mb-2">
+          <div className="flex gap-4 mb-4">
             {MEALS.map((meal) => (
               <label key={meal} className="flex items-center gap-1">
                 <input
@@ -675,144 +664,159 @@ const loadPlan = (id) => {
               </label>
             )}
           </div>
-          <div className="flex items-center gap-2 mb-2">
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="border px-2 py-1"
-            >
-              <option value="">Select ingredient</option>
-              {allIngredients
-                .filter((i) => !ingredients.some((p) => p.id === i.id))
-                .map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-            </select>
-            <button className="btn-green" onClick={handleAddIngredient}
-              disabled={!selectedId}
-            >
-              Add
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 p-3 text-left">
-                    Ingredient
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Grams
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Calories
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Protein (g)
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Carbs (g)
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Fat (g)
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">-</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ingredients.map((ingredient) => {
-                  const nutrition = calculateNutrition(ingredient);
-                  return (
-                    <tr key={ingredient.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 p-3 font-medium capitalize">
-                        {ingredient.name}
-                      </td>
-                      <td className="border border-gray-300 p-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateIngredientAmount(
-                                activeMeal,
-                                ingredient.id,
-                                ingredient.grams - 5
-                              )
-                            }
-                            className="text-red-600 hover:text-red-800 p-1 rounded"
-                          >
-                          <Minus size={16} className="wiggle" />
-                          </button>
-                          <input
-                            type="number"
-                            value={ingredient.grams}
-                            onChange={(e) =>
-                              updateIngredientAmount(
-                                activeMeal,
-                                ingredient.id,
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                            min="0"
-                          />
-                          <button
-                            onClick={() =>
-                              updateIngredientAmount(
-                                activeMeal,
-                                ingredient.id,
-                                ingredient.grams + 5
-                              )
-                            }
-                            className="text-green-600 hover:text-green-800 p-1 rounded"
-                          >
-                          <Plus size={16} className="wiggle" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.calories}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.protein}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.carbs}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.fat}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        <button
-                          className="text-red-600"
-                          onClick={() => removeIngredient(activeMeal, ingredient.id)}
-                        >
-                          x
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-blue-50 font-bold">
-                  <td className="border border-gray-300 p-3">Total/meal</td>
-                  <td className="border border-gray-300 p-3 text-center">—</td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.calories)}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.protein * 10) / 10}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.carbs * 10) / 10}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.fat * 10) / 10}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">-</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+
+          {MEALS.map((meal) => {
+            const list =
+              meal === "dinner" && matchDinner
+                ? mealIngredients.lunch
+                : mealIngredients[meal];
+            return (
+              <details
+                key={meal}
+                open={activeMeal === meal}
+                className="mb-4 border rounded"
+              >
+                <summary
+                  onClick={() => setActiveMeal(meal)}
+                  className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2"
+                >
+                  {meal}
+                </summary>
+                {activeMeal === meal && (
+                  <div className="p-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <select
+                        value={selectedId}
+                        onChange={(e) => setSelectedId(e.target.value)}
+                        className="border px-2 py-1"
+                      >
+                        <option value="">Select ingredient</option>
+                        {allIngredients
+                          .filter((i) => !list.some((p) => p.id === i.id))
+                          .map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.name}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        className="btn-green"
+                        onClick={() => handleAddIngredient(meal)}
+                        disabled={!selectedId}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 p-3 text-left">Ingredient</th>
+                            <th className="border border-gray-300 p-3 text-center">Grams</th>
+                            <th className="border border-gray-300 p-3 text-center">Calories</th>
+                            <th className="border border-gray-300 p-3 text-center">Protein (g)</th>
+                            <th className="border border-gray-300 p-3 text-center">Carbs (g)</th>
+                            <th className="border border-gray-300 p-3 text-center">Fat (g)</th>
+                            <th className="border border-gray-300 p-3 text-center">-</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {list.map((ingredient) => {
+                            const nutrition = calculateNutrition(ingredient);
+                            return (
+                              <tr key={ingredient.id} className="hover:bg-gray-50">
+                                <td className="border border-gray-300 p-3 font-medium capitalize">
+                                  {ingredient.name}
+                                </td>
+                                <td className="border border-gray-300 p-3">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          ingredient.grams - 5
+                                        )
+                                      }
+                                      className="text-red-600 hover:text-red-800 p-1 rounded"
+                                    >
+                                      <Minus size={16} className="wiggle" />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      value={ingredient.grams}
+                                      onChange={(e) =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                                      min="0"
+                                    />
+                                    <button
+                                      onClick={() =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          ingredient.grams + 5
+                                        )
+                                      }
+                                      className="text-green-600 hover:text-green-800 p-1 rounded"
+                                    >
+                                      <Plus size={16} className="wiggle" />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.calories}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.protein}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.carbs}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.fat}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  <button
+                                    className="text-red-600"
+                                    onClick={() => removeIngredient(meal, ingredient.id)}
+                                  >
+                                    x
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-blue-50 font-bold">
+                            <td className="border border-gray-300 p-3">Total/meal</td>
+                            <td className="border border-gray-300 p-3 text-center">—</td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).calories)}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).protein * 10) / 10}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).carbs * 10) / 10}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).fat * 10) / 10}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">-</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </details>
+            );
+          })}
         </div>
 
         {/* Daily Totals */}
