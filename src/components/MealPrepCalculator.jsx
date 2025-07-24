@@ -656,8 +656,13 @@ const loadPlan = (id) => {
 
           {MEALS.map((meal) => {
             const list = mealIngredients[meal];
+            const disabled = matchDinner && meal === "dinner";
             return (
-              <details key={meal} open className="mb-4 border rounded">
+              <details
+                key={meal}
+                open
+                className={`mb-4 border rounded ${disabled ? "disabled-section" : ""}`}
+              >
                 <summary className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2">
                   {meal}
                 </summary>
@@ -667,6 +672,7 @@ const loadPlan = (id) => {
                         value={selectedId}
                         onChange={(e) => setSelectedId(e.target.value)}
                         className="border px-2 py-1"
+                        disabled={disabled}
                       >
                         <option value="">Select ingredient</option>
                         {allIngredients
@@ -680,7 +686,7 @@ const loadPlan = (id) => {
                       <button
                         className="btn-green"
                         onClick={() => handleAddIngredient(meal)}
-                        disabled={!selectedId}
+                        disabled={!selectedId || disabled}
                       >
                         Add
                       </button>
@@ -701,6 +707,7 @@ const loadPlan = (id) => {
                         <tbody>
                           {list.map((ingredient) => {
                             const nutrition = calculateNutrition(ingredient);
+                            const disabled = matchDinner && meal === "dinner";
                             return (
                               <tr key={ingredient.id} className="hover:bg-gray-50">
                                 <td className="border border-gray-300 p-3 font-medium capitalize">
@@ -717,6 +724,7 @@ const loadPlan = (id) => {
                                         )
                                       }
                                       className="text-red-600 hover:text-red-800 p-1 rounded"
+                                      disabled={disabled}
                                     >
                                       <Minus size={16} className="wiggle" />
                                     </button>
@@ -732,6 +740,7 @@ const loadPlan = (id) => {
                                       }
                                       className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
                                       min="0"
+                                      disabled={disabled}
                                     />
                                     <button
                                       onClick={() =>
@@ -742,6 +751,7 @@ const loadPlan = (id) => {
                                         )
                                       }
                                       className="text-green-600 hover:text-green-800 p-1 rounded"
+                                      disabled={disabled}
                                     >
                                       <Plus size={16} className="wiggle" />
                                     </button>
@@ -763,6 +773,7 @@ const loadPlan = (id) => {
                                   <button
                                     className="text-red-600"
                                     onClick={() => removeIngredient(meal, ingredient.id)}
+                                    disabled={disabled}
                                   >
                                     x
                                   </button>
