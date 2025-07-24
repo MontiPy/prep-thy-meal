@@ -32,7 +32,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
   });
 
   const MEALS = ["breakfast", "lunch", "dinner", "snack"];
-  const [activeMeal, setActiveMeal] = useState("lunch");
   const [matchDinner, setMatchDinner] = useState(false);
   const [mealIngredients, setMealIngredients] = useState({
     breakfast: [],
@@ -620,7 +619,7 @@ const loadPlan = (id) => {
         {/* Instructions */}
         <div className="panel-yellow mb-6">
           <p className="text-sm text-yellow-800">
-            <strong>Instructions:</strong> Add foods to each meal. Select "Match
+            <strong>Instructions:</strong> Add foods to each meal. Use "Lunch =
             Dinner" if lunch and dinner are identical. All weights are raw and
             grilled unless noted.
           </p>
@@ -632,37 +631,23 @@ const loadPlan = (id) => {
             Per Meal (Raw Weights)
           </h2>
           <div className="flex gap-4 mb-4">
-            {MEALS.map((meal) => (
-              <label key={meal} className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  name="meal"
-                  value={meal}
-                  checked={activeMeal === meal}
-                  onChange={() => setActiveMeal(meal)}
-                />
-                <span className="capitalize">{meal}</span>
-              </label>
-            ))}
-            {activeMeal === "lunch" && (
-              <label className="flex items-center gap-1 ml-4">
-                <input
-                  type="checkbox"
-                  checked={matchDinner}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setMatchDinner(checked);
-                    if (checked) {
-                      setMealIngredients((prev) => ({
-                        ...prev,
-                        dinner: prev.lunch.map((i) => ({ ...i })),
-                      }));
-                    }
-                  }}
-                />
-                <span>Match Dinner</span>
-              </label>
-            )}
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={matchDinner}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setMatchDinner(checked);
+                  if (checked) {
+                    setMealIngredients((prev) => ({
+                      ...prev,
+                      dinner: prev.lunch.map((i) => ({ ...i })),
+                    }));
+                  }
+                }}
+              />
+              <span>Lunch = Dinner</span>
+            </label>
           </div>
 
           {MEALS.map((meal) => {
@@ -671,19 +656,11 @@ const loadPlan = (id) => {
                 ? mealIngredients.lunch
                 : mealIngredients[meal];
             return (
-              <details
-                key={meal}
-                open={activeMeal === meal}
-                className="mb-4 border rounded"
-              >
-                <summary
-                  onClick={() => setActiveMeal(meal)}
-                  className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2"
-                >
+              <details key={meal} open className="mb-4 border rounded">
+                <summary className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2">
                   {meal}
                 </summary>
-                {activeMeal === meal && (
-                  <div className="p-2">
+                <div className="p-2">
                     <div className="flex items-center gap-2 mb-2">
                       <select
                         value={selectedId}
@@ -813,7 +790,6 @@ const loadPlan = (id) => {
                       </table>
                     </div>
                   </div>
-                )}
               </details>
             );
           })}
