@@ -1,8 +1,17 @@
 // src/utils/nutritionHelpers.js
 import { loadCustomIngredients } from "./ingredientStorage";
 
+export const normalizeIngredient = (item) => ({
+  ...item,
+  grams: Number(item.grams) || 0,
+  calories: Number(item.calories) || 0,
+  protein: Number(item.protein) || 0,
+  carbs: Number(item.carbs) || 0,
+  fat: Number(item.fat) || 0,
+});
+
 export const getAllBaseIngredients = () => {
-  return loadCustomIngredients();
+  return loadCustomIngredients().map(normalizeIngredient);
 };
 
 const getOriginal = (id) => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { calculateNutrition } from "../utils/nutritionHelpers";
+import { calculateNutrition, normalizeIngredient } from "../utils/nutritionHelpers";
 import {
   loadPlans,
   addPlan,
@@ -36,7 +36,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
   const [matchDinner, setMatchDinner] = useState(false);
   const [mealIngredients, setMealIngredients] = useState({
     breakfast: [],
-    lunch: allIngredients.map((ingredient) => ({ ...ingredient })),
+    lunch: allIngredients.map((ingredient) => normalizeIngredient(ingredient)),
     dinner: [],
     snack: [],
   });
@@ -71,7 +71,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
         lunch: baseline.ingredients
           .map(({ id, grams }) => {
             const base = allIngredients.find((ing) => ing.id === id);
-            return base ? { ...base, grams } : null;
+            return base ? normalizeIngredient({ ...base, grams }) : null;
           })
           .filter(Boolean),
       }));
@@ -84,7 +84,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
         list
           .map((ing) => {
             const updated = allIngredients.find((i) => i.id === ing.id);
-            return updated ? { ...updated, grams: ing.grams } : ing;
+            return updated ? normalizeIngredient({ ...updated, grams: ing.grams }) : normalizeIngredient(ing);
           })
           .filter(Boolean);
       return {
@@ -108,7 +108,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       });
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
-        updated.dinner = list.map((i) => ({ ...i }));
+        updated.dinner = list.map((i) => normalizeIngredient(i));
       }
       return updated;
     });
@@ -119,7 +119,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       const list = prev[meal].filter((ing) => ing.id !== id);
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
-        updated.dinner = list.map((i) => ({ ...i }));
+        updated.dinner = list.map((i) => normalizeIngredient(i));
       }
       return updated;
     });
@@ -130,10 +130,10 @@ const MealPrepCalculator = ({ allIngredients }) => {
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
     setMealIngredients((prev) => {
-      const list = [...prev[meal], { ...item }];
+      const list = [...prev[meal], normalizeIngredient(item)];
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
-        updated.dinner = list.map((i) => ({ ...i }));
+        updated.dinner = list.map((i) => normalizeIngredient(i));
       }
       return updated;
     });
@@ -184,7 +184,7 @@ const loadPlan = (id) => {
     lunch: plan.ingredients
       .map(({ id, grams }) => {
         const base = allIngredients.find((i) => i.id === id);
-        return base ? { ...base, grams } : null;
+        return base ? normalizeIngredient({ ...base, grams }) : null;
       })
       .filter(Boolean),
   }));
@@ -334,9 +334,9 @@ const loadPlan = (id) => {
       const list = mealIngredients[meal];
       list.forEach((ing) => {
         if (!totals[ing.id]) {
-          totals[ing.id] = { ...ing, grams: ing.grams };
+          totals[ing.id] = { ...ing, grams: Number(ing.grams) || 0 };
         } else {
-          totals[ing.id].grams += ing.grams;
+          totals[ing.id].grams += Number(ing.grams) || 0;
         }
       });
     });
@@ -645,7 +645,7 @@ const loadPlan = (id) => {
                   if (checked) {
                     setMealIngredients((prev) => ({
                       ...prev,
-                      dinner: prev.lunch.map((i) => ({ ...i })),
+                      dinner: prev.lunch.map((i) => normalizeIngredient(i)),
                     }));
                   }
                 }}
