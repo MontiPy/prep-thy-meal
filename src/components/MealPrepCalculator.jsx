@@ -211,10 +211,7 @@ const loadPlan = (id) => {
     );
 
     const rows = MEALS.flatMap((meal) => {
-      const list =
-        meal === "dinner" && matchDinner
-          ? mealIngredients.lunch
-          : mealIngredients[meal];
+      const list = mealIngredients[meal];
       return list.map((ing) => {
         const n = calculateNutrition(ing);
         return [
@@ -315,10 +312,7 @@ const loadPlan = (id) => {
   // Daily totals across all meals
   const dailyTotals = MEALS.reduce(
     (totals, meal) => {
-      const list =
-        meal === "dinner" && matchDinner
-          ? mealIngredients.lunch
-          : mealIngredients[meal];
+      const list = mealIngredients[meal];
       const t = calcTotals(list);
       return {
         calories: totals.calories + t.calories,
@@ -337,10 +331,7 @@ const loadPlan = (id) => {
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
     MEALS.forEach((meal) => {
-      const list =
-        meal === "dinner" && matchDinner
-          ? mealIngredients.lunch
-          : mealIngredients[meal];
+      const list = mealIngredients[meal];
       list.forEach((ing) => {
         if (!totals[ing.id]) {
           totals[ing.id] = { ...ing, grams: ing.grams };
@@ -350,7 +341,7 @@ const loadPlan = (id) => {
       });
     });
     return Object.values(totals);
-  }, [mealIngredients, matchDinner]);
+  }, [mealIngredients]);
 
   // Calculate target macros based on calorie target and percentages
   const targetMacros = {
@@ -664,10 +655,7 @@ const loadPlan = (id) => {
           </div>
 
           {MEALS.map((meal) => {
-            const list =
-              meal === "dinner" && matchDinner
-                ? mealIngredients.lunch
-                : mealIngredients[meal];
+            const list = mealIngredients[meal];
             return (
               <details key={meal} open className="mb-4 border rounded">
                 <summary className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2">
