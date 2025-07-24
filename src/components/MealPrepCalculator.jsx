@@ -32,6 +32,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
   });
 
   const MEALS = ["breakfast", "lunch", "dinner", "snack"];
+  const DAYS = 6;
   const [matchDinner, setMatchDinner] = useState(false);
   const [mealIngredients, setMealIngredients] = useState({
     breakfast: [],
@@ -271,16 +272,10 @@ const loadPlan = (id) => {
 
     autoTable(doc, {
       head: [["Shopping List (6 days)", "Grams", "Pounds"]],
-      body: MEALS.flatMap((meal) => {
-        const list =
-          meal === "dinner" && matchDinner
-            ? mealIngredients.lunch
-            : mealIngredients[meal];
-        return list.map((ing) => {
-          const totalGrams = ing.grams * 12;
-          const pounds = (totalGrams / 453.592).toFixed(2);
-          return [`${ing.name} (${meal})`, totalGrams, pounds];
-        });
+      body: aggregatedIngredients.map((ing) => {
+        const totalGrams = ing.grams * DAYS;
+        const pounds = (totalGrams / 453.592).toFixed(2);
+        return [ing.name, totalGrams, pounds];
       }),
       startY: doc.lastAutoTable.finalY + 5,
     });
@@ -338,6 +333,24 @@ const loadPlan = (id) => {
   dailyTotals.protein = Math.round(dailyTotals.protein * 10) / 10;
   dailyTotals.carbs = Math.round(dailyTotals.carbs * 10) / 10;
   dailyTotals.fat = Math.round(dailyTotals.fat * 10) / 10;
+
+  const aggregatedIngredients = React.useMemo(() => {
+    const totals = {};
+    MEALS.forEach((meal) => {
+      const list =
+        meal === "dinner" && matchDinner
+          ? mealIngredients.lunch
+          : mealIngredients[meal];
+      list.forEach((ing) => {
+        if (!totals[ing.id]) {
+          totals[ing.id] = { ...ing, grams: ing.grams };
+        } else {
+          totals[ing.id].grams += ing.grams;
+        }
+      });
+    });
+    return Object.values(totals);
+  }, [mealIngredients, matchDinner]);
 
   // Calculate target macros based on calorie target and percentages
   const targetMacros = {
@@ -952,33 +965,23 @@ const loadPlan = (id) => {
           </h3>
           <div className="overflow-x-auto">
           <div className="grid md:grid-cols-2 gap-4 min-w-max">
-            {MEALS.flatMap((meal) => {
-              const list =
-                meal === "dinner" && matchDinner
-                  ? mealIngredients.lunch
-                  : mealIngredients[meal];
-              return list.map((ingredient) => {
-                const totalGrams = ingredient.grams * 12;
-                const pounds = (totalGrams / 453.592).toFixed(2);
-                return (
-                  <div
-                    key={`${ingredient.id}-${meal}`}
-                    className="flex justify-between items-center p-3 bg-white rounded border"
-                  >
-                    <span className="font-medium capitalize">
-                      {ingredient.name} ({meal})
+            {aggregatedIngredients.map((ingredient) => {
+              const totalGrams = ingredient.grams * DAYS;
+              const pounds = (totalGrams / 453.592).toFixed(2);
+              return (
+                <div
+                  key={ingredient.id}
+                  className="flex justify-between items-center p-3 bg-white rounded border"
+                >
+                  <span className="font-medium capitalize">{ingredient.name}</span>
+                  <div className="text-right">
+                    <span className="text-blue-600 font-bold block">
+                      {totalGrams}g
                     </span>
-                    <div className="text-right">
-                      <span className="text-blue-600 font-bold block">
-                        {totalGrams}g
-                      </span>
-                      <span className="text-gray-600 text-sm">
-                        ({pounds} lbs)
-                      </span>
-                    </div>
+                    <span className="text-gray-600 text-sm">({pounds} lbs)</span>
                   </div>
-                );
-              });
+                </div>
+              );
             })}
           </div>
           </div>
