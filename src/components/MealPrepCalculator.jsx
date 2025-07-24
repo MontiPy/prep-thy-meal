@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { calculateNutrition } from "../utils/nutritionHelpers";
+import { calculateNutrition, normalizeIngredient } from "../utils/nutritionHelpers";
 import {
   loadPlans,
   addPlan,
@@ -31,9 +31,15 @@ const MealPrepCalculator = ({ allIngredients }) => {
     carbs: 35,
   });
 
-  const [ingredients, setIngredients] = useState(
-    allIngredients.map((ingredient) => ({ ...ingredient }))
-  );
+  const MEALS = ["breakfast", "lunch", "dinner", "snack"];
+  const DAYS = 6;
+  const [matchDinner, setMatchDinner] = useState(false);
+  const [mealIngredients, setMealIngredients] = useState({
+    breakfast: [],
+    lunch: allIngredients.map((ingredient) => normalizeIngredient(ingredient)),
+    dinner: [],
+    snack: [],
+  });
   const [selectedId, setSelectedId] = useState("");
 
   const [cheer, setCheer] = useState("");
@@ -60,31 +66,39 @@ const MealPrepCalculator = ({ allIngredients }) => {
       };
       setTargetPercentages(basePerc);
       setTempPercentages(basePerc);
-      setIngredients(
-        baseline.ingredients
+      setMealIngredients((prev) => ({
+        ...prev,
+        lunch: baseline.ingredients
           .map(({ id, grams }) => {
             const base = allIngredients.find((ing) => ing.id === id);
-            return base ? { ...base, grams } : null;
+            return base ? normalizeIngredient({ ...base, grams }) : null;
           })
-          .filter(Boolean)
-      );
+          .filter(Boolean),
+      }));
     });
   }, [user, allIngredients]);
 
   useEffect(() => {
-    setIngredients((prev) =>
-      prev
-        .map((ing) => {
-          const updated = allIngredients.find((i) => i.id === ing.id);
-          return updated ? { ...updated, grams: ing.grams } : ing;
-        })
-        .filter(Boolean)
-    );
+    setMealIngredients((prev) => {
+      const updateList = (list) =>
+        list
+          .map((ing) => {
+            const updated = allIngredients.find((i) => i.id === ing.id);
+            return updated ? normalizeIngredient({ ...updated, grams: ing.grams }) : normalizeIngredient(ing);
+          })
+          .filter(Boolean);
+      return {
+        breakfast: updateList(prev.breakfast),
+        lunch: updateList(prev.lunch),
+        dinner: updateList(prev.dinner),
+        snack: updateList(prev.snack),
+      };
+    });
   }, [allIngredients]);
 
-  const updateIngredientAmount = (id, newGrams) => {
-    setIngredients((prev) => {
-      return prev.map((ingredient) => {
+  const updateIngredientAmount = (meal, id, newGrams) => {
+    setMealIngredients((prev) => {
+      const list = prev[meal].map((ingredient) => {
         if (ingredient.id !== id) return ingredient;
         if (ingredient.name === "Broccoli" && newGrams > ingredient.grams) {
           setCheer("You broc my world!");
@@ -92,18 +106,37 @@ const MealPrepCalculator = ({ allIngredients }) => {
         }
         return { ...ingredient, grams: Math.max(0, newGrams) };
       });
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => normalizeIngredient(i));
+      }
+      return updated;
     });
   };
 
-  const removeIngredient = (id) => {
-    setIngredients((prev) => prev.filter((ing) => ing.id !== id));
+  const removeIngredient = (meal, id) => {
+    setMealIngredients((prev) => {
+      const list = prev[meal].filter((ing) => ing.id !== id);
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => normalizeIngredient(i));
+      }
+      return updated;
+    });
   };
 
-  const handleAddIngredient = () => {
+  const handleAddIngredient = (meal) => {
     const id = parseInt(selectedId);
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
-    setIngredients((prev) => [...prev, { ...item }]);
+    setMealIngredients((prev) => {
+      const list = [...prev[meal], normalizeIngredient(item)];
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => normalizeIngredient(i));
+      }
+      return updated;
+    });
     setSelectedId("");
   };
 
@@ -117,7 +150,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
         fat: targetPercentages.fat,
         carbs: 100 - targetPercentages.protein - targetPercentages.fat,
       },
-      ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
+      ingredients: mealIngredients.lunch.map(({ id, grams }) => ({ id, grams })),
     };
     let plans;
     if (currentPlanId) {
@@ -146,14 +179,15 @@ const loadPlan = (id) => {
   };
   setTargetPercentages(planPerc);
   setTempPercentages(planPerc);
-  setIngredients(
-    plan.ingredients
+  setMealIngredients((prev) => ({
+    ...prev,
+    lunch: plan.ingredients
       .map(({ id, grams }) => {
         const base = allIngredients.find((i) => i.id === id);
-        return base ? { ...base, grams } : null;
+        return base ? normalizeIngredient({ ...base, grams }) : null;
       })
-      .filter(Boolean)
-  );
+      .filter(Boolean),
+  }));
 };
 
   const handleDeletePlan = async (id) => {
@@ -176,9 +210,19 @@ const loadPlan = (id) => {
       28
     );
 
-    const rows = ingredients.map((ing) => {
-      const n = calculateNutrition(ing);
-      return [ing.name, ing.grams, n.calories, n.protein, n.carbs, n.fat];
+    const rows = MEALS.flatMap((meal) => {
+      const list = mealIngredients[meal];
+      return list.map((ing) => {
+        const n = calculateNutrition(ing);
+        return [
+          `${ing.name} (${meal})`,
+          ing.grams,
+          n.calories,
+          n.protein,
+          n.carbs,
+          n.fat,
+        ];
+      });
     });
 
     autoTable(doc, {
@@ -225,8 +269,8 @@ const loadPlan = (id) => {
 
     autoTable(doc, {
       head: [["Shopping List (6 days)", "Grams", "Pounds"]],
-      body: ingredients.map((ing) => {
-        const totalGrams = ing.grams * 12;
+      body: aggregatedIngredients.map((ing) => {
+        const totalGrams = ing.grams * DAYS;
         const pounds = (totalGrams / 453.592).toFixed(2);
         return [ing.name, totalGrams, pounds];
       }),
@@ -245,32 +289,59 @@ const loadPlan = (id) => {
         fat: targetPercentages.fat,
         carbs: 100 - targetPercentages.protein - targetPercentages.fat,
       },
-      ingredients: ingredients.map(({ id, grams }) => ({ id, grams })),
+      ingredients: mealIngredients.lunch.map(({ id, grams }) => ({ id, grams })),
     };
     await saveBaseline(user.uid, baseline);
   };
 
-  // Calculate totals per meal
-  const mealTotals = ingredients.reduce(
-    (totals, ingredient) => {
-      const nutrition = calculateNutrition(ingredient);
+  const calcTotals = (list) =>
+    list.reduce(
+      (totals, ingredient) => {
+        const nutrition = calculateNutrition(ingredient);
+        return {
+          calories: totals.calories + nutrition.calories,
+          protein: totals.protein + nutrition.protein,
+          carbs: totals.carbs + nutrition.carbs,
+          fat: totals.fat + nutrition.fat,
+        };
+      },
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
+
+
+  // Daily totals across all meals
+  const dailyTotals = MEALS.reduce(
+    (totals, meal) => {
+      const list = mealIngredients[meal];
+      const t = calcTotals(list);
       return {
-        calories: totals.calories + nutrition.calories,
-        protein: totals.protein + nutrition.protein,
-        carbs: totals.carbs + nutrition.carbs,
-        fat: totals.fat + nutrition.fat,
+        calories: totals.calories + t.calories,
+        protein: totals.protein + t.protein,
+        carbs: totals.carbs + t.carbs,
+        fat: totals.fat + t.fat,
       };
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
+  dailyTotals.calories = Math.round(dailyTotals.calories);
+  dailyTotals.protein = Math.round(dailyTotals.protein * 10) / 10;
+  dailyTotals.carbs = Math.round(dailyTotals.carbs * 10) / 10;
+  dailyTotals.fat = Math.round(dailyTotals.fat * 10) / 10;
 
-  // Calculate daily totals (2 meals)
-  const dailyTotals = {
-    calories: Math.round(mealTotals.calories * 2),
-    protein: Math.round(mealTotals.protein * 2 * 10) / 10,
-    carbs: Math.round(mealTotals.carbs * 2 * 10) / 10,
-    fat: Math.round(mealTotals.fat * 2 * 10) / 10,
-  };
+  const aggregatedIngredients = React.useMemo(() => {
+    const totals = {};
+    MEALS.forEach((meal) => {
+      const list = mealIngredients[meal];
+      list.forEach((ing) => {
+        if (!totals[ing.id]) {
+          totals[ing.id] = { ...ing, grams: Number(ing.grams) || 0 };
+        } else {
+          totals[ing.id].grams += Number(ing.grams) || 0;
+        }
+      });
+    });
+    return Object.values(totals);
+  }, [mealIngredients]);
 
   // Calculate target macros based on calorie target and percentages
   const targetMacros = {
@@ -552,9 +623,9 @@ const loadPlan = (id) => {
         {/* Instructions */}
         <div className="panel-yellow mb-6">
           <p className="text-sm text-yellow-800">
-            <strong>Instructions:</strong> Eat the same meal for lunch & dinner
-            (2 × {Math.round(mealTotals.calories)} kcal), all raw weights. Grill
-            everything except rice (that's a stovetop classic).
+            <strong>Instructions:</strong> Add foods to each meal. Use "Lunch =
+            Dinner" if lunch and dinner are identical. All weights are raw and
+            grilled unless noted.
           </p>
         </div>
 
@@ -563,149 +634,183 @@ const loadPlan = (id) => {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Per Meal (Raw Weights)
           </h2>
-          <div className="flex items-center gap-2 mb-2">
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="border px-2 py-1"
-            >
-              <option value="">Select ingredient</option>
-              {allIngredients
-                .filter((i) => !ingredients.some((p) => p.id === i.id))
-                .map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-            </select>
-            <button className="btn-green" onClick={handleAddIngredient}
-              disabled={!selectedId}
-            >
-              Add
-            </button>
+          <div className="flex gap-4 mb-4">
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={matchDinner}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setMatchDinner(checked);
+                  if (checked) {
+                    setMealIngredients((prev) => ({
+                      ...prev,
+                      dinner: prev.lunch.map((i) => normalizeIngredient(i)),
+                    }));
+                  }
+                }}
+              />
+              <span>Lunch = Dinner</span>
+            </label>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-gray-300 p-3 text-left">
-                    Ingredient
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Grams
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Calories
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Protein (g)
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Carbs (g)
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">
-                    Fat (g)
-                  </th>
-                  <th className="border border-gray-300 p-3 text-center">-</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ingredients.map((ingredient) => {
-                  const nutrition = calculateNutrition(ingredient);
-                  return (
-                    <tr key={ingredient.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 p-3 font-medium capitalize">
-                        {ingredient.name}
-                      </td>
-                      <td className="border border-gray-300 p-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateIngredientAmount(
-                                ingredient.id,
-                                ingredient.grams - 5
-                              )
-                            }
-                            className="text-red-600 hover:text-red-800 p-1 rounded"
-                          >
-                          <Minus size={16} className="wiggle" />
-                          </button>
-                          <input
-                            type="number"
-                            value={ingredient.grams}
-                            onChange={(e) =>
-                              updateIngredientAmount(
-                                ingredient.id,
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                            className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                            min="0"
-                          />
-                          <button
-                            onClick={() =>
-                              updateIngredientAmount(
-                                ingredient.id,
-                                ingredient.grams + 5
-                              )
-                            }
-                            className="text-green-600 hover:text-green-800 p-1 rounded"
-                          >
-                          <Plus size={16} className="wiggle" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.calories}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.protein}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.carbs}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        {nutrition.fat}
-                      </td>
-                      <td className="border border-gray-300 p-3 text-center">
-                        <button
-                          className="text-red-600"
-                          onClick={() => removeIngredient(ingredient.id)}
-                        >
-                          x
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                <tr className="bg-blue-50 font-bold">
-                  <td className="border border-gray-300 p-3">Total/meal</td>
-                  <td className="border border-gray-300 p-3 text-center">—</td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.calories)}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.protein * 10) / 10}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.carbs * 10) / 10}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {Math.round(mealTotals.fat * 10) / 10}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">-</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+
+          {MEALS.map((meal) => {
+            const list = mealIngredients[meal];
+            const disabled = matchDinner && meal === "dinner";
+            return (
+              <details
+                key={meal}
+                open
+                className={`mb-4 border rounded ${disabled ? "disabled-section" : ""}`}
+              >
+                <summary className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2">
+                  {meal}
+                </summary>
+                <div className="p-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <select
+                        value={selectedId}
+                        onChange={(e) => setSelectedId(e.target.value)}
+                        className="border px-2 py-1"
+                        disabled={disabled}
+                      >
+                        <option value="">Select ingredient</option>
+                        {allIngredients
+                          .filter((i) => !list.some((p) => p.id === i.id))
+                          .map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.name}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        className="btn-green"
+                        onClick={() => handleAddIngredient(meal)}
+                        disabled={!selectedId || disabled}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 p-3 text-left">Ingredient</th>
+                            <th className="border border-gray-300 p-3 text-center">Grams</th>
+                            <th className="border border-gray-300 p-3 text-center">Calories</th>
+                            <th className="border border-gray-300 p-3 text-center">Protein (g)</th>
+                            <th className="border border-gray-300 p-3 text-center">Carbs (g)</th>
+                            <th className="border border-gray-300 p-3 text-center">Fat (g)</th>
+                            <th className="border border-gray-300 p-3 text-center">-</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {list.map((ingredient) => {
+                            const nutrition = calculateNutrition(ingredient);
+                            const disabled = matchDinner && meal === "dinner";
+                            return (
+                              <tr key={ingredient.id} className="hover:bg-gray-50">
+                                <td className="border border-gray-300 p-3 font-medium capitalize">
+                                  {ingredient.name}
+                                </td>
+                                <td className="border border-gray-300 p-3">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          ingredient.grams - 5
+                                        )
+                                      }
+                                      className="text-red-600 hover:text-red-800 p-1 rounded"
+                                      disabled={disabled}
+                                    >
+                                      <Minus size={16} className="wiggle" />
+                                    </button>
+                                    <input
+                                      type="number"
+                                      value={ingredient.grams}
+                                      onChange={(e) =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                                      min="0"
+                                      disabled={disabled}
+                                    />
+                                    <button
+                                      onClick={() =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          ingredient.grams + 5
+                                        )
+                                      }
+                                      className="text-green-600 hover:text-green-800 p-1 rounded"
+                                      disabled={disabled}
+                                    >
+                                      <Plus size={16} className="wiggle" />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.calories}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.protein}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.carbs}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {nutrition.fat}
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  <button
+                                    className="text-red-600"
+                                    onClick={() => removeIngredient(meal, ingredient.id)}
+                                    disabled={disabled}
+                                  >
+                                    x
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-blue-50 font-bold">
+                            <td className="border border-gray-300 p-3">Total/meal</td>
+                            <td className="border border-gray-300 p-3 text-center">—</td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).calories)}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).protein * 10) / 10}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).carbs * 10) / 10}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">
+                              {Math.round(calcTotals(list).fat * 10) / 10}
+                            </td>
+                            <td className="border border-gray-300 p-3 text-center">-</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+              </details>
+            );
+          })}
         </div>
 
         {/* Daily Totals */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           <div className="panel-blue-gradient">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
-              Per Day (x2 meals)
-            </h3>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Per Day</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="font-medium">Calories:</span>
@@ -859,24 +964,20 @@ const loadPlan = (id) => {
           </h3>
           <div className="overflow-x-auto">
           <div className="grid md:grid-cols-2 gap-4 min-w-max">
-            {ingredients.map((ingredient) => {
-              const totalGrams = ingredient.grams * 12;
+            {aggregatedIngredients.map((ingredient) => {
+              const totalGrams = ingredient.grams * DAYS;
               const pounds = (totalGrams / 453.592).toFixed(2);
               return (
                 <div
                   key={ingredient.id}
                   className="flex justify-between items-center p-3 bg-white rounded border"
                 >
-                  <span className="font-medium capitalize">
-                    {ingredient.name}
-                  </span>
+                  <span className="font-medium capitalize">{ingredient.name}</span>
                   <div className="text-right">
                     <span className="text-blue-600 font-bold block">
                       {totalGrams}g
                     </span>
-                    <span className="text-gray-600 text-sm">
-                      ({pounds} lbs)
-                    </span>
+                    <span className="text-gray-600 text-sm">({pounds} lbs)</span>
                   </div>
                 </div>
               );
