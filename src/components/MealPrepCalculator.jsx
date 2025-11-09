@@ -568,6 +568,44 @@ const MealPrepCalculator = ({ allIngredients }) => {
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
   };
 
+  const handleShareToNotes = async () => {
+    if (!navigator.share) {
+      alert("Sharing is not supported on this device/browser");
+      return;
+    }
+
+    // Format shopping list as checklist
+    const checklistItems = aggregatedIngredients.map((ing) => {
+      const totalQuantity = (ing.quantity || 1) * prepDays;
+      const totalGrams = ing.grams * prepDays;
+      const unit = ing.unit || "g";
+
+      let quantityDisplay;
+      if (unit === "g") {
+        quantityDisplay = `${totalGrams.toFixed(0)}g`;
+      } else {
+        quantityDisplay = `${totalQuantity.toFixed(1)} ${unit} (${totalGrams.toFixed(0)}g)`;
+      }
+
+      return `- [ ] ${ing.name}: ${quantityDisplay}`;
+    });
+
+    const title = `${prepDays}-Day Shopping List`;
+    const text = `${title}\n\n${checklistItems.join("\n")}`;
+
+    try {
+      await navigator.share({
+        title: title,
+        text: text,
+      });
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Error sharing:", error);
+        alert("Failed to share. Please try again.");
+      }
+    }
+  };
+
   const handleSaveBaseline = async () => {
     if (!user) return;
     const baseline = {
@@ -1521,6 +1559,12 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 className="btn-blue text-sm"
               >
                 Export PDF
+              </button>
+              <button
+                onClick={handleShareToNotes}
+                className="btn-green text-sm"
+              >
+                Share to Notes
               </button>
             </div>
           </div>
