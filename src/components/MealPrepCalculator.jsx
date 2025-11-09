@@ -1071,12 +1071,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 >
                   Set as Baseline
                 </button>
-                <button
-                  onClick={handleExportPDF}
-                  className="text-blue-600 hover:text-blue-800 p-1 font-medium text-sm"
-                >
-                  Export PDF
-                </button>
               </div>
               {savedPlans.length > 0 && currentPlanId && (
                 <div className="flex justify-between items-center bg-gray-50 rounded p-2">
@@ -1522,6 +1516,12 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 <option value={21}>3 weeks</option>
                 <option value={30}>1 month</option>
               </select>
+              <button
+                onClick={handleExportPDF}
+                className="btn-blue text-sm"
+              >
+                Export PDF
+              </button>
             </div>
           </div>
 
