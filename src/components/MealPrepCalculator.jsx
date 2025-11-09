@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { calculateNutrition, normalizeIngredient } from "../utils/nutritionHelpers";
+import {
+  calculateNutrition,
+  normalizeIngredient,
+} from "../utils/nutritionHelpers";
 import {
   loadPlans,
   addPlan,
@@ -60,27 +63,31 @@ const MealPrepCalculator = ({ allIngredients }) => {
       if (!baseline) return;
       setCalorieTarget(baseline.calorieTarget);
       setTempTarget(baseline.calorieTarget);
-      
+
       // Load matchDinner setting from baseline (default to false for older baselines)
       const shouldMatchDinner = baseline.matchDinner || false;
       setMatchDinner(shouldMatchDinner);
-      
+
       const basePerc = {
         protein: baseline.targetPercentages.protein,
         fat: baseline.targetPercentages.fat,
         carbs:
-          100 - baseline.targetPercentages.protein - baseline.targetPercentages.fat,
+          100 -
+          baseline.targetPercentages.protein -
+          baseline.targetPercentages.fat,
       };
       setTargetPercentages(basePerc);
       setTempPercentages(basePerc);
-      
+
       // Load all meals from baseline if available
       const loadMealIngredients = (mealData) => {
         if (!mealData || !Array.isArray(mealData)) return [];
         return mealData
           .map(({ id, grams, quantity }) => {
             const base = allIngredients.find((ing) => ing.id === id);
-            return base ? normalizeIngredient({ ...base, grams, quantity }) : null;
+            return base
+              ? normalizeIngredient({ ...base, grams, quantity })
+              : null;
           })
           .filter(Boolean);
       };
@@ -100,16 +107,18 @@ const MealPrepCalculator = ({ allIngredients }) => {
         mealData = {
           breakfast: [],
           lunch: lunchIngredients,
-          dinner: shouldMatchDinner ? lunchIngredients.map((i) => normalizeIngredient(i)) : [],
+          dinner: shouldMatchDinner
+            ? lunchIngredients.map((i) => normalizeIngredient(i))
+            : [],
           snack: [],
         };
       }
-      
+
       // Apply matchDinner logic if enabled
       if (shouldMatchDinner && mealData.lunch) {
         mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
       }
-        
+
       setMealIngredients((prev) => ({
         ...prev,
         ...mealData,
@@ -123,7 +132,9 @@ const MealPrepCalculator = ({ allIngredients }) => {
         list
           .map((ing) => {
             const updated = allIngredients.find((i) => i.id === ing.id);
-            return updated ? normalizeIngredient({ ...updated, grams: ing.grams }) : normalizeIngredient(ing);
+            return updated
+              ? normalizeIngredient({ ...updated, grams: ing.grams })
+              : normalizeIngredient(ing);
           })
           .filter(Boolean);
       return {
@@ -154,7 +165,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
 
         // Get the original ingredient to ensure we have correct gramsPerUnit
         const original = allIngredients.find((i) => i.id === id);
-        const gramsPerUnit = original?.gramsPerUnit || original?.grams || ingredient.gramsPerUnit || 100;
+        const gramsPerUnit =
+          original?.gramsPerUnit ||
+          original?.grams ||
+          ingredient.gramsPerUnit ||
+          100;
 
         const unit = ingredient.unit || "g";
         let quantity, grams;
@@ -205,7 +220,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       ...item,
       gramsPerUnit: item.gramsPerUnit || item.grams || 100,
       grams: item.gramsPerUnit || item.grams || 100,
-      quantity: 1
+      quantity: 1,
     });
 
     setMealIngredients((prev) => {
@@ -232,14 +247,34 @@ const MealPrepCalculator = ({ allIngredients }) => {
       },
       // Save all meals, not just lunch
       meals: {
-        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
       },
       matchDinner,
       // Keep legacy ingredients field for backward compatibility
-      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
+        id,
+        grams,
+        quantity,
+      })),
     };
     let plans;
     if (currentPlanId) {
@@ -257,112 +292,136 @@ const MealPrepCalculator = ({ allIngredients }) => {
     setTimeout(() => setShowConfetti(false), 2000);
   };
 
-const loadPlan = (id) => {
-  const plan = savedPlans.find((p) => p.id === id);
-  if (!plan) return;
-  setCurrentPlanId(plan.id);
-  setPlanName(plan.name);
-  setSelectedPlanId(plan.id);
-  setHasUnsavedChanges(false);
-  setCalorieTarget(plan.calorieTarget);
-  setTempTarget(plan.calorieTarget);
-  
-  // Load matchDinner setting (default to false for older plans)
-  const shouldMatchDinner = plan.matchDinner || false;
-  setMatchDinner(shouldMatchDinner);
-  
-  const planPerc = {
-    protein: plan.targetPercentages.protein,
-    fat: plan.targetPercentages.fat,
-    carbs: 100 - plan.targetPercentages.protein - plan.targetPercentages.fat,
-  };
-  setTargetPercentages(planPerc);
-  setTempPercentages(planPerc);
-  
-  // Load all meals if available (new format), otherwise fall back to legacy format
-  const loadMealIngredients = (mealData) => {
-    if (!mealData || !Array.isArray(mealData)) return [];
-    return mealData
-      .map(({ id, grams, quantity }) => {
-        const base = allIngredients.find((i) => i.id === id);
-        return base ? normalizeIngredient({ ...base, grams, quantity }) : null;
-      })
-      .filter(Boolean);
-  };
-
-  let mealData = {};
-  if (plan.meals) {
-    // New format with all meals
-    mealData = {
-      breakfast: loadMealIngredients(plan.meals.breakfast),
-      lunch: loadMealIngredients(plan.meals.lunch),
-      dinner: loadMealIngredients(plan.meals.dinner),
-      snack: loadMealIngredients(plan.meals.snack),
-    };
-  } else {
-    // Legacy format - only lunch ingredients
-    const lunchIngredients = loadMealIngredients(plan.ingredients);
-    mealData = {
-      breakfast: [],
-      lunch: lunchIngredients,
-      dinner: shouldMatchDinner ? lunchIngredients.map((i) => normalizeIngredient(i)) : [],
-      snack: [],
-    };
-  }
-  
-  // Apply matchDinner logic if enabled
-  if (shouldMatchDinner && mealData.lunch) {
-    mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
-  }
-    
-  setMealIngredients(mealData);
-};
-
-const handlePlanDropdownChange = (e) => {
-  const planId = e.target.value;
-  setSelectedPlanId(planId);
-  if (planId) {
-    loadPlan(planId);
-  } else {
-    // Creating new plan
-    setCurrentPlanId(null);
-    setPlanName("");
+  const loadPlan = (id) => {
+    const plan = savedPlans.find((p) => p.id === id);
+    if (!plan) return;
+    setCurrentPlanId(plan.id);
+    setPlanName(plan.name);
+    setSelectedPlanId(plan.id);
     setHasUnsavedChanges(false);
-  }
-};
+    setCalorieTarget(plan.calorieTarget);
+    setTempTarget(plan.calorieTarget);
 
-const handleSaveAsNew = async () => {
-  if (!user) return;
-  const newName = planName.trim() || `Plan ${savedPlans.length + 1}`;
-  const newPlan = {
-    name: newName,
-    calorieTarget,
-    targetPercentages: {
-      protein: targetPercentages.protein,
-      fat: targetPercentages.fat,
-      carbs: 100 - targetPercentages.protein - targetPercentages.fat,
-    },
-    // Save all meals, not just lunch
-    meals: {
-      breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-      lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-      dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-      snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-    },
-    matchDinner,
-    // Keep legacy ingredients field for backward compatibility
-    ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+    // Load matchDinner setting (default to false for older plans)
+    const shouldMatchDinner = plan.matchDinner || false;
+    setMatchDinner(shouldMatchDinner);
+
+    const planPerc = {
+      protein: plan.targetPercentages.protein,
+      fat: plan.targetPercentages.fat,
+      carbs: 100 - plan.targetPercentages.protein - plan.targetPercentages.fat,
+    };
+    setTargetPercentages(planPerc);
+    setTempPercentages(planPerc);
+
+    // Load all meals if available (new format), otherwise fall back to legacy format
+    const loadMealIngredients = (mealData) => {
+      if (!mealData || !Array.isArray(mealData)) return [];
+      return mealData
+        .map(({ id, grams, quantity }) => {
+          const base = allIngredients.find((i) => i.id === id);
+          return base
+            ? normalizeIngredient({ ...base, grams, quantity })
+            : null;
+        })
+        .filter(Boolean);
+    };
+
+    let mealData = {};
+    if (plan.meals) {
+      // New format with all meals
+      mealData = {
+        breakfast: loadMealIngredients(plan.meals.breakfast),
+        lunch: loadMealIngredients(plan.meals.lunch),
+        dinner: loadMealIngredients(plan.meals.dinner),
+        snack: loadMealIngredients(plan.meals.snack),
+      };
+    } else {
+      // Legacy format - only lunch ingredients
+      const lunchIngredients = loadMealIngredients(plan.ingredients);
+      mealData = {
+        breakfast: [],
+        lunch: lunchIngredients,
+        dinner: shouldMatchDinner
+          ? lunchIngredients.map((i) => normalizeIngredient(i))
+          : [],
+        snack: [],
+      };
+    }
+
+    // Apply matchDinner logic if enabled
+    if (shouldMatchDinner && mealData.lunch) {
+      mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
+    }
+
+    setMealIngredients(mealData);
   };
-  const plans = await addPlan(user.uid, newPlan);
-  setSavedPlans(plans);
-  const newPlanId = plans[plans.length - 1].id;
-  setCurrentPlanId(newPlanId);
-  setSelectedPlanId(newPlanId);
-  setPlanName(newName);
-  setHasUnsavedChanges(false);
-  setShowConfetti(true);
-  setTimeout(() => setShowConfetti(false), 2000);
-};
+
+  const handlePlanDropdownChange = (e) => {
+    const planId = e.target.value;
+    setSelectedPlanId(planId);
+    if (planId) {
+      loadPlan(planId);
+    } else {
+      // Creating new plan
+      setCurrentPlanId(null);
+      setPlanName("");
+      setHasUnsavedChanges(false);
+    }
+  };
+
+  const handleSaveAsNew = async () => {
+    if (!user) return;
+    const newName = planName.trim() || `Plan ${savedPlans.length + 1}`;
+    const newPlan = {
+      name: newName,
+      calorieTarget,
+      targetPercentages: {
+        protein: targetPercentages.protein,
+        fat: targetPercentages.fat,
+        carbs: 100 - targetPercentages.protein - targetPercentages.fat,
+      },
+      // Save all meals, not just lunch
+      meals: {
+        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+      },
+      matchDinner,
+      // Keep legacy ingredients field for backward compatibility
+      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
+        id,
+        grams,
+        quantity,
+      })),
+    };
+    const plans = await addPlan(user.uid, newPlan);
+    setSavedPlans(plans);
+    const newPlanId = plans[plans.length - 1].id;
+    setCurrentPlanId(newPlanId);
+    setSelectedPlanId(newPlanId);
+    setPlanName(newName);
+    setHasUnsavedChanges(false);
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 2000);
+  };
 
   const handleDeletePlan = async (id) => {
     if (!user) return;
@@ -411,13 +470,31 @@ const handleSaveAsNew = async () => {
     });
 
     autoTable(doc, {
-      head: [["Ingredient", "Quantity", "Grams", "Calories", "Protein", "Carbs", "Fat"]],
+      head: [
+        [
+          "Ingredient",
+          "Quantity",
+          "Grams",
+          "Calories",
+          "Protein",
+          "Carbs",
+          "Fat",
+        ],
+      ],
       body: rows,
       startY: 35,
     });
     autoTable(doc, {
       head: [["Daily Totals", "Calories", "Protein", "Carbs", "Fat"]],
-      body: [["", dailyTotals.calories, dailyTotals.protein, dailyTotals.carbs, dailyTotals.fat]],
+      body: [
+        [
+          "",
+          dailyTotals.calories,
+          dailyTotals.protein,
+          dailyTotals.carbs,
+          dailyTotals.fat,
+        ],
+      ],
       startY: doc.lastAutoTable.finalY + 5,
     });
 
@@ -453,7 +530,15 @@ const handleSaveAsNew = async () => {
     });
 
     autoTable(doc, {
-      head: [[`Shopping List (${prepDays} days)`, "Quantity", "Grams", "Pounds", "Kilos"]],
+      head: [
+        [
+          `Shopping List (${prepDays} days)`,
+          "Quantity",
+          "Grams",
+          "Pounds",
+          "Kilos",
+        ],
+      ],
       body: aggregatedIngredients.map((ing) => {
         const totalQuantity = (ing.quantity || 1) * prepDays;
         const totalGrams = ing.grams * prepDays;
@@ -469,7 +554,13 @@ const handleSaveAsNew = async () => {
           quantityDisplay = `${totalQuantity.toFixed(1)} ${unit}`;
         }
 
-        return [ing.name, quantityDisplay, totalGrams.toFixed(0), pounds, kilos];
+        return [
+          ing.name,
+          quantityDisplay,
+          totalGrams.toFixed(0),
+          pounds,
+          kilos,
+        ];
       }),
       startY: doc.lastAutoTable.finalY + 5,
     });
@@ -488,14 +579,34 @@ const handleSaveAsNew = async () => {
       },
       // Save all meals in baseline
       meals: {
-        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
-        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
+        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({
+          id,
+          grams,
+          quantity,
+        })),
       },
       matchDinner,
       // Keep legacy ingredients field for backward compatibility
-      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
+        id,
+        grams,
+        quantity,
+      })),
     };
     await saveBaseline(user.uid, baseline);
   };
@@ -513,7 +624,6 @@ const handleSaveAsNew = async () => {
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
-
 
   // Daily totals across all meals
   const dailyTotals = MEALS.reduce(
@@ -537,28 +647,79 @@ const handleSaveAsNew = async () => {
   // Categorize ingredients by store section
   const categorizeIngredient = (name) => {
     const nameL = name.toLowerCase();
-    if (nameL.includes('chicken') || nameL.includes('beef') || nameL.includes('pork') || nameL.includes('turkey') || nameL.includes('fish') || nameL.includes('salmon') || nameL.includes('tuna') || nameL.includes('meat')) {
-      return 'Meat & Seafood';
+    if (
+      nameL.includes("chicken") ||
+      nameL.includes("beef") ||
+      nameL.includes("pork") ||
+      nameL.includes("turkey") ||
+      nameL.includes("fish") ||
+      nameL.includes("salmon") ||
+      nameL.includes("tuna") ||
+      nameL.includes("meat")
+    ) {
+      return "Meat & Seafood";
     }
-    if (nameL.includes('milk') || nameL.includes('cheese') || nameL.includes('yogurt') || nameL.includes('butter') || nameL.includes('cream')) {
-      return 'Dairy';
+    if (
+      nameL.includes("milk") ||
+      nameL.includes("cheese") ||
+      nameL.includes("yogurt") ||
+      nameL.includes("butter") ||
+      nameL.includes("cream")
+    ) {
+      return "Dairy";
     }
-    if (nameL.includes('apple') || nameL.includes('banana') || nameL.includes('berry') || nameL.includes('orange') || nameL.includes('grape') || nameL.includes('fruit')) {
-      return 'Produce - Fruits';
+    if (
+      nameL.includes("apple") ||
+      nameL.includes("banana") ||
+      nameL.includes("berry") ||
+      nameL.includes("orange") ||
+      nameL.includes("grape") ||
+      nameL.includes("fruit")
+    ) {
+      return "Produce - Fruits";
     }
-    if (nameL.includes('broccoli') || nameL.includes('spinach') || nameL.includes('carrot') || nameL.includes('lettuce') || nameL.includes('tomato') || nameL.includes('vegetable') || nameL.includes('kale') || nameL.includes('pepper')) {
-      return 'Produce - Vegetables';
+    if (
+      nameL.includes("broccoli") ||
+      nameL.includes("spinach") ||
+      nameL.includes("carrot") ||
+      nameL.includes("lettuce") ||
+      nameL.includes("tomato") ||
+      nameL.includes("vegetable") ||
+      nameL.includes("kale") ||
+      nameL.includes("pepper")
+    ) {
+      return "Produce - Vegetables";
     }
-    if (nameL.includes('rice') || nameL.includes('pasta') || nameL.includes('bread') || nameL.includes('oats') || nameL.includes('quinoa') || nameL.includes('cereal')) {
-      return 'Grains & Bread';
+    if (
+      nameL.includes("rice") ||
+      nameL.includes("pasta") ||
+      nameL.includes("bread") ||
+      nameL.includes("oats") ||
+      nameL.includes("quinoa") ||
+      nameL.includes("cereal")
+    ) {
+      return "Grains & Bread";
     }
-    if (nameL.includes('beans') || nameL.includes('nuts') || nameL.includes('peanut') || nameL.includes('almond') || nameL.includes('seed')) {
-      return 'Nuts & Legumes';
+    if (
+      nameL.includes("beans") ||
+      nameL.includes("nuts") ||
+      nameL.includes("peanut") ||
+      nameL.includes("almond") ||
+      nameL.includes("seed")
+    ) {
+      return "Nuts & Legumes";
     }
-    if (nameL.includes('oil') || nameL.includes('sauce') || nameL.includes('spice') || nameL.includes('salt') || nameL.includes('pepper') || nameL.includes('vinegar')) {
-      return 'Condiments & Spices';
+    if (
+      nameL.includes("oil") ||
+      nameL.includes("sauce") ||
+      nameL.includes("spice") ||
+      nameL.includes("salt") ||
+      nameL.includes("pepper") ||
+      nameL.includes("vinegar")
+    ) {
+      return "Condiments & Spices";
     }
-    return 'Other';
+    return "Other";
   };
 
   const aggregatedIngredients = React.useMemo(() => {
@@ -566,14 +727,15 @@ const handleSaveAsNew = async () => {
     MEALS.forEach((meal) => {
       const list = mealIngredients[meal];
       list.forEach((ing) => {
-        const quantity = ing.quantity || (ing.grams / (ing.gramsPerUnit || ing.grams || 100));
+        const quantity =
+          ing.quantity || ing.grams / (ing.gramsPerUnit || ing.grams || 100);
         const grams = quantity * (ing.gramsPerUnit || ing.grams || 100);
 
         if (!totals[ing.id]) {
           totals[ing.id] = {
             ...ing,
             quantity: Number(quantity) || 0,
-            grams: Number(grams) || 0
+            grams: Number(grams) || 0,
           };
         } else {
           totals[ing.id].quantity += Number(quantity) || 0;
@@ -593,26 +755,28 @@ const handleSaveAsNew = async () => {
       }
       categories[category].push(ingredient);
     });
-    
+
     // Sort categories in logical shopping order
     const categoryOrder = [
-      'Produce - Fruits',
-      'Produce - Vegetables', 
-      'Meat & Seafood',
-      'Dairy',
-      'Grains & Bread',
-      'Nuts & Legumes',
-      'Condiments & Spices',
-      'Other'
+      "Produce - Fruits",
+      "Produce - Vegetables",
+      "Meat & Seafood",
+      "Dairy",
+      "Grains & Bread",
+      "Nuts & Legumes",
+      "Condiments & Spices",
+      "Other",
     ];
-    
+
     const sortedCategories = {};
-    categoryOrder.forEach(cat => {
+    categoryOrder.forEach((cat) => {
       if (categories[cat] && categories[cat].length > 0) {
-        sortedCategories[cat] = categories[cat].sort((a, b) => a.name.localeCompare(b.name));
+        sortedCategories[cat] = categories[cat].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
       }
     });
-    
+
     return sortedCategories;
   }, [aggregatedIngredients]);
 
@@ -626,9 +790,18 @@ const handleSaveAsNew = async () => {
   };
 
   const progress = {
-    calories: Math.min(100, Math.round((dailyTotals.calories / calorieTarget) * 100)),
-    protein: Math.min(100, Math.round((dailyTotals.protein / targetMacros.protein) * 100)),
-    carbs: Math.min(100, Math.round((dailyTotals.carbs / targetMacros.carbs) * 100)),
+    calories: Math.min(
+      100,
+      Math.round((dailyTotals.calories / calorieTarget) * 100)
+    ),
+    protein: Math.min(
+      100,
+      Math.round((dailyTotals.protein / targetMacros.protein) * 100)
+    ),
+    carbs: Math.min(
+      100,
+      Math.round((dailyTotals.carbs / targetMacros.carbs) * 100)
+    ),
     fat: Math.min(100, Math.round((dailyTotals.fat / targetMacros.fat) * 100)),
   };
 
@@ -685,9 +858,7 @@ const handleSaveAsNew = async () => {
 
   return (
     <div className="calculator">
-      {(showConfetti || goalConfetti) && (
-        <div className="confetti">🎉🎉🎉</div>
-      )}
+      {(showConfetti || goalConfetti) && <div className="confetti">🎉🎉🎉</div>}
       {cheer && <div className="cheer">{cheer}</div>}
       <div className="card">
         {/* Header */}
@@ -840,11 +1011,15 @@ const handleSaveAsNew = async () => {
         <div className="panel-gray mb-6">
           <div className="mb-3">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Current Plan: {currentPlanId ? 
-                <span className="text-blue-600">{planName}</span> : 
+              Current Plan:{" "}
+              {currentPlanId ? (
+                <span className="text-blue-600">{planName}</span>
+              ) : (
                 <span className="text-gray-500">New Plan</span>
-              }
-              {hasUnsavedChanges && <span className="text-orange-500 ml-2">• Unsaved changes</span>}
+              )}
+              {hasUnsavedChanges && (
+                <span className="text-orange-500 ml-2">• Unsaved changes</span>
+              )}
             </label>
             <select
               value={selectedPlanId}
@@ -859,7 +1034,7 @@ const handleSaveAsNew = async () => {
               ))}
             </select>
           </div>
-          
+
           <div className="flex items-center gap-2 mb-2">
             <input
               type="text"
@@ -872,7 +1047,7 @@ const handleSaveAsNew = async () => {
               onClick={handleSavePlan}
               className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium whitespace-nowrap"
             >
-              {currentPlanId ? `Update ${planName || 'Plan'}` : 'Save Plan'}
+              {currentPlanId ? `Update ${planName || "Plan"}` : "Save Plan"}
             </button>
             {currentPlanId && (
               <button
@@ -905,7 +1080,9 @@ const handleSaveAsNew = async () => {
               </div>
               {savedPlans.length > 0 && currentPlanId && (
                 <div className="flex justify-between items-center bg-gray-50 rounded p-2">
-                  <span className="text-sm text-gray-600">Delete current plan</span>
+                  <span className="text-sm text-gray-600">
+                    Delete current plan
+                  </span>
                   <button
                     onClick={() => handleDeletePlan(currentPlanId)}
                     className="text-red-600 hover:text-red-800 text-sm px-2 py-1"
@@ -959,174 +1136,212 @@ const handleSaveAsNew = async () => {
               <details
                 key={meal}
                 open
-                className={`mb-4 border rounded ${disabled ? "disabled-section" : ""}`}
+                className={`mb-4 border rounded ${
+                  disabled ? "disabled-section" : ""
+                }`}
               >
                 <summary className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2">
                   {meal}
                 </summary>
                 <div className="p-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <select
-                        value={selectedId}
-                        onChange={(e) => setSelectedId(e.target.value)}
-                        className="border px-2 py-1"
-                        disabled={disabled}
-                      >
-                        <option value="">Select ingredient</option>
-                        {allIngredients
-                          .filter((i) => !list.some((p) => p.id === i.id))
-                          .map((i) => (
-                            <option key={i.id} value={i.id}>
-                              {i.name}
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        className="btn-green"
-                        onClick={() => handleAddIngredient(meal)}
-                        disabled={!selectedId || disabled}
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th className="border border-gray-300 p-3 text-left">Ingredient</th>
-                            <th className="border border-gray-300 p-3 text-center">Quantity</th>
-                            <th className="border border-gray-300 p-3 text-center">Grams</th>
-                            <th className="border border-gray-300 p-3 text-center">Calories</th>
-                            <th className="border border-gray-300 p-3 text-center">Protein (g)</th>
-                            <th className="border border-gray-300 p-3 text-center">Carbs (g)</th>
-                            <th className="border border-gray-300 p-3 text-center">Fat (g)</th>
-                            <th className="border border-gray-300 p-3 text-center">-</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {list.map((ingredient) => {
-                            const nutrition = calculateNutrition(ingredient);
-                            const disabled = matchDinner && meal === "dinner";
-                            const unit = ingredient.unit || "g";
+                  <div className="flex items-center gap-2 mb-2">
+                    <select
+                      value={selectedId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                      className="border px-2 py-1"
+                      disabled={disabled}
+                    >
+                      <option value="">Select ingredient</option>
+                      {allIngredients
+                        .filter((i) => !list.some((p) => p.id === i.id))
+                        .map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      className="btn-green"
+                      onClick={() => handleAddIngredient(meal)}
+                      disabled={!selectedId || disabled}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border border-gray-300 p-3 text-left">
+                            Ingredient
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            Quantity
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            Grams
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            Calories
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            Protein (g)
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            Carbs (g)
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            Fat (g)
+                          </th>
+                          <th className="border border-gray-300 p-3 text-center">
+                            -
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {list.map((ingredient) => {
+                          const nutrition = calculateNutrition(ingredient);
+                          const disabled = matchDinner && meal === "dinner";
+                          const unit = ingredient.unit || "g";
 
-                            // For "g" type: quantity represents grams directly
-                            // For "unit" type: quantity represents number of units
-                            let displayQuantity, totalGrams, incrementStep, unitLabel;
+                          // For "g" type: quantity represents grams directly
+                          // For "unit" type: quantity represents number of units
+                          let displayQuantity,
+                            totalGrams,
+                            incrementStep,
+                            unitLabel;
 
-                            if (unit === "g") {
-                              // Gram-based: show grams directly
-                              displayQuantity = ingredient.grams || 100;
-                              totalGrams = Math.round(displayQuantity);
-                              incrementStep = 5;
-                              unitLabel = "g";
-                            } else {
-                              // Unit-based: show number of units
-                              displayQuantity = ingredient.quantity || 1;
-                              totalGrams = Math.round(displayQuantity * (ingredient.gramsPerUnit || 100));
-                              incrementStep = 0.5;
-                              unitLabel = "unit";
-                            }
+                          if (unit === "g") {
+                            // Gram-based: show grams directly
+                            displayQuantity = ingredient.grams || 100;
+                            totalGrams = Math.round(displayQuantity);
+                            incrementStep = 5;
+                            unitLabel = "g";
+                          } else {
+                            // Unit-based: show number of units
+                            displayQuantity = ingredient.quantity || 1;
+                            totalGrams = Math.round(
+                              displayQuantity * (ingredient.gramsPerUnit || 100)
+                            );
+                            incrementStep = 0.5;
+                            unitLabel = "unit";
+                          }
 
-                            return (
-                              <tr key={ingredient.id} className="hover:bg-gray-50">
-                                <td className="border border-gray-300 p-3 font-medium capitalize">
-                                  {ingredient.name}
-                                </td>
-                                <td className="border border-gray-300 p-3">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() =>
-                                        updateIngredientAmount(
-                                          meal,
-                                          ingredient.id,
-                                          displayQuantity - incrementStep
-                                        )
-                                      }
-                                      className="text-red-600 hover:text-red-800 p-1 rounded"
-                                      disabled={disabled}
-                                    >
-                                      <Minus size={16} className="wiggle" />
-                                    </button>
-                                    <input
-                                      type="number"
-                                      step="any"
-                                      value={displayQuantity}
-                                      onChange={(e) =>
-                                        updateIngredientAmount(
-                                          meal,
-                                          ingredient.id,
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
-                                      min="0"
-                                      disabled={disabled}
-                                    />
-                                    <span className="text-sm text-gray-600 w-12">{unitLabel}</span>
-                                    <button
-                                      onClick={() =>
-                                        updateIngredientAmount(
-                                          meal,
-                                          ingredient.id,
-                                          displayQuantity + incrementStep
-                                        )
-                                      }
-                                      className="text-green-600 hover:text-green-800 p-1 rounded"
-                                      disabled={disabled}
-                                    >
-                                      <Plus size={16} className="wiggle" />
-                                    </button>
-                                  </div>
-                                </td>
-                                <td className="border border-gray-300 p-3 text-center">
-                                  {totalGrams}g
-                                </td>
-                                <td className="border border-gray-300 p-3 text-center">
-                                  {nutrition.calories}
-                                </td>
-                                <td className="border border-gray-300 p-3 text-center">
-                                  {nutrition.protein}
-                                </td>
-                                <td className="border border-gray-300 p-3 text-center">
-                                  {nutrition.carbs}
-                                </td>
-                                <td className="border border-gray-300 p-3 text-center">
-                                  {nutrition.fat}
-                                </td>
-                                <td className="border border-gray-300 p-3 text-center">
+                          return (
+                            <tr
+                              key={ingredient.id}
+                              className="hover:bg-gray-50"
+                            >
+                              <td className="border border-gray-300 p-3 font-medium capitalize">
+                                {ingredient.name}
+                              </td>
+                              <td className="border border-gray-300 p-3">
+                                <div className="flex items-center justify-center gap-2">
                                   <button
-                                    className="text-red-600"
-                                    onClick={() => removeIngredient(meal, ingredient.id)}
+                                    onClick={() =>
+                                      updateIngredientAmount(
+                                        meal,
+                                        ingredient.id,
+                                        displayQuantity - incrementStep
+                                      )
+                                    }
+                                    className="text-red-600 hover:text-red-800 p-1 rounded"
                                     disabled={disabled}
                                   >
-                                    x
+                                    <Minus size={16} className="wiggle" />
                                   </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          <tr className="bg-blue-50 font-bold">
-                            <td className="border border-gray-300 p-3">Total/meal</td>
-                            <td className="border border-gray-300 p-3 text-center">—</td>
-                            <td className="border border-gray-300 p-3 text-center">—</td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {Math.round(calcTotals(list).calories)}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {Math.round(calcTotals(list).protein * 10) / 10}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {Math.round(calcTotals(list).carbs * 10) / 10}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center">
-                              {Math.round(calcTotals(list).fat * 10) / 10}
-                            </td>
-                            <td className="border border-gray-300 p-3 text-center">-</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={displayQuantity}
+                                    onChange={(e) =>
+                                      updateIngredientAmount(
+                                        meal,
+                                        ingredient.id,
+                                        parseFloat(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                                    min="0"
+                                    disabled={disabled}
+                                  />
+                                  <span className="text-sm text-gray-600 w-12">
+                                    {unitLabel}
+                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      updateIngredientAmount(
+                                        meal,
+                                        ingredient.id,
+                                        displayQuantity + incrementStep
+                                      )
+                                    }
+                                    className="text-green-600 hover:text-green-800 p-1 rounded"
+                                    disabled={disabled}
+                                  >
+                                    <Plus size={16} className="wiggle" />
+                                  </button>
+                                </div>
+                              </td>
+                              <td className="border border-gray-300 p-3 text-center">
+                                {totalGrams}g
+                              </td>
+                              <td className="border border-gray-300 p-3 text-center">
+                                {nutrition.calories}
+                              </td>
+                              <td className="border border-gray-300 p-3 text-center">
+                                {nutrition.protein}
+                              </td>
+                              <td className="border border-gray-300 p-3 text-center">
+                                {nutrition.carbs}
+                              </td>
+                              <td className="border border-gray-300 p-3 text-center">
+                                {nutrition.fat}
+                              </td>
+                              <td className="border border-gray-300 p-3 text-center">
+                                <button
+                                  className="text-red-600"
+                                  onClick={() =>
+                                    removeIngredient(meal, ingredient.id)
+                                  }
+                                  disabled={disabled}
+                                >
+                                  x
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-blue-50 font-bold">
+                          <td className="border border-gray-300 p-3">
+                            Total/meal
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            —
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            —
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {Math.round(calcTotals(list).calories)}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {Math.round(calcTotals(list).protein * 10) / 10}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {Math.round(calcTotals(list).carbs * 10) / 10}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            {Math.round(calcTotals(list).fat * 10) / 10}
+                          </td>
+                          <td className="border border-gray-300 p-3 text-center">
+                            -
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
+                </div>
               </details>
             );
           })}
@@ -1135,7 +1350,7 @@ const handleSaveAsNew = async () => {
         {/* Daily Totals */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           <div className="panel-blue-gradient">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">Per Day</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Per Day</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="font-medium">Calories:</span>
@@ -1211,7 +1426,8 @@ const handleSaveAsNew = async () => {
                         : "text-red-600"
                     }`}
                   >
-                    {targetMacros.protein}g ({targetPercentages.protein}%) → {dailyTotals.protein}g (
+                    {targetMacros.protein}g ({targetPercentages.protein}%) →{" "}
+                    {dailyTotals.protein}g (
                     {Math.round(
                       ((dailyTotals.protein * 4) / dailyTotals.calories) * 100
                     )}
@@ -1235,7 +1451,8 @@ const handleSaveAsNew = async () => {
                         : "text-red-600"
                     }`}
                   >
-                    {targetMacros.carbs}g ({targetPercentages.carbs}%) → {dailyTotals.carbs}g (
+                    {targetMacros.carbs}g ({targetPercentages.carbs}%) →{" "}
+                    {dailyTotals.carbs}g (
                     {Math.round(
                       ((dailyTotals.carbs * 4) / dailyTotals.calories) * 100
                     )}
@@ -1259,7 +1476,8 @@ const handleSaveAsNew = async () => {
                         : "text-red-600"
                     }`}
                   >
-                    {targetMacros.fat}g ({targetPercentages.fat}%) → {dailyTotals.fat}g (
+                    {targetMacros.fat}g ({targetPercentages.fat}%) →{" "}
+                    {dailyTotals.fat}g (
                     {Math.round(
                       ((dailyTotals.fat * 9) / dailyTotals.calories) * 100
                     )}
@@ -1290,8 +1508,8 @@ const handleSaveAsNew = async () => {
             </h3>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Prep days:</span>
-              <select 
-                value={prepDays} 
+              <select
+                value={prepDays}
                 onChange={(e) => setPrepDays(Number(e.target.value))}
                 className="px-2 py-1 border border-gray-300 rounded text-sm"
               >
@@ -1306,109 +1524,137 @@ const handleSaveAsNew = async () => {
               </select>
             </div>
           </div>
-          
+
           {prepDays > 7 && (
             <div className="mb-4 p-3 bg-green-50 rounded-lg">
-              <h4 className="font-semibold text-green-800 mb-1">🏗️ Extended Meal Prep Benefits:</h4>
+              <h4 className="font-semibold text-green-800 mb-1">
+                🏗️ Extended Meal Prep Benefits:
+              </h4>
               <p className="text-sm text-green-700">
-                Planning for {prepDays} days saves time and money. Consider freezing portions 
-                and buying in bulk for better deals.
+                Planning for {prepDays} days saves time and money. Consider
+                freezing portions and buying in bulk for better deals.
               </p>
             </div>
           )}
-          
-          <div className="space-y-4">
-            {Object.entries(categorizedShoppingList).map(([category, ingredients]) => (
-              <details key={category} open className="border rounded-lg">
-                <summary className="cursor-pointer bg-gray-50 p-3 font-semibold text-gray-700 hover:bg-gray-100 rounded-t-lg">
-                  {category} ({ingredients.length} items)
-                </summary>
-                <div className="p-3 space-y-2">
-                  {ingredients.map((ingredient) => {
-                    const totalQuantity = (ingredient.quantity || 1) * prepDays;
-                    const totalGrams = ingredient.grams * prepDays;
-                    const pounds = (totalGrams / 453.592).toFixed(2);
-                    const kilos = (totalGrams / 1000).toFixed(2);
-                    const unit = ingredient.unit || "g";
-                    const quantityPerDay = (ingredient.quantity || 1);
-                    const isGrams = unit === "g";
 
-                    return (
-                      <div
-                        key={ingredient.id}
-                        className="flex justify-between items-center p-2 bg-white rounded border hover:shadow-sm transition-shadow"
-                      >
-                        <span className="font-medium capitalize">{ingredient.name}</span>
-                        <div className="text-right">
-                          {isGrams ? (
-                            <>
-                              <span className="text-blue-600 font-bold block">
-                                {totalGrams.toFixed(0)}g
-                              </span>
-                              <div className="text-gray-600 text-sm">
-                                ({pounds} lbs | {kilos} kg)
-                                {prepDays > 7 && (
-                                  <div className="text-xs text-gray-500">
-                                    {(totalGrams / prepDays).toFixed(0)}g per day
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-blue-600 font-bold block">
-                                {totalQuantity.toFixed(1)} {unit}
-                              </span>
-                              <div className="text-gray-600 text-sm">
-                                ({totalGrams.toFixed(0)}g | {pounds} lbs | {kilos} kg)
-                                {prepDays > 7 && (
-                                  <div className="text-xs text-gray-500">
-                                    {quantityPerDay.toFixed(1)} {unit} per day
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
+          <div className="space-y-4">
+            {Object.entries(categorizedShoppingList).map(
+              ([category, ingredients]) => (
+                <details key={category} open className="border rounded-lg">
+                  <summary className="cursor-pointer bg-gray-50 p-3 font-semibold text-gray-700 hover:bg-gray-100 rounded-t-lg">
+                    {category} ({ingredients.length} items)
+                  </summary>
+                  <div className="p-3 space-y-2">
+                    {ingredients.map((ingredient) => {
+                      const totalQuantity =
+                        (ingredient.quantity || 1) * prepDays;
+                      const totalGrams = ingredient.grams * prepDays;
+                      const pounds = (totalGrams / 453.592).toFixed(2);
+                      const kilos = (totalGrams / 1000).toFixed(2);
+                      const unit = ingredient.unit || "g";
+                      const quantityPerDay = ingredient.quantity || 1;
+                      const isGrams = unit === "g";
+
+                      return (
+                        <div
+                          key={ingredient.id}
+                          className="flex justify-between items-center p-2 bg-white rounded border hover:shadow-sm transition-shadow"
+                        >
+                          <span className="font-medium capitalize">
+                            {ingredient.name}
+                          </span>
+                          <div className="text-right">
+                            {isGrams ? (
+                              <>
+                                <span className="text-blue-600 font-bold block">
+                                  {totalGrams.toFixed(0)}g
+                                </span>
+                                <div className="text-gray-600 text-sm">
+                                  ({pounds} lbs | {kilos} kg)
+                                  {prepDays > 7 && (
+                                    <div className="text-xs text-gray-500">
+                                      {(totalGrams / prepDays).toFixed(0)}g per
+                                      day
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-blue-600 font-bold block">
+                                  {totalQuantity.toFixed(1)} {unit}
+                                </span>
+                                <div className="text-gray-600 text-sm">
+                                  ({totalGrams.toFixed(0)}g | {pounds} lbs |{" "}
+                                  {kilos} kg)
+                                  {prepDays > 7 && (
+                                    <div className="text-xs text-gray-500">
+                                      {quantityPerDay.toFixed(1)} {unit} per day
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </details>
-            ))}
+                      );
+                    })}
+                  </div>
+                </details>
+              )
+            )}
           </div>
-          
+
           {/* Shopping Tips */}
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <h4 className="font-semibold text-blue-800 mb-2">💡 {prepDays > 7 ? 'Extended Meal Prep' : 'Shopping'} Tips:</h4>
+            <h4 className="font-semibold text-blue-800 mb-2">
+              💡 {prepDays > 7 ? "Extended Meal Prep" : "Shopping"} Tips:
+            </h4>
             <ul className="text-sm text-blue-700 space-y-1">
               {prepDays > 7 ? (
                 <>
-                  <li>• <strong>Storage:</strong> Invest in quality containers and freezer bags</li>
-                  <li>• <strong>Freezing:</strong> Most proteins freeze well for 3+ months</li>
-                  <li>• <strong>Bulk buying:</strong> Warehouse stores offer better prices for large quantities</li>
-                  <li>• <strong>Prep scheduling:</strong> Cook proteins in batches and freeze portions</li>
-                  <li>• <strong>Vegetables:</strong> Frozen vegetables are perfect for extended meal prep</li>
+                  <li>
+                    <strong>Storage:</strong> Invest in quality containers and
+                    freezer bags
+                  </li>
+                  <li>
+                    <strong>Freezing:</strong> Most proteins freeze well for 3+
+                    months
+                  </li>
+                  <li>
+                    <strong>Bulk buying:</strong> Warehouse stores offer better
+                    prices for large quantities
+                  </li>
+                  <li>
+                    <strong>Prep scheduling:</strong> Cook proteins in batches
+                    and freeze portions
+                  </li>
+                  <li>
+                    <strong>Vegetables:</strong> Frozen vegetables are perfect
+                    for extended meal prep
+                  </li>
                 </>
               ) : (
                 <>
-                  <li>• Buy in bulk to save money on larger quantities</li>
-                  <li>• Check for sales on protein sources first</li>
-                  <li>• Frozen vegetables are nutritious and last longer</li>
-                  <li>• Pre-cut vegetables save prep time</li>
+                  <li>Buy in bulk to save money on larger quantities</li>
+                  <li>Check for sales on protein sources first</li>
+                  <li>Frozen vegetables are nutritious and last longer</li>
+                  <li>Pre-cut vegetables save prep time</li>
                 </>
               )}
             </ul>
           </div>
-          
+
           {prepDays > 14 && (
             <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
-              <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Long-term Storage Notes:</h4>
+              <h4 className="font-semibold text-yellow-800 mb-2">
+                ⚠️ Long-term Storage Notes:
+              </h4>
               <ul className="text-sm text-yellow-700 space-y-1">
-                <li>• Label everything with dates before freezing</li>
-                <li>• Rotate stock - use oldest items first</li>
-                <li>• Consider vacuum sealing for better preservation</li>
-                <li>• Keep a freezer inventory list to track what you have</li>
+                <li>Label everything with dates before freezing</li>
+                <li>Rotate stock - use oldest items first</li>
+                <li>Consider vacuum sealing for better preservation</li>
+                <li>Keep a freezer inventory list to track what you have</li>
               </ul>
             </div>
           )}
