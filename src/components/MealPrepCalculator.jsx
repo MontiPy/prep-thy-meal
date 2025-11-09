@@ -568,13 +568,13 @@ const MealPrepCalculator = ({ allIngredients }) => {
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
   };
 
-  const handleShareToNotes = async () => {
+  const handleShareToReminders = async () => {
     if (!navigator.share) {
       alert("Sharing is not supported on this device/browser");
       return;
     }
 
-    // Format shopping list as checklist
+    // Format shopping list - each line becomes a reminder item
     const checklistItems = aggregatedIngredients.map((ing) => {
       const totalQuantity = (ing.quantity || 1) * prepDays;
       const totalGrams = ing.grams * prepDays;
@@ -587,11 +587,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
         quantityDisplay = `${totalQuantity.toFixed(1)} ${unit} (${totalGrams.toFixed(0)}g)`;
       }
 
-      return `- [ ] ${ing.name}: ${quantityDisplay}`;
+      return `${ing.name}: ${quantityDisplay}`;
     });
 
     const title = `${prepDays}-Day Shopping List`;
-    const text = `${title}\n\n${checklistItems.join("\n")}`;
+    const text = checklistItems.join("\n");
 
     try {
       await navigator.share({
@@ -603,6 +603,35 @@ const MealPrepCalculator = ({ allIngredients }) => {
         console.error("Error sharing:", error);
         alert("Failed to share. Please try again.");
       }
+    }
+  };
+
+  const handleCopyToClipboard = async () => {
+    // Format shopping list for copying
+    const checklistItems = aggregatedIngredients.map((ing) => {
+      const totalQuantity = (ing.quantity || 1) * prepDays;
+      const totalGrams = ing.grams * prepDays;
+      const unit = ing.unit || "g";
+
+      let quantityDisplay;
+      if (unit === "g") {
+        quantityDisplay = `${totalGrams.toFixed(0)}g`;
+      } else {
+        quantityDisplay = `${totalQuantity.toFixed(1)} ${unit} (${totalGrams.toFixed(0)}g)`;
+      }
+
+      return `${ing.name}: ${quantityDisplay}`;
+    });
+
+    const title = `${prepDays}-Day Shopping List`;
+    const text = `${title}\n\n${checklistItems.join("\n")}`;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Shopping list copied to clipboard!");
+    } catch (error) {
+      console.error("Error copying:", error);
+      alert("Failed to copy. Please try again.");
     }
   };
 
@@ -1561,10 +1590,16 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 Export PDF
               </button>
               <button
-                onClick={handleShareToNotes}
+                onClick={handleShareToReminders}
                 className="btn-green text-sm"
               >
-                Share to Notes
+                Share List
+              </button>
+              <button
+                onClick={handleCopyToClipboard}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Copy
               </button>
             </div>
           </div>
