@@ -32,7 +32,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
   });
 
   const MEALS = ["breakfast", "lunch", "dinner", "snack"];
-  const DAYS = 6;
+  const [prepDays, setPrepDays] = useState(6);
   const [matchDinner, setMatchDinner] = useState(false);
   const [mealIngredients, setMealIngredients] = useState({
     breakfast: [],
@@ -50,6 +50,8 @@ const MealPrepCalculator = ({ allIngredients }) => {
   const [savedPlans, setSavedPlans] = useState([]);
   const [planName, setPlanName] = useState("");
   const [currentPlanId, setCurrentPlanId] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +60,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
       if (!baseline) return;
       setCalorieTarget(baseline.calorieTarget);
       setTempTarget(baseline.calorieTarget);
+      
+      // Load matchDinner setting from baseline (default to false for older baselines)
+      const shouldMatchDinner = baseline.matchDinner || false;
+      setMatchDinner(shouldMatchDinner);
+      
       const basePerc = {
         protein: baseline.targetPercentages.protein,
         fat: baseline.targetPercentages.fat,
@@ -66,14 +73,46 @@ const MealPrepCalculator = ({ allIngredients }) => {
       };
       setTargetPercentages(basePerc);
       setTempPercentages(basePerc);
+      
+      // Load all meals from baseline if available
+      const loadMealIngredients = (mealData) => {
+        if (!mealData || !Array.isArray(mealData)) return [];
+        return mealData
+          .map(({ id, grams, quantity }) => {
+            const base = allIngredients.find((ing) => ing.id === id);
+            return base ? normalizeIngredient({ ...base, grams, quantity }) : null;
+          })
+          .filter(Boolean);
+      };
+
+      let mealData = {};
+      if (baseline.meals) {
+        // New format with all meals
+        mealData = {
+          breakfast: loadMealIngredients(baseline.meals.breakfast),
+          lunch: loadMealIngredients(baseline.meals.lunch),
+          dinner: loadMealIngredients(baseline.meals.dinner),
+          snack: loadMealIngredients(baseline.meals.snack),
+        };
+      } else {
+        // Legacy format - only lunch ingredients
+        const lunchIngredients = loadMealIngredients(baseline.ingredients);
+        mealData = {
+          breakfast: [],
+          lunch: lunchIngredients,
+          dinner: shouldMatchDinner ? lunchIngredients.map((i) => normalizeIngredient(i)) : [],
+          snack: [],
+        };
+      }
+      
+      // Apply matchDinner logic if enabled
+      if (shouldMatchDinner && mealData.lunch) {
+        mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
+      }
+        
       setMealIngredients((prev) => ({
         ...prev,
-        lunch: baseline.ingredients
-          .map(({ id, grams }) => {
-            const base = allIngredients.find((ing) => ing.id === id);
-            return base ? normalizeIngredient({ ...base, grams }) : null;
-          })
-          .filter(Boolean),
+        ...mealData,
       }));
     });
   }, [user, allIngredients]);
@@ -96,15 +135,46 @@ const MealPrepCalculator = ({ allIngredients }) => {
     });
   }, [allIngredients]);
 
-  const updateIngredientAmount = (meal, id, newGrams) => {
+  // Track changes to detect unsaved modifications
+  useEffect(() => {
+    if (currentPlanId && user) {
+      setHasUnsavedChanges(true);
+    }
+  }, [calorieTarget, targetPercentages, mealIngredients, matchDinner]);
+
+  // Don't trigger unsaved changes on initial load or plan switching
+  useEffect(() => {
+    setHasUnsavedChanges(false);
+  }, [currentPlanId]);
+
+  const updateIngredientAmount = (meal, id, newValue) => {
     setMealIngredients((prev) => {
       const list = prev[meal].map((ingredient) => {
         if (ingredient.id !== id) return ingredient;
-        if (ingredient.name === "Broccoli" && newGrams > ingredient.grams) {
+
+        // Get the original ingredient to ensure we have correct gramsPerUnit
+        const original = allIngredients.find((i) => i.id === id);
+        const gramsPerUnit = original?.gramsPerUnit || original?.grams || ingredient.gramsPerUnit || 100;
+
+        const unit = ingredient.unit || "g";
+        let quantity, grams;
+
+        if (unit === "g") {
+          // Gram-based: newValue is grams directly
+          grams = Math.max(0, newValue);
+          quantity = grams / gramsPerUnit;
+        } else {
+          // Unit-based: newValue is number of units
+          quantity = Math.max(0, newValue);
+          grams = quantity * gramsPerUnit;
+        }
+
+        if (ingredient.name === "Broccoli" && grams > ingredient.grams) {
           setCheer("You broc my world!");
           setTimeout(() => setCheer(""), 2000);
         }
-        return { ...ingredient, grams: Math.max(0, newGrams) };
+
+        return { ...ingredient, quantity, grams, gramsPerUnit };
       });
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
@@ -129,8 +199,17 @@ const MealPrepCalculator = ({ allIngredients }) => {
     const id = parseInt(selectedId);
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
+
+    // Ensure gramsPerUnit is set to match grams for proper scaling
+    const ingredientToAdd = normalizeIngredient({
+      ...item,
+      gramsPerUnit: item.gramsPerUnit || item.grams || 100,
+      grams: item.gramsPerUnit || item.grams || 100,
+      quantity: 1
+    });
+
     setMealIngredients((prev) => {
-      const list = [...prev[meal], normalizeIngredient(item)];
+      const list = [...prev[meal], ingredientToAdd];
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
         updated.dinner = list.map((i) => normalizeIngredient(i));
@@ -141,26 +220,39 @@ const MealPrepCalculator = ({ allIngredients }) => {
   };
 
   const handleSavePlan = async () => {
-    if (!planName.trim() || !user) return;
+    if (!user) return;
+    const name = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
-      name: planName.trim(),
+      name,
       calorieTarget,
       targetPercentages: {
         protein: targetPercentages.protein,
         fat: targetPercentages.fat,
         carbs: 100 - targetPercentages.protein - targetPercentages.fat,
       },
-      ingredients: mealIngredients.lunch.map(({ id, grams }) => ({ id, grams })),
+      // Save all meals, not just lunch
+      meals: {
+        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      },
+      matchDinner,
+      // Keep legacy ingredients field for backward compatibility
+      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
     };
     let plans;
     if (currentPlanId) {
       plans = await updatePlan(user.uid, currentPlanId, newPlan);
     } else {
       plans = await addPlan(user.uid, newPlan);
+      const newPlanId = plans[plans.length - 1].id;
+      setCurrentPlanId(newPlanId);
+      setSelectedPlanId(newPlanId);
     }
     setSavedPlans(plans);
-    setPlanName("");
-    setCurrentPlanId(null);
+    setPlanName(name);
+    setHasUnsavedChanges(false);
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 2000);
   };
@@ -170,8 +262,15 @@ const loadPlan = (id) => {
   if (!plan) return;
   setCurrentPlanId(plan.id);
   setPlanName(plan.name);
+  setSelectedPlanId(plan.id);
+  setHasUnsavedChanges(false);
   setCalorieTarget(plan.calorieTarget);
   setTempTarget(plan.calorieTarget);
+  
+  // Load matchDinner setting (default to false for older plans)
+  const shouldMatchDinner = plan.matchDinner || false;
+  setMatchDinner(shouldMatchDinner);
+  
   const planPerc = {
     protein: plan.targetPercentages.protein,
     fat: plan.targetPercentages.fat,
@@ -179,15 +278,90 @@ const loadPlan = (id) => {
   };
   setTargetPercentages(planPerc);
   setTempPercentages(planPerc);
-  setMealIngredients((prev) => ({
-    ...prev,
-    lunch: plan.ingredients
-      .map(({ id, grams }) => {
+  
+  // Load all meals if available (new format), otherwise fall back to legacy format
+  const loadMealIngredients = (mealData) => {
+    if (!mealData || !Array.isArray(mealData)) return [];
+    return mealData
+      .map(({ id, grams, quantity }) => {
         const base = allIngredients.find((i) => i.id === id);
-        return base ? normalizeIngredient({ ...base, grams }) : null;
+        return base ? normalizeIngredient({ ...base, grams, quantity }) : null;
       })
-      .filter(Boolean),
-  }));
+      .filter(Boolean);
+  };
+
+  let mealData = {};
+  if (plan.meals) {
+    // New format with all meals
+    mealData = {
+      breakfast: loadMealIngredients(plan.meals.breakfast),
+      lunch: loadMealIngredients(plan.meals.lunch),
+      dinner: loadMealIngredients(plan.meals.dinner),
+      snack: loadMealIngredients(plan.meals.snack),
+    };
+  } else {
+    // Legacy format - only lunch ingredients
+    const lunchIngredients = loadMealIngredients(plan.ingredients);
+    mealData = {
+      breakfast: [],
+      lunch: lunchIngredients,
+      dinner: shouldMatchDinner ? lunchIngredients.map((i) => normalizeIngredient(i)) : [],
+      snack: [],
+    };
+  }
+  
+  // Apply matchDinner logic if enabled
+  if (shouldMatchDinner && mealData.lunch) {
+    mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
+  }
+    
+  setMealIngredients(mealData);
+};
+
+const handlePlanDropdownChange = (e) => {
+  const planId = e.target.value;
+  setSelectedPlanId(planId);
+  if (planId) {
+    loadPlan(planId);
+  } else {
+    // Creating new plan
+    setCurrentPlanId(null);
+    setPlanName("");
+    setHasUnsavedChanges(false);
+  }
+};
+
+const handleSaveAsNew = async () => {
+  if (!user) return;
+  const newName = planName.trim() || `Plan ${savedPlans.length + 1}`;
+  const newPlan = {
+    name: newName,
+    calorieTarget,
+    targetPercentages: {
+      protein: targetPercentages.protein,
+      fat: targetPercentages.fat,
+      carbs: 100 - targetPercentages.protein - targetPercentages.fat,
+    },
+    // Save all meals, not just lunch
+    meals: {
+      breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+    },
+    matchDinner,
+    // Keep legacy ingredients field for backward compatibility
+    ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+  };
+  const plans = await addPlan(user.uid, newPlan);
+  setSavedPlans(plans);
+  const newPlanId = plans[plans.length - 1].id;
+  setCurrentPlanId(newPlanId);
+  setSelectedPlanId(newPlanId);
+  setPlanName(newName);
+  setHasUnsavedChanges(false);
+  setShowConfetti(true);
+  setTimeout(() => setShowConfetti(false), 2000);
 };
 
   const handleDeletePlan = async (id) => {
@@ -214,9 +388,20 @@ const loadPlan = (id) => {
       const list = mealIngredients[meal];
       return list.map((ing) => {
         const n = calculateNutrition(ing);
+        const unit = ing.unit || "g";
+
+        // Show quantity based on unit type
+        let quantityDisplay;
+        if (unit === "g") {
+          quantityDisplay = `${ing.grams}g`;
+        } else {
+          quantityDisplay = `${(ing.quantity || 1).toFixed(1)} ${unit}`;
+        }
+
         return [
           `${ing.name} (${meal})`,
-          ing.grams,
+          quantityDisplay,
+          `${ing.grams}g`,
           n.calories,
           n.protein,
           n.carbs,
@@ -226,7 +411,7 @@ const loadPlan = (id) => {
     });
 
     autoTable(doc, {
-      head: [["Ingredient", "Grams", "Calories", "Protein", "Carbs", "Fat"]],
+      head: [["Ingredient", "Quantity", "Grams", "Calories", "Protein", "Carbs", "Fat"]],
       body: rows,
       startY: 35,
     });
@@ -268,11 +453,23 @@ const loadPlan = (id) => {
     });
 
     autoTable(doc, {
-      head: [["Shopping List (6 days)", "Grams", "Pounds"]],
+      head: [[`Shopping List (${prepDays} days)`, "Quantity", "Grams", "Pounds", "Kilos"]],
       body: aggregatedIngredients.map((ing) => {
-        const totalGrams = ing.grams * DAYS;
+        const totalQuantity = (ing.quantity || 1) * prepDays;
+        const totalGrams = ing.grams * prepDays;
         const pounds = (totalGrams / 453.592).toFixed(2);
-        return [ing.name, totalGrams, pounds];
+        const kilos = (totalGrams / 1000).toFixed(2);
+        const unit = ing.unit || "g";
+
+        // Show quantity based on unit type
+        let quantityDisplay;
+        if (unit === "g") {
+          quantityDisplay = `${totalGrams.toFixed(0)}g`;
+        } else {
+          quantityDisplay = `${totalQuantity.toFixed(1)} ${unit}`;
+        }
+
+        return [ing.name, quantityDisplay, totalGrams.toFixed(0), pounds, kilos];
       }),
       startY: doc.lastAutoTable.finalY + 5,
     });
@@ -289,7 +486,16 @@ const loadPlan = (id) => {
         fat: targetPercentages.fat,
         carbs: 100 - targetPercentages.protein - targetPercentages.fat,
       },
-      ingredients: mealIngredients.lunch.map(({ id, grams }) => ({ id, grams })),
+      // Save all meals in baseline
+      meals: {
+        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+      },
+      matchDinner,
+      // Keep legacy ingredients field for backward compatibility
+      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
     };
     await saveBaseline(user.uid, baseline);
   };
@@ -328,20 +534,87 @@ const loadPlan = (id) => {
   dailyTotals.carbs = Math.round(dailyTotals.carbs * 10) / 10;
   dailyTotals.fat = Math.round(dailyTotals.fat * 10) / 10;
 
+  // Categorize ingredients by store section
+  const categorizeIngredient = (name) => {
+    const nameL = name.toLowerCase();
+    if (nameL.includes('chicken') || nameL.includes('beef') || nameL.includes('pork') || nameL.includes('turkey') || nameL.includes('fish') || nameL.includes('salmon') || nameL.includes('tuna') || nameL.includes('meat')) {
+      return 'Meat & Seafood';
+    }
+    if (nameL.includes('milk') || nameL.includes('cheese') || nameL.includes('yogurt') || nameL.includes('butter') || nameL.includes('cream')) {
+      return 'Dairy';
+    }
+    if (nameL.includes('apple') || nameL.includes('banana') || nameL.includes('berry') || nameL.includes('orange') || nameL.includes('grape') || nameL.includes('fruit')) {
+      return 'Produce - Fruits';
+    }
+    if (nameL.includes('broccoli') || nameL.includes('spinach') || nameL.includes('carrot') || nameL.includes('lettuce') || nameL.includes('tomato') || nameL.includes('vegetable') || nameL.includes('kale') || nameL.includes('pepper')) {
+      return 'Produce - Vegetables';
+    }
+    if (nameL.includes('rice') || nameL.includes('pasta') || nameL.includes('bread') || nameL.includes('oats') || nameL.includes('quinoa') || nameL.includes('cereal')) {
+      return 'Grains & Bread';
+    }
+    if (nameL.includes('beans') || nameL.includes('nuts') || nameL.includes('peanut') || nameL.includes('almond') || nameL.includes('seed')) {
+      return 'Nuts & Legumes';
+    }
+    if (nameL.includes('oil') || nameL.includes('sauce') || nameL.includes('spice') || nameL.includes('salt') || nameL.includes('pepper') || nameL.includes('vinegar')) {
+      return 'Condiments & Spices';
+    }
+    return 'Other';
+  };
+
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
     MEALS.forEach((meal) => {
       const list = mealIngredients[meal];
       list.forEach((ing) => {
+        const quantity = ing.quantity || (ing.grams / (ing.gramsPerUnit || ing.grams || 100));
+        const grams = quantity * (ing.gramsPerUnit || ing.grams || 100);
+
         if (!totals[ing.id]) {
-          totals[ing.id] = { ...ing, grams: Number(ing.grams) || 0 };
+          totals[ing.id] = {
+            ...ing,
+            quantity: Number(quantity) || 0,
+            grams: Number(grams) || 0
+          };
         } else {
-          totals[ing.id].grams += Number(ing.grams) || 0;
+          totals[ing.id].quantity += Number(quantity) || 0;
+          totals[ing.id].grams += Number(grams) || 0;
         }
       });
     });
     return Object.values(totals);
   }, [mealIngredients]);
+
+  const categorizedShoppingList = React.useMemo(() => {
+    const categories = {};
+    aggregatedIngredients.forEach((ingredient) => {
+      const category = categorizeIngredient(ingredient.name);
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push(ingredient);
+    });
+    
+    // Sort categories in logical shopping order
+    const categoryOrder = [
+      'Produce - Fruits',
+      'Produce - Vegetables', 
+      'Meat & Seafood',
+      'Dairy',
+      'Grains & Bread',
+      'Nuts & Legumes',
+      'Condiments & Spices',
+      'Other'
+    ];
+    
+    const sortedCategories = {};
+    categoryOrder.forEach(cat => {
+      if (categories[cat] && categories[cat].length > 0) {
+        sortedCategories[cat] = categories[cat].sort((a, b) => a.name.localeCompare(b.name));
+      }
+    });
+    
+    return sortedCategories;
+  }, [aggregatedIngredients]);
 
   // Calculate target macros based on calorie target and percentages
   const targetMacros = {
@@ -565,59 +838,84 @@ const loadPlan = (id) => {
 
         {/* Plan Manager */}
         <div className="panel-gray mb-6">
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Current Plan: {currentPlanId ? 
+                <span className="text-blue-600">{planName}</span> : 
+                <span className="text-gray-500">New Plan</span>
+              }
+              {hasUnsavedChanges && <span className="text-orange-500 ml-2">• Unsaved changes</span>}
+            </label>
+            <select
+              value={selectedPlanId}
+              onChange={handlePlanDropdownChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+            >
+              <option value="">Create new plan...</option>
+              {savedPlans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
           <div className="flex items-center gap-2 mb-2">
             <input
               type="text"
               value={planName}
               onChange={(e) => setPlanName(e.target.value)}
-              placeholder="Plan name"
-              className="w-full px-2 py-1 border border-gray-300 rounded"
+              placeholder="Plan name (optional)"
+              className="flex-1 px-2 py-1 border border-gray-300 rounded"
             />
             <button
               onClick={handleSavePlan}
-              className="text-blue-600 hover:text-gray-800 p-1 font-medium"
+              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium whitespace-nowrap"
             >
-              Save
+              {currentPlanId ? `Update ${planName || 'Plan'}` : 'Save Plan'}
             </button>
-            <button
-              onClick={handleSaveBaseline}
-              className="text-blue-600 hover:text-gray-800 p-1 font-medium"
-            >
-              Set Baseline
-            </button>
-            <button
-              onClick={handleExportPDF}
-              className="text-blue-600 hover:text-gray-800 p-1 font-medium"
-            >
-              Export PDF
-            </button>
+            {currentPlanId && (
+              <button
+                onClick={handleSaveAsNew}
+                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 font-medium whitespace-nowrap"
+              >
+                Save As New
+              </button>
+            )}
           </div>
-          {savedPlans.length > 0 && (
-            <div className="space-y-2">
-              {savedPlans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className="flex justify-between items-center border rounded p-1"
+
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+              Advanced Plan Management
+            </summary>
+            <div className="mt-2 space-y-2 border-t pt-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveBaseline}
+                  className="text-blue-600 hover:text-blue-800 p-1 font-medium text-sm"
                 >
-                  <span className="font-medium">{plan.name}</span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => loadPlan(plan.id)}
-                      className="text-green-600 hover:text-green-800 p-1"
-                    >
-                      Load
-                    </button>
-                    <button
-                      onClick={() => handleDeletePlan(plan.id)}
-                      className="text-red-600 hover:text-red-800 p-1"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  Set as Baseline
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  className="text-blue-600 hover:text-blue-800 p-1 font-medium text-sm"
+                >
+                  Export PDF
+                </button>
+              </div>
+              {savedPlans.length > 0 && currentPlanId && (
+                <div className="flex justify-between items-center bg-gray-50 rounded p-2">
+                  <span className="text-sm text-gray-600">Delete current plan</span>
+                  <button
+                    onClick={() => handleDeletePlan(currentPlanId)}
+                    className="text-red-600 hover:text-red-800 text-sm px-2 py-1"
+                  >
+                    Delete
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
-          )}
+          </details>
         </div>
 
         {/* Instructions */}
@@ -696,6 +994,7 @@ const loadPlan = (id) => {
                         <thead>
                           <tr className="bg-gray-100">
                             <th className="border border-gray-300 p-3 text-left">Ingredient</th>
+                            <th className="border border-gray-300 p-3 text-center">Quantity</th>
                             <th className="border border-gray-300 p-3 text-center">Grams</th>
                             <th className="border border-gray-300 p-3 text-center">Calories</th>
                             <th className="border border-gray-300 p-3 text-center">Protein (g)</th>
@@ -708,6 +1007,26 @@ const loadPlan = (id) => {
                           {list.map((ingredient) => {
                             const nutrition = calculateNutrition(ingredient);
                             const disabled = matchDinner && meal === "dinner";
+                            const unit = ingredient.unit || "g";
+
+                            // For "g" type: quantity represents grams directly
+                            // For "unit" type: quantity represents number of units
+                            let displayQuantity, totalGrams, incrementStep, unitLabel;
+
+                            if (unit === "g") {
+                              // Gram-based: show grams directly
+                              displayQuantity = ingredient.grams || 100;
+                              totalGrams = Math.round(displayQuantity);
+                              incrementStep = 5;
+                              unitLabel = "g";
+                            } else {
+                              // Unit-based: show number of units
+                              displayQuantity = ingredient.quantity || 1;
+                              totalGrams = Math.round(displayQuantity * (ingredient.gramsPerUnit || 100));
+                              incrementStep = 0.5;
+                              unitLabel = "unit";
+                            }
+
                             return (
                               <tr key={ingredient.id} className="hover:bg-gray-50">
                                 <td className="border border-gray-300 p-3 font-medium capitalize">
@@ -720,7 +1039,7 @@ const loadPlan = (id) => {
                                         updateIngredientAmount(
                                           meal,
                                           ingredient.id,
-                                          ingredient.grams - 5
+                                          displayQuantity - incrementStep
                                         )
                                       }
                                       className="text-red-600 hover:text-red-800 p-1 rounded"
@@ -730,24 +1049,26 @@ const loadPlan = (id) => {
                                     </button>
                                     <input
                                       type="number"
-                                      value={ingredient.grams}
+                                      step="any"
+                                      value={displayQuantity}
                                       onChange={(e) =>
                                         updateIngredientAmount(
                                           meal,
                                           ingredient.id,
-                                          parseInt(e.target.value) || 0
+                                          parseFloat(e.target.value) || 0
                                         )
                                       }
-                                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
+                                      className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
                                       min="0"
                                       disabled={disabled}
                                     />
+                                    <span className="text-sm text-gray-600 w-12">{unitLabel}</span>
                                     <button
                                       onClick={() =>
                                         updateIngredientAmount(
                                           meal,
                                           ingredient.id,
-                                          ingredient.grams + 5
+                                          displayQuantity + incrementStep
                                         )
                                       }
                                       className="text-green-600 hover:text-green-800 p-1 rounded"
@@ -756,6 +1077,9 @@ const loadPlan = (id) => {
                                       <Plus size={16} className="wiggle" />
                                     </button>
                                   </div>
+                                </td>
+                                <td className="border border-gray-300 p-3 text-center">
+                                  {totalGrams}g
                                 </td>
                                 <td className="border border-gray-300 p-3 text-center">
                                   {nutrition.calories}
@@ -783,6 +1107,7 @@ const loadPlan = (id) => {
                           })}
                           <tr className="bg-blue-50 font-bold">
                             <td className="border border-gray-300 p-3">Total/meal</td>
+                            <td className="border border-gray-300 p-3 text-center">—</td>
                             <td className="border border-gray-300 p-3 text-center">—</td>
                             <td className="border border-gray-300 p-3 text-center">
                               {Math.round(calcTotals(list).calories)}
@@ -959,31 +1284,134 @@ const loadPlan = (id) => {
 
         {/* Shopping List */}
         <div className="panel-gray">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">
-            6-Day Shopping List
-          </h3>
-          <div className="overflow-x-auto">
-          <div className="grid md:grid-cols-2 gap-4 min-w-max">
-            {aggregatedIngredients.map((ingredient) => {
-              const totalGrams = ingredient.grams * DAYS;
-              const pounds = (totalGrams / 453.592).toFixed(2);
-              return (
-                <div
-                  key={ingredient.id}
-                  className="flex justify-between items-center p-3 bg-white rounded border"
-                >
-                  <span className="font-medium capitalize">{ingredient.name}</span>
-                  <div className="text-right">
-                    <span className="text-blue-600 font-bold block">
-                      {totalGrams}g
-                    </span>
-                    <span className="text-gray-600 text-sm">({pounds} lbs)</span>
-                  </div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="text-xl font-bold text-gray-800">
+              {prepDays}-Day Shopping List
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Prep days:</span>
+              <select 
+                value={prepDays} 
+                onChange={(e) => setPrepDays(Number(e.target.value))}
+                className="px-2 py-1 border border-gray-300 rounded text-sm"
+              >
+                <option value={3}>3 days</option>
+                <option value={5}>5 days</option>
+                <option value={6}>6 days</option>
+                <option value={7}>1 week</option>
+                <option value={10}>10 days</option>
+                <option value={14}>2 weeks</option>
+                <option value={21}>3 weeks</option>
+                <option value={30}>1 month</option>
+              </select>
+            </div>
+          </div>
+          
+          {prepDays > 7 && (
+            <div className="mb-4 p-3 bg-green-50 rounded-lg">
+              <h4 className="font-semibold text-green-800 mb-1">🏗️ Extended Meal Prep Benefits:</h4>
+              <p className="text-sm text-green-700">
+                Planning for {prepDays} days saves time and money. Consider freezing portions 
+                and buying in bulk for better deals.
+              </p>
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            {Object.entries(categorizedShoppingList).map(([category, ingredients]) => (
+              <details key={category} open className="border rounded-lg">
+                <summary className="cursor-pointer bg-gray-50 p-3 font-semibold text-gray-700 hover:bg-gray-100 rounded-t-lg">
+                  {category} ({ingredients.length} items)
+                </summary>
+                <div className="p-3 space-y-2">
+                  {ingredients.map((ingredient) => {
+                    const totalQuantity = (ingredient.quantity || 1) * prepDays;
+                    const totalGrams = ingredient.grams * prepDays;
+                    const pounds = (totalGrams / 453.592).toFixed(2);
+                    const kilos = (totalGrams / 1000).toFixed(2);
+                    const unit = ingredient.unit || "g";
+                    const quantityPerDay = (ingredient.quantity || 1);
+                    const isGrams = unit === "g";
+
+                    return (
+                      <div
+                        key={ingredient.id}
+                        className="flex justify-between items-center p-2 bg-white rounded border hover:shadow-sm transition-shadow"
+                      >
+                        <span className="font-medium capitalize">{ingredient.name}</span>
+                        <div className="text-right">
+                          {isGrams ? (
+                            <>
+                              <span className="text-blue-600 font-bold block">
+                                {totalGrams.toFixed(0)}g
+                              </span>
+                              <div className="text-gray-600 text-sm">
+                                ({pounds} lbs | {kilos} kg)
+                                {prepDays > 7 && (
+                                  <div className="text-xs text-gray-500">
+                                    {(totalGrams / prepDays).toFixed(0)}g per day
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-blue-600 font-bold block">
+                                {totalQuantity.toFixed(1)} {unit}
+                              </span>
+                              <div className="text-gray-600 text-sm">
+                                ({totalGrams.toFixed(0)}g | {pounds} lbs | {kilos} kg)
+                                {prepDays > 7 && (
+                                  <div className="text-xs text-gray-500">
+                                    {quantityPerDay.toFixed(1)} {unit} per day
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </details>
+            ))}
           </div>
+          
+          {/* Shopping Tips */}
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <h4 className="font-semibold text-blue-800 mb-2">💡 {prepDays > 7 ? 'Extended Meal Prep' : 'Shopping'} Tips:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              {prepDays > 7 ? (
+                <>
+                  <li>• <strong>Storage:</strong> Invest in quality containers and freezer bags</li>
+                  <li>• <strong>Freezing:</strong> Most proteins freeze well for 3+ months</li>
+                  <li>• <strong>Bulk buying:</strong> Warehouse stores offer better prices for large quantities</li>
+                  <li>• <strong>Prep scheduling:</strong> Cook proteins in batches and freeze portions</li>
+                  <li>• <strong>Vegetables:</strong> Frozen vegetables are perfect for extended meal prep</li>
+                </>
+              ) : (
+                <>
+                  <li>• Buy in bulk to save money on larger quantities</li>
+                  <li>• Check for sales on protein sources first</li>
+                  <li>• Frozen vegetables are nutritious and last longer</li>
+                  <li>• Pre-cut vegetables save prep time</li>
+                </>
+              )}
+            </ul>
           </div>
+          
+          {prepDays > 14 && (
+            <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
+              <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Long-term Storage Notes:</h4>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                <li>• Label everything with dates before freezing</li>
+                <li>• Rotate stock - use oldest items first</li>
+                <li>• Consider vacuum sealing for better preservation</li>
+                <li>• Keep a freezer inventory list to track what you have</li>
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

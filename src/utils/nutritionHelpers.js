@@ -8,6 +8,9 @@ export const normalizeIngredient = (item) => ({
   protein: Number(item.protein) || 0,
   carbs: Number(item.carbs) || 0,
   fat: Number(item.fat) || 0,
+  unit: item.unit || "g",
+  gramsPerUnit: Number(item.gramsPerUnit) || Number(item.grams) || 100,
+  quantity: Number(item.quantity) || 1, // quantity in units (e.g., 2.5 slices)
 });
 
 export const getAllBaseIngredients = () => {
@@ -25,16 +28,27 @@ export const getOriginalCarbs = (id) => getOriginal(id)?.carbs || 0;
 export const getOriginalFat = (id) => getOriginal(id)?.fat || 0;
 
 /**
- * Calculates scaled nutrition based on current grams.
+ * Calculates scaled nutrition based on current quantity and units.
+ * Nutrition values are stored per gramsPerUnit in the original ingredient.
  */
 export const calculateNutrition = (ingredient) => {
   const original = getOriginal(ingredient.id);
-  const ratio = ingredient.grams / (original?.grams || 1);
+  if (!original) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
 
+  // Get quantity - either from quantity field (new) or calculate from grams (legacy)
+  let quantity = ingredient.quantity;
+  if (quantity === undefined || quantity === null) {
+    // Legacy support: calculate quantity from grams
+    const gramsPerUnit = original.gramsPerUnit || original.grams || 100;
+    quantity = ingredient.grams / gramsPerUnit;
+  }
+
+  // Nutrition values in original are per gramsPerUnit
+  // Multiply by quantity to get total nutrition
   return {
-    calories: Math.round(original.calories * ratio * 10) / 10,
-    protein: Math.round(original.protein * ratio * 10) / 10,
-    carbs: Math.round(original.carbs * ratio * 10) / 10,
-    fat: Math.round(original.fat * ratio * 10) / 10,
+    calories: Math.round(original.calories * quantity * 10) / 10,
+    protein: Math.round(original.protein * quantity * 10) / 10,
+    carbs: Math.round(original.carbs * quantity * 10) / 10,
+    fat: Math.round(original.fat * quantity * 10) / 10,
   };
 };

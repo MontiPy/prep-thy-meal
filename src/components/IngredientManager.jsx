@@ -12,10 +12,12 @@ import { fetchNutritionByName, searchFoods } from "../utils/nutritionixApi";
 const empty = {
   name: "",
   grams: 100,
+  gramsPerUnit: 100,
   calories: 0,
   protein: 0,
   carbs: 0,
   fat: 0,
+  unit: "g",
 };
 
 const IngredientManager = ({ onChange }) => {
@@ -37,7 +39,16 @@ const IngredientManager = ({ onChange }) => {
     const details =
       item.grams !== undefined ? item : await fetchNutritionByName(name);
     if (!details) return;
-    await addCustomIngredient({ name, ...details }, user?.uid);
+
+    const ingredientToAdd = { name, ...details };
+
+    // Ensure gramsPerUnit and grams are always equal
+    if (!ingredientToAdd.gramsPerUnit) {
+      ingredientToAdd.gramsPerUnit = ingredientToAdd.grams;
+    }
+    ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
+
+    await addCustomIngredient(ingredientToAdd, user?.uid);
     setSearchResults([]);
     setSearchQuery("");
     refresh();
@@ -58,7 +69,12 @@ const IngredientManager = ({ onChange }) => {
 
   const handleAdd = async () => {
     if (!newIngredient.name.trim()) return;
-    await addCustomIngredient({ ...newIngredient }, user?.uid);
+    const ingredientToAdd = { ...newIngredient };
+
+    // Ensure gramsPerUnit and grams are always equal
+    ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
+
+    await addCustomIngredient(ingredientToAdd, user?.uid);
     setNewIngredient({ ...empty });
     refresh();
   };
@@ -69,7 +85,12 @@ const IngredientManager = ({ onChange }) => {
   };
 
   const saveEdit = async () => {
-    await upsertCustomIngredient(editData, user?.uid);
+    const ingredientToSave = { ...editData };
+
+    // Ensure gramsPerUnit and grams are always equal
+    ingredientToSave.grams = ingredientToSave.gramsPerUnit;
+
+    await upsertCustomIngredient(ingredientToSave, user?.uid);
     setEditingId(null);
     refresh();
   };
@@ -79,8 +100,21 @@ const IngredientManager = ({ onChange }) => {
     refresh();
   };
 
-  const handleChange = (setter) => (e) =>
-    setter((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (setter) => (e) => {
+    const { name, value } = e.target;
+    setter((prev) => {
+      const updated = { ...prev, [name]: value };
+
+      // gramsPerUnit should always equal grams
+      if (name === "gramsPerUnit") {
+        updated.grams = value;
+      } else if (name === "grams") {
+        updated.gramsPerUnit = value;
+      }
+
+      return updated;
+    });
+  };
 
   return (
     <div className="p-4">
@@ -105,7 +139,8 @@ const IngredientManager = ({ onChange }) => {
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border p-1">Name</th>
-                  <th className="border p-1">g</th>
+                  <th className="border p-1">Unit</th>
+                  <th className="border p-1">g/unit</th>
                   <th className="border p-1">Cal</th>
                   <th className="border p-1">P</th>
                   <th className="border p-1">C</th>
@@ -117,7 +152,8 @@ const IngredientManager = ({ onChange }) => {
                 {searchResults.map((res) => (
                   <tr key={res.id} className="border-t">
                     <td className="border p-1 capitalize">{res.name}</td>
-                    <td className="border p-1 text-center">{res.grams !== undefined ? res.grams : "-"}</td>
+                    <td className="border p-1 text-center">{res.unit || "g"}</td>
+                    <td className="border p-1 text-center">{res.gramsPerUnit || res.grams || "-"}</td>
                     <td className="border p-1 text-center">{res.calories !== undefined ? res.calories : "-"}</td>
                     <td className="border p-1 text-center">{res.protein !== undefined ? res.protein : "-"}</td>
                     <td className="border p-1 text-center">{res.carbs !== undefined ? res.carbs : "-"}</td>
@@ -143,7 +179,8 @@ const IngredientManager = ({ onChange }) => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="border p-1">Name</th>
-                <th className="border p-1">g</th>
+                <th className="border p-1">Unit</th>
+                <th className="border p-1">g/unit</th>
                 <th className="border p-1">Cal</th>
                 <th className="border p-1">P</th>
                 <th className="border p-1">C</th>
@@ -163,12 +200,24 @@ const IngredientManager = ({ onChange }) => {
                   />
                 </td>
                 <td className="border p-1">
-                  <input
-                    name="grams"
-                    type="number"
-                    value={newIngredient.grams}
+                  <select
+                    name="unit"
+                    value={newIngredient.unit}
                     onChange={handleChange(setNewIngredient)}
                     className="border px-1 w-full"
+                  >
+                    <option value="g">g</option>
+                    <option value="unit">unit</option>
+                  </select>
+                </td>
+                <td className="border p-1">
+                  <input
+                    name="gramsPerUnit"
+                    type="number"
+                    value={newIngredient.gramsPerUnit}
+                    onChange={handleChange(setNewIngredient)}
+                    className="border px-1 w-full"
+                    placeholder="100"
                   />
                 </td>
                 <td className="border p-1">
@@ -222,7 +271,8 @@ const IngredientManager = ({ onChange }) => {
         <thead>
           <tr className="bg-gray-100">
             <th className="border p-1">Name</th>
-            <th className="border p-1">g</th>
+            <th className="border p-1">Unit</th>
+            <th className="border p-1">g/unit</th>
             <th className="border p-1">Cal</th>
             <th className="border p-1">P</th>
             <th className="border p-1">C</th>
@@ -244,10 +294,21 @@ const IngredientManager = ({ onChange }) => {
                     />
                   </td>
                   <td className="border p-1">
+                    <select
+                      name="unit"
+                      value={editData.unit || "g"}
+                      onChange={handleChange(setEditData)}
+                      className="border px-1 w-full"
+                    >
+                      <option value="g">g</option>
+                      <option value="unit">unit</option>
+                    </select>
+                  </td>
+                  <td className="border p-1">
                     <input
-                      name="grams"
+                      name="gramsPerUnit"
                       type="number"
-                      value={editData.grams}
+                      value={editData.gramsPerUnit || editData.grams || 100}
                       onChange={handleChange(setEditData)}
                       className="border px-1 w-full"
                     />
@@ -303,7 +364,8 @@ const IngredientManager = ({ onChange }) => {
               ) : (
                 <>
                   <td className="border p-1 capitalize">{ing.name}</td>
-                  <td className="border p-1 text-center">{ing.grams}</td>
+                  <td className="border p-1 text-center">{ing.unit || "g"}</td>
+                  <td className="border p-1 text-center">{ing.gramsPerUnit || ing.grams || 100}</td>
                   <td className="border p-1 text-center">{ing.calories}</td>
                   <td className="border p-1 text-center">{ing.protein}</td>
                   <td className="border p-1 text-center">{ing.carbs}</td>
