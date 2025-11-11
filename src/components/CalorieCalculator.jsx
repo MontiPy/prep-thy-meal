@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useUser } from '../context/UserContext.jsx';
 
 const CalorieCalculator = () => {
@@ -86,13 +87,13 @@ const CalorieCalculator = () => {
         await setDoc(doc(db, 'userProfiles', user.uid), {
           calorieProfile: profile
         }, { merge: true });
-        alert('Profile saved successfully!');
+        toast.success('Profile saved successfully!');
       } catch (error) {
         console.error('Error saving to cloud:', error);
-        alert('Profile saved locally. Please check your internet connection for cloud sync.');
+        toast.warning('Profile saved locally. Please check your internet connection for cloud sync.');
       }
     } else {
-      alert('Profile saved locally. Sign in to sync across devices.');
+      toast.success('Profile saved locally. Sign in to sync across devices.');
     }
   };
 

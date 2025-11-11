@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import toast from "react-hot-toast";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -15,12 +16,15 @@ import {
   saveBaseline,
 } from "../utils/storage";
 import { useUser } from "../context/UserContext.jsx";
+import ConfirmDialog from "./ConfirmDialog";
+import IngredientCard from "./IngredientCard";
 
 const MealPrepCalculator = ({ allIngredients }) => {
   const { user } = useUser();
   const [calorieTarget, setCalorieTarget] = useState(1400);
   const [editingTarget, setEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState(2000);
+  const [targetWarning, setTargetWarning] = useState("");
 
   const [targetPercentages, setTargetPercentages] = useState({
     protein: 40,
@@ -33,6 +37,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
     fat: 25,
     carbs: 35,
   });
+  const [percentageWarning, setPercentageWarning] = useState("");
 
   const MEALS = ["breakfast", "lunch", "dinner", "snack"];
   const [prepDays, setPrepDays] = useState(6);
@@ -55,6 +60,13 @@ const MealPrepCalculator = ({ allIngredients }) => {
   const [currentPlanId, setCurrentPlanId] = useState(null);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Confirmation dialog state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState(null);
+
+  // Import file input ref
+  const importFileRef = useRef(null);
 
   useEffect(() => {
     if (!user) return;
@@ -425,8 +437,186 @@ const MealPrepCalculator = ({ allIngredients }) => {
 
   const handleDeletePlan = async (id) => {
     if (!user) return;
-    const plans = await removePlan(user.uid, id);
+    const plan = savedPlans.find(p => p.id === id);
+    setPlanToDelete({ id, name: plan?.name || 'this plan' });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeletePlan = async () => {
+    if (!user || !planToDelete) return;
+    const plans = await removePlan(user.uid, planToDelete.id);
     setSavedPlans(plans);
+    // Clear current plan if we deleted it
+    if (currentPlanId === planToDelete.id) {
+      setCurrentPlanId(null);
+      setSelectedPlanId("");
+      setPlanName("");
+    }
+    setPlanToDelete(null);
+  };
+
+  const handleImportJSON = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+
+        // Validate structure
+        if (!importedData.plan || !importedData.plan.meals) {
+          toast.error('Invalid meal plan file format.');
+          return;
+        }
+
+        const plan = importedData.plan;
+
+        // Load plan data
+        setPlanName(plan.name || 'Imported Plan');
+        setCalorieTarget(plan.calorieTarget || 2000);
+        setTempTarget(plan.calorieTarget || 2000);
+        setTargetPercentages({
+          protein: plan.targetPercentages?.protein || 40,
+          fat: plan.targetPercentages?.fat || 25,
+          carbs: plan.targetPercentages?.carbs || 35,
+        });
+        setTempPercentages({
+          protein: plan.targetPercentages?.protein || 40,
+          fat: plan.targetPercentages?.fat || 25,
+          carbs: plan.targetPercentages?.carbs || 35,
+        });
+        setMatchDinner(plan.matchDinner || false);
+
+        // Load meals - match ingredients with allIngredients or create new ones
+        const loadMeal = (mealData) => {
+          if (!Array.isArray(mealData)) return [];
+          return mealData.map(ing => {
+            // Try to find existing ingredient
+            const existing = allIngredients.find(i => i.id === ing.id);
+            if (existing) {
+              return normalizeIngredient({
+                ...existing,
+                grams: ing.grams,
+                quantity: ing.quantity,
+              });
+            }
+            // Use imported ingredient data
+            return normalizeIngredient(ing);
+          });
+        };
+
+        setMealIngredients({
+          breakfast: loadMeal(plan.meals.breakfast),
+          lunch: loadMeal(plan.meals.lunch),
+          dinner: loadMeal(plan.meals.dinner),
+          snack: loadMeal(plan.meals.snack),
+        });
+
+        // Clear current plan ID since this is imported
+        setCurrentPlanId(null);
+        setSelectedPlanId("");
+        setHasUnsavedChanges(true);
+
+        toast.success(`Meal plan "${plan.name}" imported successfully!`);
+      } catch (error) {
+        console.error('Error importing meal plan:', error);
+        toast.error('Failed to import meal plan. Please check the file format.');
+      }
+    };
+
+    reader.onerror = () => {
+      toast.error('Failed to read file. Please try again.');
+    };
+
+    reader.readAsText(file);
+    // Reset input so same file can be imported again
+    event.target.value = '';
+  };
+
+  const handleExportJSON = () => {
+    const exportData = {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      plan: {
+        name: planName || "Untitled Plan",
+        calorieTarget,
+        targetPercentages: {
+          protein: targetPercentages.protein,
+          fat: targetPercentages.fat,
+          carbs: targetPercentages.carbs,
+        },
+        matchDinner,
+        meals: {
+          breakfast: mealIngredients.breakfast.map(ing => ({
+            id: ing.id,
+            name: ing.name,
+            grams: ing.grams,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            gramsPerUnit: ing.gramsPerUnit,
+            calories: ing.calories,
+            protein: ing.protein,
+            carbs: ing.carbs,
+            fat: ing.fat,
+          })),
+          lunch: mealIngredients.lunch.map(ing => ({
+            id: ing.id,
+            name: ing.name,
+            grams: ing.grams,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            gramsPerUnit: ing.gramsPerUnit,
+            calories: ing.calories,
+            protein: ing.protein,
+            carbs: ing.carbs,
+            fat: ing.fat,
+          })),
+          dinner: mealIngredients.dinner.map(ing => ({
+            id: ing.id,
+            name: ing.name,
+            grams: ing.grams,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            gramsPerUnit: ing.gramsPerUnit,
+            calories: ing.calories,
+            protein: ing.protein,
+            carbs: ing.carbs,
+            fat: ing.fat,
+          })),
+          snack: mealIngredients.snack.map(ing => ({
+            id: ing.id,
+            name: ing.name,
+            grams: ing.grams,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            gramsPerUnit: ing.gramsPerUnit,
+            calories: ing.calories,
+            protein: ing.protein,
+            carbs: ing.carbs,
+            fat: ing.fat,
+          })),
+        },
+        dailyTotals: {
+          calories: dailyTotals.calories,
+          protein: dailyTotals.protein,
+          carbs: dailyTotals.carbs,
+          fat: dailyTotals.fat,
+        },
+      },
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(planName || 'meal-plan').replace(/\s+/g, '_').toLowerCase()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Meal plan exported as JSON!');
   };
 
   const handleExportPDF = () => {
@@ -570,7 +760,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
 
   const handleShareToReminders = async () => {
     if (!navigator.share) {
-      alert("Sharing is not supported on this device/browser");
+      toast.error("Sharing is not supported on this device/browser");
       return;
     }
 
@@ -601,7 +791,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
     } catch (error) {
       if (error.name !== "AbortError") {
         console.error("Error sharing:", error);
-        alert("Failed to share. Please try again.");
+        toast.error("Failed to share. Please try again.");
       }
     }
   };
@@ -628,10 +818,10 @@ const MealPrepCalculator = ({ allIngredients }) => {
 
     try {
       await navigator.clipboard.writeText(text);
-      alert("Shopping list copied to clipboard!");
+      toast.success("Shopping list copied to clipboard!");
     } catch (error) {
       console.error("Error copying:", error);
-      alert("Failed to copy. Please try again.");
+      toast.error("Failed to copy. Please try again.");
     }
   };
 
@@ -888,14 +1078,59 @@ const MealPrepCalculator = ({ allIngredients }) => {
     lastRange.current = withinRange;
   }, [withinRange]);
 
+  const validateCalorieTarget = (value) => {
+    if (value < 800) {
+      setTargetWarning("⚠️ Very low calorie target. Consider consulting a healthcare professional.");
+    } else if (value < 1200) {
+      setTargetWarning("⚠️ Low calorie target. Ensure adequate nutrition.");
+    } else if (value > 5000) {
+      setTargetWarning("⚠️ Very high calorie target. Verify this is correct.");
+    } else if (value > 3500) {
+      setTargetWarning("💡 High calorie target for muscle gain or athletic training.");
+    } else {
+      setTargetWarning("");
+    }
+  };
+
+  const handleTargetChange = (value) => {
+    const numValue = parseInt(value) || 0;
+    setTempTarget(numValue);
+    validateCalorieTarget(numValue);
+  };
+
   const handleTargetEdit = () => {
+    if (tempTarget < 500 || tempTarget > 10000) {
+      setTargetWarning("❌ Calorie target must be between 500 and 10,000 kcal.");
+      return;
+    }
     setCalorieTarget(tempTarget);
     setEditingTarget(false);
+    setTargetWarning("");
   };
 
   const handleTargetCancel = () => {
     setTempTarget(calorieTarget);
     setEditingTarget(false);
+    setTargetWarning("");
+  };
+
+  const validateMacroPercentages = (protein, fat, carbs) => {
+    const total = protein + fat;
+    if (total > 100) {
+      setPercentageWarning("❌ Protein + Fat cannot exceed 100%. Carbs will be negative!");
+      return false;
+    } else if (carbs < 5) {
+      setPercentageWarning("⚠️ Very low carb diet (< 5%). Typical for ketogenic diets.");
+    } else if (protein < 10) {
+      setPercentageWarning("⚠️ Very low protein (< 10%). Consider increasing for muscle health.");
+    } else if (fat < 15) {
+      setPercentageWarning("⚠️ Very low fat (< 15%). Fats are essential for hormone health.");
+    } else if (protein > 40) {
+      setPercentageWarning("💡 High protein diet. Good for muscle building or weight loss.");
+    } else {
+      setPercentageWarning("");
+    }
+    return true;
   };
 
   const handlePercentageEdit = () => {
@@ -904,23 +1139,31 @@ const MealPrepCalculator = ({ allIngredients }) => {
       fat: tempPercentages.fat,
       carbs: Math.max(0, 100 - tempPercentages.protein - tempPercentages.fat),
     };
+
+    if (!validateMacroPercentages(cleaned.protein, cleaned.fat, cleaned.carbs)) {
+      return; // Don't save if validation fails
+    }
+
     setTargetPercentages(cleaned);
     setTempPercentages(cleaned);
     setEditingPercentages(false);
+    setPercentageWarning("");
   };
 
   const handlePercentageCancel = () => {
     setTempPercentages(targetPercentages);
     setEditingPercentages(false);
+    setPercentageWarning("");
   };
 
   const updateTempPercentage = (macro, value) => {
     let protein = macro === "protein" ? value : tempPercentages.protein;
     let fat = macro === "fat" ? value : tempPercentages.fat;
     protein = Math.max(0, Math.min(100, protein));
-    fat = Math.max(0, Math.min(100 - protein, fat));
+    fat = Math.max(0, Math.min(100, fat)); // Allow fat to go up to 100 temporarily
     const carbs = Math.max(0, 100 - protein - fat);
     setTempPercentages({ protein, fat, carbs });
+    validateMacroPercentages(protein, fat, carbs);
   };
 
   return (
@@ -933,32 +1176,42 @@ const MealPrepCalculator = ({ allIngredients }) => {
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
           </h1>
-          <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex items-center justify-center gap-2 mb-4 flex-col">
             {editingTarget ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={tempTarget}
-                  onChange={(e) => setTempTarget(parseInt(e.target.value) || 0)}
-                  className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
-                  min="0"
-                />
-                <span className="text-lg font-semibold text-blue-600">
-                  kcal/day Target
-                </span>
-                <button
-                  onClick={handleTargetEdit}
-                  className="text-green-600 hover:text-green-800 p-1"
-                >
-                  <Check size={16} />
-                </button>
-                <button
-                  onClick={handleTargetCancel}
-                  className="text-red-600 hover:text-red-800 p-1"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={tempTarget}
+                    onChange={(e) => handleTargetChange(e.target.value)}
+                    className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                    min="500"
+                    max="10000"
+                  />
+                  <span className="text-lg font-semibold text-blue-600">
+                    kcal/day Target
+                  </span>
+                  <button
+                    onClick={handleTargetEdit}
+                    className="text-green-600 hover:text-green-800 p-1"
+                    aria-label="Save calorie target"
+                  >
+                    <Check size={16} />
+                  </button>
+                  <button
+                    onClick={handleTargetCancel}
+                    className="text-red-600 hover:text-red-800 p-1"
+                    aria-label="Cancel editing"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                {targetWarning && (
+                  <p className="text-sm text-orange-600 max-w-md text-center">
+                    {targetWarning}
+                  </p>
+                )}
+              </>
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-blue-600">
@@ -1030,16 +1283,23 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <span className="text-sm text-gray-600">Total: 100%</span>
                 </div>
+                {percentageWarning && (
+                  <p className="text-sm text-orange-600 text-center mt-2">
+                    {percentageWarning}
+                  </p>
+                )}
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <button
                     onClick={handlePercentageEdit}
                     className="text-green-600 hover:text-green-800 p-1"
+                    aria-label="Save macro percentages"
                   >
                     <Check size={16} />
                   </button>
                   <button
                     onClick={handlePercentageCancel}
                     className="text-red-600 hover:text-red-800 p-1"
+                    aria-label="Cancel editing"
                   >
                     <X size={16} />
                   </button>
@@ -1131,6 +1391,37 @@ const MealPrepCalculator = ({ allIngredients }) => {
               Advanced Plan Management
             </summary>
             <div className="mt-2 space-y-2 border-t pt-2">
+              {/* Export/Import Section */}
+              <div className="bg-blue-50 rounded p-3 space-y-2">
+                <p className="text-sm font-medium text-gray-700">💾 Backup & Restore</p>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={handleExportJSON}
+                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                  >
+                    📥 Export JSON
+                  </button>
+                  <button
+                    onClick={() => importFileRef.current?.click()}
+                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
+                  >
+                    📤 Import JSON
+                  </button>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportJSON}
+                    style={{ display: 'none' }}
+                    aria-label="Import meal plan from JSON file"
+                  />
+                </div>
+                <p className="text-xs text-gray-600">
+                  Export to backup your plan or share with others. Import to restore a saved plan.
+                </p>
+              </div>
+
+              {/* Baseline Setting */}
               <div className="flex gap-2">
                 <button
                   onClick={handleSaveBaseline}
@@ -1139,6 +1430,8 @@ const MealPrepCalculator = ({ allIngredients }) => {
                   Set as Baseline
                 </button>
               </div>
+
+              {/* Delete Plan */}
               {savedPlans.length > 0 && currentPlanId && (
                 <div className="flex justify-between items-center bg-gray-50 rounded p-2">
                   <span className="text-sm text-gray-600">
@@ -1229,7 +1522,74 @@ const MealPrepCalculator = ({ allIngredients }) => {
                       Add
                     </button>
                   </div>
-                  <div className="overflow-x-auto">
+
+                  {/* Mobile Card Layout */}
+                  <div className="md:hidden space-y-3">
+                    {list.map((ingredient) => {
+                      const nutrition = calculateNutrition(ingredient);
+                      const disabled = matchDinner && meal === "dinner";
+                      const unit = ingredient.unit || "g";
+
+                      let displayQuantity, incrementStep;
+                      if (unit === "g") {
+                        displayQuantity = ingredient.grams || 100;
+                        incrementStep = 5;
+                      } else {
+                        displayQuantity = ingredient.quantity || 1;
+                        incrementStep = 0.5;
+                      }
+
+                      return (
+                        <IngredientCard
+                          key={ingredient.id}
+                          ingredient={{
+                            ...ingredient,
+                            ...nutrition,
+                            quantity: displayQuantity,
+                          }}
+                          onIncrease={(id) => updateIngredientAmount(meal, id, displayQuantity + incrementStep)}
+                          onDecrease={(id) => updateIngredientAmount(meal, id, displayQuantity - incrementStep)}
+                          onRemove={(id) => removeIngredient(meal, id)}
+                        />
+                      );
+                    })}
+
+                    {/* Mobile Meal Total */}
+                    {list.length > 0 && (
+                      <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                        <h4 className="font-bold text-gray-800 mb-3">Total per Meal</h4>
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          <div>
+                            <div className="text-xs text-gray-600 mb-1">Cal</div>
+                            <div className="font-semibold text-gray-800">
+                              {Math.round(calcTotals(list).calories)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600 mb-1">P</div>
+                            <div className="font-semibold text-gray-800">
+                              {Math.round(calcTotals(list).protein * 10) / 10}g
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600 mb-1">C</div>
+                            <div className="font-semibold text-gray-800">
+                              {Math.round(calcTotals(list).carbs * 10) / 10}g
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-600 mb-1">F</div>
+                            <div className="font-semibold text-gray-800">
+                              {Math.round(calcTotals(list).fat * 10) / 10}g
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop Table Layout */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
                       <thead>
                         <tr className="bg-gray-100">
@@ -1306,10 +1666,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
                                         displayQuantity - incrementStep
                                       )
                                     }
-                                    className="text-red-600 hover:text-red-800 p-1 rounded"
+                                    className="w-11 h-11 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-bold touch-manipulation"
                                     disabled={disabled}
+                                    aria-label={`Decrease ${ingredient.name} quantity`}
                                   >
-                                    <Minus size={16} className="wiggle" />
+                                    <Minus size={20} />
                                   </button>
                                   <input
                                     type="number"
@@ -1322,7 +1683,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                                         parseFloat(e.target.value) || 0
                                       )
                                     }
-                                    className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
+                                    className="w-20 px-3 py-2 border border-gray-300 rounded text-center"
                                     min="0"
                                     disabled={disabled}
                                   />
@@ -1337,10 +1698,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
                                         displayQuantity + incrementStep
                                       )
                                     }
-                                    className="text-green-600 hover:text-green-800 p-1 rounded"
+                                    className="w-11 h-11 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-bold touch-manipulation"
                                     disabled={disabled}
+                                    aria-label={`Increase ${ingredient.name} quantity`}
                                   >
-                                    <Plus size={16} className="wiggle" />
+                                    <Plus size={20} />
                                   </button>
                                 </div>
                               </td>
@@ -1745,6 +2107,21 @@ const MealPrepCalculator = ({ allIngredients }) => {
           <p className="text-sm">Interactive meal plan calculator</p>
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setPlanToDelete(null);
+        }}
+        onConfirm={confirmDeletePlan}
+        title="Delete Meal Plan?"
+        message={`Are you sure you want to delete "${planToDelete?.name}"?\n\nThis action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

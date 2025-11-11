@@ -1,8 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useUser } from '../context/UserContext.jsx';
+import ConfirmDialog from './ConfirmDialog';
 
 const AccountPage = () => {
   const { user, logout } = useUser();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    // TODO: Implement actual account deletion with Firebase
+    // For now, just logout and clear data
+    try {
+      // Clear local storage
+      localStorage.clear();
+      // Sign out
+      await logout();
+      // In production, this would also delete the Firebase user account
+      // and all associated data from Firestore
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast.error('Failed to delete account. Please try again.');
+    }
+  };
 
   return (
     <div className="calculator">
@@ -150,7 +169,10 @@ const AccountPage = () => {
             >
               🚪 Sign Out
             </button>
-            <button className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+            >
               🗑️ Delete Account
             </button>
           </div>
@@ -159,6 +181,18 @@ const AccountPage = () => {
           </p>
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteAccount}
+        title="Delete Account?"
+        message={`Are you sure you want to permanently delete your account?\n\nThis will:\n• Delete all your meal plans\n• Delete all custom ingredients\n• Remove all your data from our servers\n\nThis action CANNOT be undone!`}
+        confirmText="Delete My Account"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };
