@@ -39,7 +39,7 @@ const MealPrep = () => {
   return (
     <div className="app-container">
       {/* User Info Bar */}
-      <div className="flex items-center justify-between mb-4 p-3 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center justify-between mb-4 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         <div className="flex items-center gap-3">
           {user?.photoURL && (
             <img
@@ -48,11 +48,11 @@ const MealPrep = () => {
               className="w-8 h-8 rounded-full"
             />
           )}
-          <span className="font-medium text-gray-700">
+          <span className="font-medium text-gray-700 dark:text-gray-200">
             Welcome back, {user?.displayName?.split(' ')[0] || 'User'}!
           </span>
         </div>
-        <span className="text-sm text-gray-500">Prep Thy Meal</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">Prep Thy Meal</span>
       </div>
 
       <nav className="nav-bar">

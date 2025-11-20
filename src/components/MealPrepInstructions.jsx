@@ -3,7 +3,7 @@ import React from "react";
 
 const MealPrepInstructions = () => (
   <div className="instruction-box mt-8">
-    <h2 className="text-2xl font-bold text-gray-800 mb-6">
+    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">
       How to Prep Like a Pro (and Have Fun Doing It!)
     </h2>
 

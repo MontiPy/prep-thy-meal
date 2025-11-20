@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
+import { Star } from "lucide-react";
 import {
   addCustomIngredient,
   removeCustomIngredient,
   upsertCustomIngredient,
   syncFromRemote,
 } from "../utils/ingredientStorage";
+import { loadFavorites, toggleFavorite, isFavorite } from "../utils/favoritesStorage";
 import { useUser } from "../context/UserContext.jsx";
 import { getAllBaseIngredients } from "../utils/nutritionHelpers";
 import { fetchNutritionByName, searchFoods } from "../utils/nutritionixApi";
@@ -38,7 +40,15 @@ const IngredientManager = ({ onChange }) => {
   const [ingredientSearch, setIngredientSearch] = useState("");
   const [sortBy, setSortBy] = useState("name"); // name, calories, protein, carbs, fat
   const [sortDirection, setSortDirection] = useState("asc"); // asc, desc
-  const [filterType, setFilterType] = useState("all"); // all, custom, standard
+  const [filterType, setFilterType] = useState("all"); // all, custom, standard, favorites
+  const [favorites, setFavorites] = useState(loadFavorites());
+
+  // Handle favorite toggle
+  const handleToggleFavorite = (ingredientId) => {
+    const newStatus = toggleFavorite(ingredientId);
+    setFavorites(loadFavorites());
+    toast.success(newStatus ? "Added to favorites" : "Removed from favorites");
+  };
 
   // Filtered and sorted ingredients
   const filteredIngredients = React.useMemo(() => {
@@ -57,6 +67,8 @@ const IngredientManager = ({ onChange }) => {
       result = result.filter(ing => ing.id >= 1000); // Custom ingredients have ID >= 1000
     } else if (filterType === "standard") {
       result = result.filter(ing => ing.id < 1000);
+    } else if (filterType === "favorites") {
+      result = result.filter(ing => favorites.includes(ing.id));
     }
 
     // Apply sorting
@@ -99,7 +111,7 @@ const IngredientManager = ({ onChange }) => {
     });
 
     return result;
-  }, [ingredients, ingredientSearch, sortBy, sortDirection, filterType]);
+  }, [ingredients, ingredientSearch, sortBy, sortDirection, filterType, favorites]);
 
   const handleSearch = async () => {
     const foods = await searchFoods(searchQuery.trim());
@@ -355,13 +367,14 @@ const IngredientManager = ({ onChange }) => {
 
           {/* Filter by Type */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Filter:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</label>
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All ({ingredients.length})</option>
+              <option value="favorites">⭐ Favorites ({favorites.length})</option>
               <option value="custom">Custom Only ({ingredients.filter(i => i.id >= 1000).length})</option>
               <option value="standard">Standard Only ({ingredients.filter(i => i.id < 1000).length})</option>
             </select>
@@ -369,7 +382,7 @@ const IngredientManager = ({ onChange }) => {
 
           {/* Sort Controls */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Sort by:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -392,7 +405,7 @@ const IngredientManager = ({ onChange }) => {
         </div>
 
         {/* Results count */}
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
           Showing {filteredIngredients.length} of {ingredients.length} ingredients
           {ingredientSearch && ` matching "${ingredientSearch}"`}
         </div>
@@ -680,6 +693,18 @@ const IngredientManager = ({ onChange }) => {
                   <td className="border p-1 text-center">{ing.carbs}</td>
                   <td className="border p-1 text-center">{ing.fat}</td>
                   <td className="border p-1 text-center space-x-1">
+                    <button
+                      onClick={() => handleToggleFavorite(ing.id)}
+                      className={`${
+                        isFavorite(ing.id)
+                          ? "text-yellow-500"
+                          : "text-gray-400 dark:text-gray-600"
+                      } hover:text-yellow-500 transition-colors`}
+                      aria-label={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
+                      title={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Star size={16} fill={isFavorite(ing.id) ? "currentColor" : "none"} />
+                    </button>
                     <button
                       className="text-blue-600"
                       onClick={() => startEdit(ing)}

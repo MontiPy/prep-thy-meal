@@ -17,7 +17,6 @@ import {
 } from "../utils/storage";
 import { useUser } from "../context/UserContext.jsx";
 import ConfirmDialog from "./ConfirmDialog";
-import IngredientCard from "./IngredientCard";
 
 const MealPrepCalculator = ({ allIngredients }) => {
   const { user } = useUser();
@@ -1173,7 +1172,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       <div className="card">
         {/* Header */}
         <div className="center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-200 mb-2">
             <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
           </h1>
           <div className="flex items-center justify-center gap-2 mb-4 flex-col">
@@ -1281,7 +1280,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                   </div>
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className="text-sm text-gray-600">Total: 100%</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total: 100%</span>
                 </div>
                 {percentageWarning && (
                   <p className="text-sm text-orange-600 text-center mt-2">
@@ -1387,13 +1386,13 @@ const MealPrepCalculator = ({ allIngredients }) => {
           </div>
 
           <details className="mt-3">
-            <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+            <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 dark:text-gray-200">
               Advanced Plan Management
             </summary>
             <div className="mt-2 space-y-2 border-t pt-2">
               {/* Export/Import Section */}
               <div className="bg-blue-50 rounded p-3 space-y-2">
-                <p className="text-sm font-medium text-gray-700">💾 Backup & Restore</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">💾 Backup & Restore</p>
                 <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={handleExportJSON}
@@ -1416,7 +1415,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                     aria-label="Import meal plan from JSON file"
                   />
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   Export to backup your plan or share with others. Import to restore a saved plan.
                 </p>
               </div>
@@ -1434,7 +1433,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
               {/* Delete Plan */}
               {savedPlans.length > 0 && currentPlanId && (
                 <div className="flex justify-between items-center bg-gray-50 rounded p-2">
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
                     Delete current plan
                   </span>
                   <button
@@ -1523,73 +1522,8 @@ const MealPrepCalculator = ({ allIngredients }) => {
                     </button>
                   </div>
 
-                  {/* Mobile Card Layout */}
-                  <div className="md:hidden space-y-3">
-                    {list.map((ingredient) => {
-                      const nutrition = calculateNutrition(ingredient);
-                      const disabled = matchDinner && meal === "dinner";
-                      const unit = ingredient.unit || "g";
-
-                      let displayQuantity, incrementStep;
-                      if (unit === "g") {
-                        displayQuantity = ingredient.grams || 100;
-                        incrementStep = 5;
-                      } else {
-                        displayQuantity = ingredient.quantity || 1;
-                        incrementStep = 0.5;
-                      }
-
-                      return (
-                        <IngredientCard
-                          key={ingredient.id}
-                          ingredient={{
-                            ...ingredient,
-                            ...nutrition,
-                            quantity: displayQuantity,
-                          }}
-                          onIncrease={(id) => updateIngredientAmount(meal, id, displayQuantity + incrementStep)}
-                          onDecrease={(id) => updateIngredientAmount(meal, id, displayQuantity - incrementStep)}
-                          onRemove={(id) => removeIngredient(meal, id)}
-                        />
-                      );
-                    })}
-
-                    {/* Mobile Meal Total */}
-                    {list.length > 0 && (
-                      <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-                        <h4 className="font-bold text-gray-800 mb-3">Total per Meal</h4>
-                        <div className="grid grid-cols-4 gap-2 text-center">
-                          <div>
-                            <div className="text-xs text-gray-600 mb-1">Cal</div>
-                            <div className="font-semibold text-gray-800">
-                              {Math.round(calcTotals(list).calories)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600 mb-1">P</div>
-                            <div className="font-semibold text-gray-800">
-                              {Math.round(calcTotals(list).protein * 10) / 10}g
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600 mb-1">C</div>
-                            <div className="font-semibold text-gray-800">
-                              {Math.round(calcTotals(list).carbs * 10) / 10}g
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-600 mb-1">F</div>
-                            <div className="font-semibold text-gray-800">
-                              {Math.round(calcTotals(list).fat * 10) / 10}g
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Desktop Table Layout */}
-                  <div className="hidden md:block overflow-x-auto">
+                  {/* Table Layout */}
+                  <div className="overflow-x-auto">
                     <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
                       <thead>
                         <tr className="bg-gray-100">
@@ -1926,11 +1860,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
         {/* Shopping List */}
         <div className="panel-gray">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h3 className="text-xl font-bold text-gray-800">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
               {prepDays}-Day Shopping List
             </h3>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Prep days:</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Prep days:</span>
               <select
                 value={prepDays}
                 onChange={(e) => setPrepDays(Number(e.target.value))}
@@ -2102,7 +2036,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-gray-600">
+        <div className="text-center mt-8 text-gray-600 dark:text-gray-400">
           <p className="font-medium">Eat more, live mas! 🌟</p>
           <p className="text-sm">Interactive meal plan calculator</p>
         </div>
