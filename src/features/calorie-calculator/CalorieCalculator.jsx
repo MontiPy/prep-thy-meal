@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { useUser } from '../context/UserContext.jsx';
+import { useUser } from '../auth/UserContext.jsx';
 
 const CalorieCalculator = () => {
   const { user } = useUser();
@@ -12,6 +12,7 @@ const CalorieCalculator = () => {
   const [goal, setGoal] = useState('maintain');
   const [units, setUnits] = useState('metric');
   const [weightChangeRate, setWeightChangeRate] = useState(0); // -3 to +3 lbs per week
+  const [lastProfileSavedAt, setLastProfileSavedAt] = useState(null);
   
   // Convert units to metric for calculation
   const getMetricValues = () => {
@@ -78,6 +79,7 @@ const CalorieCalculator = () => {
 
     // Save to localStorage
     localStorage.setItem('calorieCalculatorProfile', JSON.stringify(profile));
+    setLastProfileSavedAt(new Date());
 
     // Save to cloud if user is logged in
     if (user) {
@@ -135,6 +137,9 @@ const CalorieCalculator = () => {
         setGoal(profile.goal || 'maintain');
         setUnits(profile.units || 'metric');
         setWeightChangeRate(profile.weightChangeRate || 0);
+        if (profile.savedAt) {
+          setLastProfileSavedAt(new Date(profile.savedAt));
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -295,6 +300,11 @@ const CalorieCalculator = () => {
                   📂 Load Profile
                 </button>
               </div>
+              {lastProfileSavedAt && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Last saved: {lastProfileSavedAt.toLocaleTimeString()}
+                </p>
+              )}
             </div>
           </div>
 

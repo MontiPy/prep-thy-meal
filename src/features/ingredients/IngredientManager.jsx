@@ -6,12 +6,13 @@ import {
   removeCustomIngredient,
   upsertCustomIngredient,
   syncFromRemote,
-} from "../utils/ingredientStorage";
-import { loadFavorites, toggleFavorite, isFavorite } from "../utils/favoritesStorage";
-import { useUser } from "../context/UserContext.jsx";
-import { getAllBaseIngredients } from "../utils/nutritionHelpers";
-import { fetchNutritionByName, searchFoods } from "../utils/nutritionixApi";
-import ConfirmDialog from "./ConfirmDialog";
+} from './ingredientStorage';
+import { loadFavorites, toggleFavorite, isFavorite } from './favorites';
+import { useUser } from '../auth/UserContext.jsx';
+import { getAllBaseIngredients } from './nutritionHelpers';
+import { fetchNutritionByName, searchFoods } from '../../shared/services/nutritionix';
+import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
 
 const empty = {
   name: "",
@@ -32,9 +33,13 @@ const IngredientManager = ({ onChange }) => {
   const [editData, setEditData] = useState({ ...empty });
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [ingredientToDelete, setIngredientToDelete] = useState(null);
   const csvImportRef = useRef(null);
+  const searchDebounceRef = useRef(null);
 
   // Search, Sort, Filter state
   const [ingredientSearch, setIngredientSearch] = useState("");
@@ -114,9 +119,47 @@ const IngredientManager = ({ onChange }) => {
   }, [ingredients, ingredientSearch, sortBy, sortDirection, filterType, favorites]);
 
   const handleSearch = async () => {
-    const foods = await searchFoods(searchQuery.trim());
-    setSearchResults(foods);
+    if (!searchQuery.trim() || isOffline) return;
+
+    setIsSearching(true);
+    try {
+      const foods = await searchFoods(searchQuery.trim());
+      setSearchResults(foods);
+      setHasSearched(true);
+    } catch (error) {
+      console.error("Search error:", error);
+      toast.error("Failed to search ingredients. Please try again.");
+    } finally {
+      setIsSearching(false);
+    }
   };
+
+  // Debounce Nutritionix search to reduce API spam on quick typing
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      handleSearch();
+    }, 500);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [searchQuery]);
 
   const toggleSort = (field) => {
     if (sortBy === field) {
@@ -131,22 +174,28 @@ const IngredientManager = ({ onChange }) => {
 
   const addFromApi = async (item) => {
     const { name } = item;
-    const details =
-      item.grams !== undefined ? item : await fetchNutritionByName(name);
-    if (!details) return;
+    try {
+      const details =
+        item.grams !== undefined ? item : await fetchNutritionByName(name);
+      if (!details) return;
 
-    const ingredientToAdd = { name, ...details };
+      const ingredientToAdd = { name, ...details };
 
-    // Ensure gramsPerUnit and grams are always equal
-    if (!ingredientToAdd.gramsPerUnit) {
-      ingredientToAdd.gramsPerUnit = ingredientToAdd.grams;
+      // Ensure gramsPerUnit and grams are always equal
+      if (!ingredientToAdd.gramsPerUnit) {
+        ingredientToAdd.gramsPerUnit = ingredientToAdd.grams;
+      }
+      ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
+
+      await addCustomIngredient(ingredientToAdd, user?.uid);
+      setSearchResults([]);
+      setSearchQuery("");
+      refresh();
+      toast.success("Ingredient added");
+    } catch (err) {
+      console.error("Failed to add ingredient from API", err);
+      toast.error("Could not add ingredient. Please try again.");
     }
-    ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
-
-    await addCustomIngredient(ingredientToAdd, user?.uid);
-    setSearchResults([]);
-    setSearchQuery("");
-    refresh();
   };
 
   const refresh = () => {
@@ -155,11 +204,21 @@ const IngredientManager = ({ onChange }) => {
   };
 
   useEffect(() => {
-    if (user) {
-      syncFromRemote(user.uid).then(refresh);
-    } else {
-      refresh();
-    }
+    const load = async () => {
+      if (!user) {
+        refresh();
+        return;
+      }
+      try {
+        await syncFromRemote(user.uid);
+        refresh();
+      } catch (err) {
+        console.error("Failed to sync ingredients", err);
+        toast.error("Could not sync your ingredients.");
+        refresh(); // fall back to local even if remote failed
+      }
+    };
+    load();
   }, [user]);
 
   const handleAdd = async () => {
@@ -169,9 +228,15 @@ const IngredientManager = ({ onChange }) => {
     // Ensure gramsPerUnit and grams are always equal
     ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
 
-    await addCustomIngredient(ingredientToAdd, user?.uid);
-    setNewIngredient({ ...empty });
-    refresh();
+    try {
+      await addCustomIngredient(ingredientToAdd, user?.uid);
+      setNewIngredient({ ...empty });
+      refresh();
+      toast.success("Ingredient added");
+    } catch (err) {
+      console.error("Failed to add ingredient", err);
+      toast.error("Could not add ingredient. Please try again.");
+    }
   };
 
   const startEdit = (ing) => {
@@ -185,9 +250,15 @@ const IngredientManager = ({ onChange }) => {
     // Ensure gramsPerUnit and grams are always equal
     ingredientToSave.grams = ingredientToSave.gramsPerUnit;
 
-    await upsertCustomIngredient(ingredientToSave, user?.uid);
-    setEditingId(null);
-    refresh();
+    try {
+      await upsertCustomIngredient(ingredientToSave, user?.uid);
+      setEditingId(null);
+      refresh();
+      toast.success("Ingredient updated");
+    } catch (err) {
+      console.error("Failed to save ingredient", err);
+      toast.error("Could not save ingredient changes.");
+    }
   };
 
   const handleRemove = (id) => {
@@ -198,9 +269,15 @@ const IngredientManager = ({ onChange }) => {
 
   const confirmDeleteIngredient = async () => {
     if (!ingredientToDelete) return;
-    await removeCustomIngredient(ingredientToDelete.id, user?.uid);
-    refresh();
-    setIngredientToDelete(null);
+    try {
+      await removeCustomIngredient(ingredientToDelete.id, user?.uid);
+      refresh();
+      setIngredientToDelete(null);
+      toast.success("Ingredient deleted");
+    } catch (err) {
+      console.error("Failed to delete ingredient", err);
+      toast.error("Could not delete ingredient.");
+    }
   };
 
   const handleChange = (setter) => (e) => {
@@ -285,14 +362,18 @@ const IngredientManager = ({ onChange }) => {
             const ingredient = {
               name: name,
               unit: unit || 'g',
-              gramsPerUnit: parseFloat(gramsPerUnit) || 100,
-              grams: parseFloat(gramsPerUnit) || 100,
-              calories: parseFloat(calories) || 0,
-              protein: parseFloat(protein) || 0,
-              carbs: parseFloat(carbs) || 0,
-              fat: parseFloat(fat) || 0,
+              gramsPerUnit: Math.max(0, parseFloat(gramsPerUnit) || 100),
+              grams: Math.max(0, parseFloat(gramsPerUnit) || 100),
+              calories: Math.max(0, parseFloat(calories) || 0),
+              protein: Math.max(0, parseFloat(protein) || 0),
+              carbs: Math.max(0, parseFloat(carbs) || 0),
+              fat: Math.max(0, parseFloat(fat) || 0),
             };
 
+            if (Number.isNaN(ingredient.calories) || Number.isNaN(ingredient.protein) || Number.isNaN(ingredient.carbs) || Number.isNaN(ingredient.fat)) {
+              errors++;
+              continue;
+            }
             await addCustomIngredient(ingredient, user?.uid);
             imported++;
           } catch (err) {
@@ -419,47 +500,92 @@ const IngredientManager = ({ onChange }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search"
-            className="border px-2 py-1"
+            className="border px-2 py-1 rounded-md dark:bg-gray-800 dark:border-gray-700"
+            disabled={isOffline}
           />
-          <button className="btn-blue" type="button" onClick={handleSearch}>
-            Search
+          <button className="btn-blue" type="button" onClick={handleSearch} disabled={isSearching || isOffline}>
+            {isOffline ? 'Offline' : isSearching ? 'Searching...' : 'Search'}
           </button>
         </div>
-        {searchResults.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-max w-full border-collapse border">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border p-1">Name</th>
-                  <th className="border p-1">Unit</th>
-                  <th className="border p-1">g/unit</th>
-                  <th className="border p-1">Cal</th>
-                  <th className="border p-1">P</th>
-                  <th className="border p-1">C</th>
-                  <th className="border p-1">F</th>
-                  <th className="border p-1">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {searchResults.map((res) => (
-                  <tr key={res.id} className="border-t">
-                    <td className="border p-1 capitalize">{res.name}</td>
-                    <td className="border p-1 text-center">{res.unit || "g"}</td>
-                    <td className="border p-1 text-center">{res.gramsPerUnit || res.grams || "-"}</td>
-                    <td className="border p-1 text-center">{res.calories !== undefined ? res.calories : "-"}</td>
-                    <td className="border p-1 text-center">{res.protein !== undefined ? res.protein : "-"}</td>
-                    <td className="border p-1 text-center">{res.carbs !== undefined ? res.carbs : "-"}</td>
-                    <td className="border p-1 text-center">{res.fat !== undefined ? res.fat : "-"}</td>
-                    <td className="border p-1 text-center">
-                      <button className="btn-green" type="button" onClick={() => addFromApi(res)}>
-                        Add
-                      </button>
-                    </td>
+        {isOffline && (
+          <p className="text-sm text-amber-600">Offline: Nutritionix search is disabled until you reconnect.</p>
+        )}
+        {isSearching && (
+          <LoadingSpinner message="Searching for ingredients..." size="small" />
+        )}
+        {!isSearching && hasSearched && searchResults.length === 0 && (
+          <p className="text-sm text-gray-600 dark:text-gray-400">No ingredients found for “{searchQuery}”. Try another term.</p>
+        )}
+        {!isSearching && searchResults.length > 0 && (
+          <>
+            <div className="overflow-x-auto hidden md:block">
+              <table className="min-w-max w-full border-collapse border dark:border-gray-700">
+                <thead>
+                  <tr className="bg-gray-100 dark:bg-gray-800">
+                    <th className="border p-1">Name</th>
+                    <th className="border p-1">Unit</th>
+                    <th className="border p-1">g/unit</th>
+                    <th className="border p-1">Cal</th>
+                    <th className="border p-1">P</th>
+                    <th className="border p-1">C</th>
+                    <th className="border p-1">F</th>
+                    <th className="border p-1">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {searchResults.map((res) => (
+                    <tr key={res.id} className="border-t">
+                      <td className="border p-1 capitalize">{res.name}</td>
+                      <td className="border p-1 text-center">{res.unit || "g"}</td>
+                      <td className="border p-1 text-center">{res.gramsPerUnit || res.grams || "-"}</td>
+                      <td className="border p-1 text-center">{res.calories !== undefined ? res.calories : "-"}</td>
+                      <td className="border p-1 text-center">{res.protein !== undefined ? res.protein : "-"}</td>
+                      <td className="border p-1 text-center">{res.carbs !== undefined ? res.carbs : "-"}</td>
+                      <td className="border p-1 text-center">{res.fat !== undefined ? res.fat : "-"}</td>
+                      <td className="border p-1 text-center">
+                        <button className="btn-green" type="button" onClick={() => addFromApi(res)}>
+                          Add
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden space-y-2">
+            {searchResults.map((res) => (
+              <div key={res.id} className="border rounded-lg p-3 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold capitalize">{res.name}</p>
+                    <p className="text-xs text-gray-500">{res.unit || 'g'} • {res.gramsPerUnit || res.grams || '-'}g</p>
+                  </div>
+                  <button className="btn-green text-sm" type="button" onClick={() => addFromApi(res)}>
+                    Add
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
+                  <div>
+                    <p className="text-gray-500">Cal</p>
+                    <p className="font-semibold">{res.calories ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">P</p>
+                    <p className="font-semibold">{res.protein ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">C</p>
+                    <p className="font-semibold">{res.carbs ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">F</p>
+                    <p className="font-semibold">{res.fat ?? '-'}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -558,7 +684,7 @@ const IngredientManager = ({ onChange }) => {
           </table>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto hidden md:block">
       <table className="min-w-max w-full border-collapse border">
         <thead>
           <tr className="bg-gray-100">
@@ -727,6 +853,72 @@ const IngredientManager = ({ onChange }) => {
         </tbody>
       </table>
       </div>
+
+      {/* Mobile card layout */}
+      <div className="md:hidden space-y-3">
+        {filteredIngredients.length === 0 && (
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded border dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300">
+            No ingredients yet. Add one above or import/search to get started.
+          </div>
+        )}
+        {filteredIngredients.map((ing) => (
+          <div key={ing.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow-sm">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-semibold capitalize">{ing.name}</p>
+                <p className="text-xs text-gray-500">{ing.unit || 'g'} • {ing.gramsPerUnit || ing.grams || 100}g/unit</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleToggleFavorite(ing.id)}
+                  className={`${isFavorite(ing.id) ? "text-yellow-500" : "text-gray-400 dark:text-gray-500"}`}
+                  aria-label={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
+                  title={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
+                >
+                  <Star size={16} fill={isFavorite(ing.id) ? "currentColor" : "none"} />
+                </button>
+                {ing.id >= 1000 && (
+                  <button className="text-red-600 text-sm" onClick={() => handleRemove(ing.id)}>
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
+              <div>
+                <p className="text-gray-500">Cal</p>
+                <p className="font-semibold">{ing.calories}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">P</p>
+                <p className="font-semibold">{ing.protein}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">C</p>
+                <p className="font-semibold">{ing.carbs}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">F</p>
+                <p className="font-semibold">{ing.fat}</p>
+              </div>
+            </div>
+            {ing.id >= 1000 && (
+              <button
+                className="mt-3 w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                onClick={() => startEdit(ing)}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {filteredIngredients.length === 0 && (
+        <div className="hidden md:block p-4 bg-gray-50 dark:bg-gray-800 rounded border dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 mt-3">
+          No ingredients found. Adjust filters or add a custom ingredient to begin.
+        </div>
+      )}
 
       {/* Confirmation Dialogs */}
       <ConfirmDialog

@@ -22,17 +22,33 @@ export const loadPlans = async (uid) => {
 };
 
 export const addPlan = async (uid, plan) => {
-  await addDoc(plansRef, { ...plan, uid });
+  // Ownership guard lives here so every call path is protected.
+  const data = { ...plan, uid };
+  await addDoc(plansRef, data);
   return loadPlans(uid);
 };
 
+const assertPlanOwnership = async (uid, id) => {
+  const ref = doc(plansRef, id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    throw new Error('Plan not found');
+  }
+  if (snap.data().uid !== uid) {
+    throw new Error('Unauthorized plan access');
+  }
+  return ref;
+};
+
 export const removePlan = async (uid, id) => {
-  await deleteDoc(doc(plansRef, id));
+  const ref = await assertPlanOwnership(uid, id);
+  await deleteDoc(ref);
   return loadPlans(uid);
 };
 
 export const updatePlan = async (uid, id, plan) => {
-  await updateDoc(doc(plansRef, id), plan);
+  const ref = await assertPlanOwnership(uid, id);
+  await updateDoc(ref, plan);
   return loadPlans(uid);
 };
 

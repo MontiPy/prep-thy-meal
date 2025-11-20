@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '../utils/firebase.js';
+import { auth, googleProvider } from '../../shared/services/firebase.js';
 
 const Login = () => {
   const [error, setError] = useState('');

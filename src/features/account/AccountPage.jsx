@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useUser } from '../context/UserContext.jsx';
-import ConfirmDialog from './ConfirmDialog';
+import { useUser } from '../auth/UserContext.jsx';
+import ConfirmDialog from '../../shared/components/ui/ConfirmDialog';
 
 const AccountPage = () => {
   const { user, logout } = useUser();
@@ -9,14 +9,11 @@ const AccountPage = () => {
 
   const handleDeleteAccount = async () => {
     // TODO: Implement actual account deletion with Firebase
-    // For now, just logout and clear data
+    // For now, just clear local data to avoid misleading deletion promises
     try {
-      // Clear local storage
       localStorage.clear();
-      // Sign out
       await logout();
-      // In production, this would also delete the Firebase user account
-      // and all associated data from Firestore
+      toast.success('Local data cleared. Sign-in again to resync from cloud.');
     } catch (error) {
       console.error('Error deleting account:', error);
       toast.error('Failed to delete account. Please try again.');
@@ -173,11 +170,11 @@ const AccountPage = () => {
               onClick={() => setShowDeleteConfirm(true)}
               className="px-4 py-2 bg-gray-600 dark:bg-gray-700 text-white rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
             >
-              🗑️ Delete Account
+              🗑️ Reset Local Data
             </button>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            Signing out will keep your data safe in the cloud for next time.
+            Signing out keeps your data safe in the cloud. Reset Local Data only clears this device.
           </p>
         </div>
       </div>
@@ -187,11 +184,11 @@ const AccountPage = () => {
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDeleteAccount}
-        title="Delete Account?"
-        message={`Are you sure you want to permanently delete your account?\n\nThis will:\n• Delete all your meal plans\n• Delete all custom ingredients\n• Remove all your data from our servers\n\nThis action CANNOT be undone!`}
-        confirmText="Delete My Account"
-        cancelText="Cancel"
-        variant="danger"
+        title="Reset Local Data?"
+        message={`This will clear all saved plans and ingredients on this device.\n\nCloud data in your account will resync after sign-in.\n\nProceed?`}
+        confirmText="Clear Local Data"
+        cancelText="Keep Data"
+        variant="warning"
       />
     </div>
   );

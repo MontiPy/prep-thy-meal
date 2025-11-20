@@ -11,9 +11,15 @@
       "mcp__playwright__browser_resize",
       "mcp__playwright__browser_close",
       "Bash(taskkill:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(git mv:*)",
+      "Bash(npm run test:run:*)",
+      "Bash(dir:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "outputStyle": "default"
 }

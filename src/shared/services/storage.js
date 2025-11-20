@@ -5,7 +5,7 @@ import {
   updatePlan as apiUpdate,
   loadBaseline as apiLoadBaseline,
   saveBaseline as apiSaveBaseline,
-} from './api.js';
+} from './firestore.js';
 
 export const loadPlans = async (uid) => {
   return apiLoad(uid);

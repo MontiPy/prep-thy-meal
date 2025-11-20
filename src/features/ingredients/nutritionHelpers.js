@@ -10,7 +10,7 @@ export const normalizeIngredient = (item) => ({
   fat: Number(item.fat) || 0,
   unit: item.unit || "g",
   gramsPerUnit: Number(item.gramsPerUnit) || Number(item.grams) || 100,
-  quantity: Number(item.quantity) || 1, // quantity in units (e.g., 2.5 slices)
+  quantity: item.quantity !== undefined && item.quantity !== null ? Number(item.quantity) : 1, // quantity in units (e.g., 2.5 slices)
 });
 
 export const getAllBaseIngredients = () => {

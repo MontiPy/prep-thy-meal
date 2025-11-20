@@ -1,5 +1,5 @@
 const LOCAL_KEY = 'customIngredients';
-import { loadCustomIngredients as apiLoad, saveCustomIngredients as apiSave } from './api.js';
+import { loadCustomIngredients as apiLoad, saveCustomIngredients as apiSave } from '../../shared/services/firestore';
 
 export const loadCustomIngredients = () => {
   try {
@@ -21,9 +21,21 @@ const saveRemote = async (uid, items) => {
 
 export const syncFromRemote = async (uid) => {
   if (!uid) return loadCustomIngredients();
-  const items = await apiLoad(uid);
-  saveLocal(items);
-  return items;
+  const remoteItems = await apiLoad(uid);
+  const localItems = loadCustomIngredients();
+
+  // Merge by id: prefer remote definition, but keep any local-only items
+  const mergedMap = new Map();
+  remoteItems.forEach(item => mergedMap.set(item.id, item));
+  localItems.forEach(item => {
+    if (!mergedMap.has(item.id)) {
+      mergedMap.set(item.id, item);
+    }
+  });
+
+  const merged = Array.from(mergedMap.values());
+  saveLocal(merged);
+  return merged;
 };
 
 export const addCustomIngredient = async (ingredient, uid) => {

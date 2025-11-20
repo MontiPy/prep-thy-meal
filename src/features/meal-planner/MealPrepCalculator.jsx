@@ -6,7 +6,7 @@ import autoTable from "jspdf-autotable";
 import {
   calculateNutrition,
   normalizeIngredient,
-} from "../utils/nutritionHelpers";
+} from '../ingredients/nutritionHelpers';
 import {
   loadPlans,
   addPlan,
@@ -14,12 +14,14 @@ import {
   updatePlan,
   loadBaseline,
   saveBaseline,
-} from "../utils/storage";
-import { useUser } from "../context/UserContext.jsx";
-import ConfirmDialog from "./ConfirmDialog";
+} from '../../shared/services/storage';
+import { useUser } from '../auth/UserContext.jsx';
+import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
 
 const MealPrepCalculator = ({ allIngredients }) => {
   const { user } = useUser();
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [calorieTarget, setCalorieTarget] = useState(1400);
   const [editingTarget, setEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState(2000);
@@ -59,6 +61,9 @@ const MealPrepCalculator = ({ allIngredients }) => {
   const [currentPlanId, setCurrentPlanId] = useState(null);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
+  const [lastBaselineSavedAt, setLastBaselineSavedAt] = useState(null);
+  const [lastExportedAt, setLastExportedAt] = useState(null);
 
   // Confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -67,74 +72,110 @@ const MealPrepCalculator = ({ allIngredients }) => {
   // Import file input ref
   const importFileRef = useRef(null);
 
-  useEffect(() => {
-    if (!user) return;
-    loadPlans(user.uid).then(setSavedPlans);
-    loadBaseline(user.uid).then((baseline) => {
-      if (!baseline) return;
-      setCalorieTarget(baseline.calorieTarget);
-      setTempTarget(baseline.calorieTarget);
+  // Helper to refresh ingredient from base list while preserving quantity/grams
+  const refreshIngredientData = (ingredient) => {
+    const original = allIngredients.find((i) => i.id === ingredient.id);
+    if (!original) return normalizeIngredient(ingredient);
 
-      // Load matchDinner setting from baseline (default to false for older baselines)
-      const shouldMatchDinner = baseline.matchDinner || false;
-      setMatchDinner(shouldMatchDinner);
-
-      const basePerc = {
-        protein: baseline.targetPercentages.protein,
-        fat: baseline.targetPercentages.fat,
-        carbs:
-          100 -
-          baseline.targetPercentages.protein -
-          baseline.targetPercentages.fat,
-      };
-      setTargetPercentages(basePerc);
-      setTempPercentages(basePerc);
-
-      // Load all meals from baseline if available
-      const loadMealIngredients = (mealData) => {
-        if (!mealData || !Array.isArray(mealData)) return [];
-        return mealData
-          .map(({ id, grams, quantity }) => {
-            const base = allIngredients.find((ing) => ing.id === id);
-            return base
-              ? normalizeIngredient({ ...base, grams, quantity })
-              : null;
-          })
-          .filter(Boolean);
-      };
-
-      let mealData = {};
-      if (baseline.meals) {
-        // New format with all meals
-        mealData = {
-          breakfast: loadMealIngredients(baseline.meals.breakfast),
-          lunch: loadMealIngredients(baseline.meals.lunch),
-          dinner: loadMealIngredients(baseline.meals.dinner),
-          snack: loadMealIngredients(baseline.meals.snack),
-        };
-      } else {
-        // Legacy format - only lunch ingredients
-        const lunchIngredients = loadMealIngredients(baseline.ingredients);
-        mealData = {
-          breakfast: [],
-          lunch: lunchIngredients,
-          dinner: shouldMatchDinner
-            ? lunchIngredients.map((i) => normalizeIngredient(i))
-            : [],
-          snack: [],
-        };
-      }
-
-      // Apply matchDinner logic if enabled
-      if (shouldMatchDinner && mealData.lunch) {
-        mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
-      }
-
-      setMealIngredients((prev) => ({
-        ...prev,
-        ...mealData,
-      }));
+    return normalizeIngredient({
+      ...original,
+      quantity: ingredient.quantity,
+      grams: ingredient.grams,
     });
+  };
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) {
+      setIsLoadingData(false);
+      return;
+    }
+
+    const loadData = async () => {
+      try {
+        const plans = await loadPlans(uid);
+        // Bail if user switched during async work
+        if (uid !== user?.uid) return;
+        setSavedPlans(plans);
+      } catch (err) {
+        console.error("Failed to load plans", err);
+        toast.error("Could not load your saved plans. Please retry.");
+      }
+
+      try {
+        const baseline = await loadBaseline(uid);
+        if (!baseline || uid !== user?.uid) return;
+        setCalorieTarget(baseline.calorieTarget);
+        setTempTarget(baseline.calorieTarget);
+
+        // Load matchDinner setting from baseline (default to false for older baselines)
+        const shouldMatchDinner = baseline.matchDinner || false;
+        setMatchDinner(shouldMatchDinner);
+
+        const basePerc = {
+          protein: baseline.targetPercentages.protein,
+          fat: baseline.targetPercentages.fat,
+          carbs:
+            100 -
+            baseline.targetPercentages.protein -
+            baseline.targetPercentages.fat,
+        };
+        setTargetPercentages(basePerc);
+        setTempPercentages(basePerc);
+
+        // Load all meals from baseline if available
+        const loadMealIngredients = (mealData) => {
+          if (!mealData || !Array.isArray(mealData)) return [];
+          return mealData
+            .map(({ id, grams, quantity }) => {
+              const base = allIngredients.find((ing) => ing.id === id);
+              return base
+                ? normalizeIngredient({ ...base, grams, quantity })
+                : null;
+            })
+            .filter(Boolean);
+        };
+
+        let mealData = {};
+        if (baseline.meals) {
+          // New format with all meals
+          mealData = {
+            breakfast: loadMealIngredients(baseline.meals.breakfast),
+            lunch: loadMealIngredients(baseline.meals.lunch),
+            dinner: loadMealIngredients(baseline.meals.dinner),
+            snack: loadMealIngredients(baseline.meals.snack),
+          };
+        } else {
+          // Legacy format - only lunch ingredients
+          const lunchIngredients = loadMealIngredients(baseline.ingredients);
+          mealData = {
+            breakfast: [],
+            lunch: lunchIngredients,
+            dinner: shouldMatchDinner
+              ? lunchIngredients.map((i) => refreshIngredientData(i))
+              : [],
+            snack: [],
+          };
+        }
+
+        // Apply matchDinner logic if enabled
+        if (shouldMatchDinner && mealData.lunch) {
+          mealData.dinner = mealData.lunch.map((i) => refreshIngredientData(i));
+        }
+
+        setMealIngredients((prev) => ({
+          ...prev,
+          ...mealData,
+        }));
+      } catch (err) {
+        console.error("Failed to load baseline", err);
+        toast.error("Could not load your baseline settings.");
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    loadData();
   }, [user, allIngredients]);
 
   useEffect(() => {
@@ -204,7 +245,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       });
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
-        updated.dinner = list.map((i) => normalizeIngredient(i));
+        updated.dinner = list.map((i) => refreshIngredientData(i));
       }
       return updated;
     });
@@ -215,7 +256,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       const list = prev[meal].filter((ing) => ing.id !== id);
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
-        updated.dinner = list.map((i) => normalizeIngredient(i));
+        updated.dinner = list.map((i) => refreshIngredientData(i));
       }
       return updated;
     });
@@ -238,7 +279,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       const list = [...prev[meal], ingredientToAdd];
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
-        updated.dinner = list.map((i) => normalizeIngredient(i));
+        updated.dinner = list.map((i) => refreshIngredientData(i));
       }
       return updated;
     });
@@ -246,7 +287,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
   };
 
   const handleSavePlan = async () => {
-    if (!user) return;
+    const uid = user?.uid;
+    if (!uid) {
+      toast.error("Please sign in to save plans.");
+      return;
+    }
     const name = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
       name,
@@ -287,20 +332,30 @@ const MealPrepCalculator = ({ allIngredients }) => {
         quantity,
       })),
     };
-    let plans;
-    if (currentPlanId) {
-      plans = await updatePlan(user.uid, currentPlanId, newPlan);
-    } else {
-      plans = await addPlan(user.uid, newPlan);
-      const newPlanId = plans[plans.length - 1].id;
-      setCurrentPlanId(newPlanId);
-      setSelectedPlanId(newPlanId);
+    try {
+      let plans;
+      if (currentPlanId) {
+        plans = await updatePlan(uid, currentPlanId, newPlan);
+      } else {
+        plans = await addPlan(uid, newPlan);
+        const newPlanId = plans[plans.length - 1].id;
+        setCurrentPlanId(newPlanId);
+        setSelectedPlanId(newPlanId);
+      }
+      // User may have switched during async work
+      if (uid !== user?.uid) return;
+      setSavedPlans(plans);
+      setPlanName(name);
+      setHasUnsavedChanges(false);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2000);
+      setLastPlanSavedAt(new Date());
+      toast.success("Plan saved");
+    } catch (err) {
+      console.error("Error saving plan", err);
+      setHasUnsavedChanges(true);
+      toast.error(err?.message || "Could not save plan. Try again.");
     }
-    setSavedPlans(plans);
-    setPlanName(name);
-    setHasUnsavedChanges(false);
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 2000);
   };
 
   const loadPlan = (id) => {
@@ -354,7 +409,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
         breakfast: [],
         lunch: lunchIngredients,
         dinner: shouldMatchDinner
-          ? lunchIngredients.map((i) => normalizeIngredient(i))
+          ? lunchIngredients.map((i) => refreshIngredientData(i))
           : [],
         snack: [],
       };
@@ -362,7 +417,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
 
     // Apply matchDinner logic if enabled
     if (shouldMatchDinner && mealData.lunch) {
-      mealData.dinner = mealData.lunch.map((i) => normalizeIngredient(i));
+      mealData.dinner = mealData.lunch.map((i) => refreshIngredientData(i));
     }
 
     setMealIngredients(mealData);
@@ -382,7 +437,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
   };
 
   const handleSaveAsNew = async () => {
-    if (!user) return;
+    const uid = user?.uid;
+    if (!uid) {
+      toast.error("Please sign in to save plans.");
+      return;
+    }
     const newName = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
       name: newName,
@@ -423,35 +482,58 @@ const MealPrepCalculator = ({ allIngredients }) => {
         quantity,
       })),
     };
-    const plans = await addPlan(user.uid, newPlan);
-    setSavedPlans(plans);
-    const newPlanId = plans[plans.length - 1].id;
-    setCurrentPlanId(newPlanId);
-    setSelectedPlanId(newPlanId);
-    setPlanName(newName);
-    setHasUnsavedChanges(false);
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 2000);
+    try {
+      const plans = await addPlan(uid, newPlan);
+      if (uid !== user?.uid) return;
+      setSavedPlans(plans);
+      const newPlanId = plans[plans.length - 1].id;
+      setCurrentPlanId(newPlanId);
+      setSelectedPlanId(newPlanId);
+      setPlanName(newName);
+      setHasUnsavedChanges(false);
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2000);
+      setLastPlanSavedAt(new Date());
+      toast.success("Saved as new plan");
+    } catch (err) {
+      console.error("Error saving new plan", err);
+      setHasUnsavedChanges(true);
+      toast.error(err?.message || "Could not save plan. Try again.");
+    }
   };
 
   const handleDeletePlan = async (id) => {
-    if (!user) return;
+    if (!user?.uid) {
+      toast.error("Please sign in to delete plans.");
+      return;
+    }
     const plan = savedPlans.find(p => p.id === id);
     setPlanToDelete({ id, name: plan?.name || 'this plan' });
     setShowDeleteConfirm(true);
   };
 
   const confirmDeletePlan = async () => {
-    if (!user || !planToDelete) return;
-    const plans = await removePlan(user.uid, planToDelete.id);
-    setSavedPlans(plans);
-    // Clear current plan if we deleted it
-    if (currentPlanId === planToDelete.id) {
-      setCurrentPlanId(null);
-      setSelectedPlanId("");
-      setPlanName("");
+    const uid = user?.uid;
+    if (!uid || !planToDelete) {
+      toast.error("Not signed in. Cannot delete plan.");
+      return;
     }
-    setPlanToDelete(null);
+    try {
+      const plans = await removePlan(uid, planToDelete.id);
+      if (uid !== user?.uid) return;
+      setSavedPlans(plans);
+      // Clear current plan if we deleted it
+      if (currentPlanId === planToDelete.id) {
+        setCurrentPlanId(null);
+        setSelectedPlanId("");
+        setPlanName("");
+      }
+      setPlanToDelete(null);
+      toast.success("Plan deleted");
+    } catch (err) {
+      console.error("Error deleting plan", err);
+      toast.error(err?.message || "Could not delete plan.");
+    }
   };
 
   const handleImportJSON = (event) => {
@@ -615,6 +697,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    setLastExportedAt(new Date());
     toast.success('Meal plan exported as JSON!');
   };
 
@@ -755,6 +838,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
     });
 
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
+    setLastExportedAt(new Date());
   };
 
   const handleShareToReminders = async () => {
@@ -825,7 +909,11 @@ const MealPrepCalculator = ({ allIngredients }) => {
   };
 
   const handleSaveBaseline = async () => {
-    if (!user) return;
+    const uid = user?.uid;
+    if (!uid) {
+      toast.error("Please sign in to save a baseline.");
+      return;
+    }
     const baseline = {
       calorieTarget,
       targetPercentages: {
@@ -864,7 +952,15 @@ const MealPrepCalculator = ({ allIngredients }) => {
         quantity,
       })),
     };
-    await saveBaseline(user.uid, baseline);
+    try {
+      await saveBaseline(uid, baseline);
+      if (uid !== user?.uid) return;
+      setLastBaselineSavedAt(new Date());
+      toast.success("Baseline saved");
+    } catch (err) {
+      console.error("Error saving baseline", err);
+      toast.error(err?.message || "Could not save baseline.");
+    }
   };
 
   const calcTotals = (list) =>
@@ -1165,6 +1261,10 @@ const MealPrepCalculator = ({ allIngredients }) => {
     validateMacroPercentages(protein, fat, carbs);
   };
 
+  if (isLoadingData) {
+    return <LoadingSpinner message="Loading your meal plan..." size="large" />;
+  }
+
   return (
     <div className="calculator">
       {(showConfetti || goalConfetti) && <div className="confetti">🎉🎉🎉</div>}
@@ -1359,6 +1459,12 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 </option>
               ))}
             </select>
+            {(lastPlanSavedAt || lastBaselineSavedAt) && (
+              <p className="text-xs text-gray-500 mt-1">
+                {lastPlanSavedAt && `Last plan save: ${lastPlanSavedAt.toLocaleTimeString()}`}{" "}
+                {lastBaselineSavedAt && `• Baseline saved: ${lastBaselineSavedAt.toLocaleTimeString()}`}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 mb-2">
@@ -1391,8 +1497,15 @@ const MealPrepCalculator = ({ allIngredients }) => {
             </summary>
             <div className="mt-2 space-y-2 border-t pt-2">
               {/* Export/Import Section */}
-              <div className="bg-blue-50 rounded p-3 space-y-2">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">💾 Backup & Restore</p>
+              <div className="bg-blue-50 dark:bg-blue-900/30 rounded p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">💾 Backup & Restore</p>
+                  {lastExportedAt && (
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      Last export: {lastExportedAt.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={handleExportJSON}
@@ -1462,8 +1575,8 @@ const MealPrepCalculator = ({ allIngredients }) => {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Per Meal (Raw Weights)
           </h2>
-          <div className="flex gap-4 mb-4">
-            <label className="flex items-center gap-1">
+          <div className="flex flex-col gap-2 mb-4">
+            <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={matchDinner}
@@ -1473,13 +1586,21 @@ const MealPrepCalculator = ({ allIngredients }) => {
                   if (checked) {
                     setMealIngredients((prev) => ({
                       ...prev,
-                      dinner: prev.lunch.map((i) => normalizeIngredient(i)),
+                      dinner: prev.lunch.map((i) => refreshIngredientData(i)),
                     }));
                   }
                 }}
               />
-              <span>Lunch = Dinner</span>
+              <span className="font-medium">Lunch = Dinner</span>
+              {matchDinner && (
+                <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
+                  Dinner mirrors lunch while enabled
+                </span>
+              )}
             </label>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              When enabled, dinner updates follow lunch. Turn off to edit dinner separately.
+            </p>
           </div>
 
           {MEALS.map((meal) => {
@@ -1720,7 +1841,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 <span className="font-bold">
                   {dailyTotals.protein}g (
                   {Math.round(
-                    ((dailyTotals.protein * 4) / dailyTotals.calories) * 100
+                    ((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100
                   )}
                   %)
                 </span>
@@ -1730,7 +1851,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 <span className="font-bold">
                   {dailyTotals.carbs}g (
                   {Math.round(
-                    ((dailyTotals.carbs * 4) / dailyTotals.calories) * 100
+                    ((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100
                   )}
                   %)
                 </span>
@@ -1740,7 +1861,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                 <span className="font-bold">
                   {dailyTotals.fat}g (
                   {Math.round(
-                    ((dailyTotals.fat * 9) / dailyTotals.calories) * 100
+                    ((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100
                   )}
                   %)
                 </span>
@@ -1786,7 +1907,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                     {targetMacros.protein}g ({targetPercentages.protein}%) →{" "}
                     {dailyTotals.protein}g (
                     {Math.round(
-                      ((dailyTotals.protein * 4) / dailyTotals.calories) * 100
+                      ((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100
                     )}
                     %)
                   </span>
@@ -1811,7 +1932,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                     {targetMacros.carbs}g ({targetPercentages.carbs}%) →{" "}
                     {dailyTotals.carbs}g (
                     {Math.round(
-                      ((dailyTotals.carbs * 4) / dailyTotals.calories) * 100
+                      ((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100
                     )}
                     %)
                   </span>
@@ -1836,7 +1957,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
                     {targetMacros.fat}g ({targetPercentages.fat}%) →{" "}
                     {dailyTotals.fat}g (
                     {Math.round(
-                      ((dailyTotals.fat * 9) / dailyTotals.calories) * 100
+                      ((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100
                     )}
                     %)
                   </span>
