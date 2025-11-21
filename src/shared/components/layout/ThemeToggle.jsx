@@ -1,23 +1,36 @@
 import React from 'react';
-import { Moon, Sun } from 'lucide-react';
+import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
+import LightModeIcon from '@mui/icons-material/LightModeOutlined';
+import { IconButton, Tooltip } from '@mui/material';
 import { useTheme } from '../../context/ThemeContext';
 
 const ThemeToggle = () => {
   const { isDark, toggleTheme } = useTheme();
 
   return (
-    <button
-      onClick={toggleTheme}
-      className="fixed top-4 right-4 z-50 w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300 flex items-center justify-center shadow-lg hover:shadow-xl transform hover:scale-110"
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={isDark ? 'Light mode' : 'Dark mode'}
-    >
-      {isDark ? (
-        <Sun size={20} className="text-yellow-400 animate-spin-slow" />
-      ) : (
-        <Moon size={20} className="text-gray-700" />
-      )}
-    </button>
+    <Tooltip title={isDark ? 'Light mode' : 'Dark mode'} arrow>
+      <IconButton
+        onClick={toggleTheme}
+        size="medium"
+        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        sx={(theme) => ({
+          border: `1px solid ${theme.palette.divider}`,
+          backgroundColor: isDark ? 'grey.900' : 'grey.100',
+          color: isDark ? 'warning.light' : 'text.primary',
+          boxShadow: theme.shadows[1],
+          transition: theme.transitions.create(['transform', 'box-shadow'], {
+            duration: theme.transitions.duration.shorter,
+          }),
+          '&:hover': {
+            transform: 'translateY(-1px)',
+            boxShadow: theme.shadows[4],
+            backgroundColor: isDark ? 'grey.800' : 'grey.200',
+          },
+        })}
+      >
+        {isDark ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+      </IconButton>
+    </Tooltip>
   );
 };
 

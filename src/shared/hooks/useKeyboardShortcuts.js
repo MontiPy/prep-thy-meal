@@ -14,6 +14,8 @@ import { useEffect } from 'react';
  * }, [handleSave, handleUndo, handleClose]);
  */
 export const useKeyboardShortcuts = (shortcuts, dependencies = []) => {
+  const deps = Array.isArray(dependencies) ? dependencies : [];
+  const depsKey = JSON.stringify(deps);
   useEffect(() => {
     const handleKeyDown = (event) => {
       // Don't trigger shortcuts when typing in input fields
@@ -49,13 +51,15 @@ export const useKeyboardShortcuts = (shortcuts, dependencies = []) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, dependencies);
+  }, [shortcuts, depsKey]);
 };
 
 /**
  * Hook for handling numeric key presses (1-9)
  */
 export const useNumericShortcuts = (handlers, dependencies = []) => {
+  const deps = Array.isArray(dependencies) ? dependencies : [];
+  const depsKey = JSON.stringify(deps);
   useEffect(() => {
     const handleKeyDown = (event) => {
       // Don't trigger in input fields
@@ -76,7 +80,7 @@ export const useNumericShortcuts = (handlers, dependencies = []) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, dependencies);
+  }, [handlers, depsKey]);
 };
 
 /**

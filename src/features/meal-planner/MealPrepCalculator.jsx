@@ -1,6 +1,29 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
 import { Plus, Minus, Edit2, Check, X } from "lucide-react";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  Divider,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -18,6 +41,8 @@ import {
 import { useUser } from '../auth/UserContext.jsx';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+
+const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 
 const MealPrepCalculator = ({ allIngredients }) => {
   const { user } = useUser();
@@ -40,7 +65,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
   });
   const [percentageWarning, setPercentageWarning] = useState("");
 
-  const MEALS = ["breakfast", "lunch", "dinner", "snack"];
   const [prepDays, setPrepDays] = useState(6);
   const [matchDinner, setMatchDinner] = useState(false);
   const [mealIngredients, setMealIngredients] = useState({
@@ -73,7 +97,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
   const importFileRef = useRef(null);
 
   // Helper to refresh ingredient from base list while preserving quantity/grams
-  const refreshIngredientData = (ingredient) => {
+  const refreshIngredientData = useCallback((ingredient) => {
     const original = allIngredients.find((i) => i.id === ingredient.id);
     if (!original) return normalizeIngredient(ingredient);
 
@@ -82,7 +106,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       quantity: ingredient.quantity,
       grams: ingredient.grams,
     });
-  };
+  }, [allIngredients]);
 
   useEffect(() => {
     const uid = user?.uid;
@@ -176,7 +200,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
     };
 
     loadData();
-  }, [user, allIngredients]);
+  }, [user, allIngredients, refreshIngredientData]);
 
   useEffect(() => {
     setMealIngredients((prev) => {
@@ -203,7 +227,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
     if (currentPlanId && user) {
       setHasUnsavedChanges(true);
     }
-  }, [calorieTarget, targetPercentages, mealIngredients, matchDinner]);
+  }, [calorieTarget, targetPercentages, mealIngredients, matchDinner, currentPlanId, user]);
 
   // Don't trigger unsaved changes on initial load or plan switching
   useEffect(() => {
@@ -1266,784 +1290,640 @@ const MealPrepCalculator = ({ allIngredients }) => {
   }
 
   return (
-    <div className="calculator">
+    <Box sx={{ maxWidth: 1440, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 10, md: 4 } }}>
       {(showConfetti || goalConfetti) && <div className="confetti">🎉🎉🎉</div>}
       {cheer && <div className="cheer">{cheer}</div>}
-      <div className="card">
-        {/* Header */}
-        <div className="center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-            <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
-          </h1>
-          <div className="flex items-center justify-center gap-2 mb-4 flex-col">
+
+      <Stack spacing={3}>
+        {/* Header + Targets */}
+        <Paper sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 3 }}>
+          <Stack spacing={2.5} alignItems="center" textAlign="center">
+            <Typography variant="h4" fontWeight={800}>
+              <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
+            </Typography>
+
+            {/* Calorie target */}
             {editingTarget ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <input
+              <Stack spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
                     type="number"
                     value={tempTarget}
                     onChange={(e) => handleTargetChange(e.target.value)}
-                    className="w-20 px-2 py-1 border border-gray-300 rounded text-center"
-                    min="500"
-                    max="10000"
+                    size="small"
+                    inputProps={{ min: 500, max: 10000 }}
+                    sx={{ width: 110 }}
                   />
-                  <span className="text-lg font-semibold text-blue-600">
+                  <Typography fontWeight={700} color="primary.main">
                     kcal/day Target
-                  </span>
-                  <button
-                    onClick={handleTargetEdit}
-                    className="text-green-600 hover:text-green-800 p-1"
-                    aria-label="Save calorie target"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    onClick={handleTargetCancel}
-                    className="text-red-600 hover:text-red-800 p-1"
-                    aria-label="Cancel editing"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+                  </Typography>
+                  <IconButton color="success" onClick={handleTargetEdit} aria-label="Save calorie target">
+                    <Check size={18} />
+                  </IconButton>
+                  <IconButton color="error" onClick={handleTargetCancel} aria-label="Cancel editing">
+                    <X size={18} />
+                  </IconButton>
+                </Stack>
                 {targetWarning && (
-                  <p className="text-sm text-orange-600 max-w-md text-center">
+                  <Typography variant="body2" color="warning.main">
                     {targetWarning}
-                  </p>
+                  </Typography>
                 )}
-              </>
+              </Stack>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-blue-600">
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="h6" color="primary.main" fontWeight={800}>
                   {calorieTarget} kcal/day Target
-                </span>
-                <button
-                  onClick={() => setEditingTarget(true)}
-                  className="text-gray-600 hover:text-gray-800 p-1"
-                >
-                  <Edit2 size={16} />
-                </button>
-              </div>
+                </Typography>
+                <IconButton onClick={() => setEditingTarget(true)} aria-label="Edit target">
+                  <Edit2 size={18} />
+                </IconButton>
+              </Stack>
             )}
-          </div>
 
-          {/* Macro Targets */}
-          <div className="panel-blue mb-4 max-w-2xl mx-auto">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
-              Macro Targets
-            </h3>
-            {editingPercentages ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Protein:</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={tempPercentages.protein}
-                      onChange={(e) =>
-                        updateTempPercentage(
-                          "protein",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                    />
-                    <span>%</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Carbs:</span>
-                  <span className="font-semibold">
-                    {tempPercentages.carbs.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Fat:</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={tempPercentages.fat}
-                      onChange={(e) =>
-                        updateTempPercentage(
-                          "fat",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                      min="0"
-                      max="100"
-                      step="0.5"
-                    />
-                    <span>%</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Total: 100%</span>
-                </div>
-                {percentageWarning && (
-                  <p className="text-sm text-orange-600 text-center mt-2">
-                    {percentageWarning}
-                  </p>
+            {/* Macro Targets */}
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2.5,
+                maxWidth: 520,
+                width: "100%",
+                borderRadius: 2,
+                backgroundColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(59,130,246,0.07)" : "rgba(59,130,246,0.06)",
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Macro Targets
+                </Typography>
+                {!editingPercentages && (
+                  <IconButton onClick={() => setEditingPercentages(true)} aria-label="Edit macro targets">
+                    <Edit2 size={16} />
+                  </IconButton>
                 )}
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  <button
-                    onClick={handlePercentageEdit}
-                    className="text-green-600 hover:text-green-800 p-1"
-                    aria-label="Save macro percentages"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    onClick={handlePercentageCancel}
-                    className="text-red-600 hover:text-red-800 p-1"
-                    aria-label="Cancel editing"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex gap-6">
-                  <span className="text-sm">
-                    <strong>Protein:</strong> {targetPercentages.protein}%
-                  </span>
-                  <span className="text-sm">
-                    <strong>Carbs:</strong> {targetPercentages.carbs}%
-                  </span>
-                  <span className="text-sm">
-                    <strong>Fat:</strong> {targetPercentages.fat}%
-                  </span>
-                </div>
-                <button
-                  onClick={() => setEditingPercentages(true)}
-                  className="text-gray-600 hover:text-gray-800 p-1"
-                >
-                  <Edit2 size={16} />
-                </button>
-              </div>
-            )}
-          </div>
+              </Stack>
+              {editingPercentages ? (
+                <Stack spacing={2}>
+                  {[
+                    { key: "protein", label: "Protein" },
+                    { key: "fat", label: "Fat" },
+                  ].map(({ key, label }) => (
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" key={key}>
+                      <Typography fontWeight={600}>{label}:</Typography>
+                      <TextField
+                        type="number"
+                        value={tempPercentages[key]}
+                        onChange={(e) =>
+                          updateTempPercentage(key, parseFloat(e.target.value) || 0)
+                        }
+                        size="small"
+                        inputProps={{ min: 0, max: 100, step: 0.5 }}
+                        sx={{ width: 90 }}
+                      />
+                    </Stack>
+                  ))}
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography fontWeight={600}>Carbs:</Typography>
+                    <Typography fontWeight={700}>{tempPercentages.carbs.toFixed(1)}%</Typography>
+                  </Stack>
+                  {percentageWarning && (
+                    <Typography variant="body2" color="warning.main" textAlign="center">
+                      {percentageWarning}
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={1} justifyContent="center">
+                    <Button size="small" color="success" variant="contained" onClick={handlePercentageEdit}>
+                      Save
+                    </Button>
+                    <Button size="small" color="inherit" onClick={handlePercentageCancel}>
+                      Cancel
+                    </Button>
+                  </Stack>
+                </Stack>
+              ) : (
+                <Stack direction="row" spacing={3}>
+                  <Chip label={`Protein: ${targetPercentages.protein}%`} />
+                  <Chip label={`Carbs: ${targetPercentages.carbs}%`} />
+                  <Chip label={`Fat: ${targetPercentages.fat}%`} />
+                </Stack>
+              )}
+            </Paper>
 
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Simple. Delicious. Healthy. Adjust portions below to customize your
-            meal prep!
-          </p>
-        </div>
+            <Typography variant="body2" color="text.secondary" maxWidth={640}>
+              Simple. Delicious. Healthy. Adjust portions below to customize your meal prep!
+            </Typography>
+          </Stack>
+        </Paper>
 
         {/* Plan Manager */}
-        <div className="panel-gray mb-6">
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Current Plan:{" "}
-              {currentPlanId ? (
-                <span className="text-blue-600">{planName}</span>
-              ) : (
-                <span className="text-gray-500">New Plan</span>
-              )}
-              {hasUnsavedChanges && (
-                <span className="text-orange-500 ml-2">• Unsaved changes</span>
-              )}
-            </label>
-            <select
-              value={selectedPlanId}
-              onChange={handlePlanDropdownChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
-            >
-              <option value="">Create new plan...</option>
-              {savedPlans.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.name}
-                </option>
-              ))}
-            </select>
-            {(lastPlanSavedAt || lastBaselineSavedAt) && (
-              <p className="text-xs text-gray-500 mt-1">
-                {lastPlanSavedAt && `Last plan save: ${lastPlanSavedAt.toLocaleTimeString()}`}{" "}
-                {lastBaselineSavedAt && `• Baseline saved: ${lastBaselineSavedAt.toLocaleTimeString()}`}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 mb-2">
-            <input
-              type="text"
-              value={planName}
-              onChange={(e) => setPlanName(e.target.value)}
-              placeholder="Plan name (optional)"
-              className="flex-1 px-2 py-1 border border-gray-300 rounded"
-            />
-            <button
-              onClick={handleSavePlan}
-              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium whitespace-nowrap"
-            >
-              {currentPlanId ? `Update ${planName || "Plan"}` : "Save Plan"}
-            </button>
-            {currentPlanId && (
-              <button
-                onClick={handleSaveAsNew}
-                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 font-medium whitespace-nowrap"
-              >
-                Save As New
-              </button>
-            )}
-          </div>
-
-          <details className="mt-3">
-            <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 dark:text-gray-200">
-              Advanced Plan Management
-            </summary>
-            <div className="mt-2 space-y-2 border-t pt-2">
-              {/* Export/Import Section */}
-              <div className="bg-blue-50 dark:bg-blue-900/30 rounded p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">💾 Backup & Restore</p>
-                  {lastExportedAt && (
-                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                      Last export: {lastExportedAt.toLocaleTimeString()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={handleExportJSON}
-                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-                  >
-                    📥 Export JSON
-                  </button>
-                  <button
-                    onClick={() => importFileRef.current?.click()}
-                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
-                  >
-                    📤 Import JSON
-                  </button>
-                  <input
-                    ref={importFileRef}
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={handleImportJSON}
-                    style={{ display: 'none' }}
-                    aria-label="Import meal plan from JSON file"
-                  />
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Export to backup your plan or share with others. Import to restore a saved plan.
-                </p>
-              </div>
-
-              {/* Baseline Setting */}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSaveBaseline}
-                  className="text-blue-600 hover:text-blue-800 p-1 font-medium text-sm"
+        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+          <Stack spacing={2}>
+            <Stack spacing={0.5}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Current Plan
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                <Typography fontWeight={700} color={currentPlanId ? "primary.main" : "text.secondary"}>
+                  {currentPlanId ? planName || "Saved Plan" : "New Plan"}
+                </Typography>
+                {hasUnsavedChanges && <Chip size="small" color="warning" label="Unsaved changes" />}
+              </Stack>
+              <FormControl fullWidth size="small">
+                <InputLabel id="plan-select-label">Saved plans</InputLabel>
+                <Select
+                  labelId="plan-select-label"
+                  label="Saved plans"
+                  value={selectedPlanId}
+                  onChange={handlePlanDropdownChange}
                 >
-                  Set as Baseline
-                </button>
-              </div>
-
-              {/* Delete Plan */}
-              {savedPlans.length > 0 && currentPlanId && (
-                <div className="flex justify-between items-center bg-gray-50 rounded p-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Delete current plan
-                  </span>
-                  <button
-                    onClick={() => handleDeletePlan(currentPlanId)}
-                    className="text-red-600 hover:text-red-800 text-sm px-2 py-1"
-                  >
-                    Delete
-                  </button>
-                </div>
+                  <MenuItem value="">Create new plan...</MenuItem>
+                  {savedPlans.map((plan) => (
+                    <MenuItem key={plan.id} value={plan.id}>
+                      {plan.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {(lastPlanSavedAt || lastBaselineSavedAt) && (
+                <Typography variant="caption" color="text.secondary">
+                  {lastPlanSavedAt && `Last plan save: ${lastPlanSavedAt.toLocaleTimeString()}`}{" "}
+                  {lastBaselineSavedAt && `• Baseline saved: ${lastBaselineSavedAt.toLocaleTimeString()}`}
+                </Typography>
               )}
-            </div>
-          </details>
-        </div>
+            </Stack>
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Plan name (optional)"
+                value={planName}
+                onChange={(e) => setPlanName(e.target.value)}
+              />
+              <Stack direction="row" spacing={1}>
+                <Button variant="contained" onClick={handleSavePlan}>
+                  {currentPlanId ? `Update ${planName || "Plan"}` : "Save Plan"}
+                </Button>
+                {currentPlanId && (
+                  <Button variant="contained" color="success" onClick={handleSaveAsNew}>
+                    Save As New
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+
+            <Divider />
+            <Stack spacing={1.5}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  💾 Backup & Restore
+                </Typography>
+                {lastExportedAt && (
+                  <Typography variant="caption" color="text.secondary">
+                    Last export: {lastExportedAt.toLocaleTimeString()}
+                  </Typography>
+                )}
+              </Stack>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                <Button variant="contained" onClick={handleExportJSON}>
+                  Export JSON
+                </Button>
+                <Button variant="contained" color="success" onClick={() => importFileRef.current?.click()}>
+                  Import JSON
+                </Button>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportJSON}
+                  style={{ display: "none" }}
+                  aria-label="Import meal plan from JSON file"
+                />
+                <Button variant="outlined" onClick={handleSaveBaseline}>
+                  Set as Baseline
+                </Button>
+              </Stack>
+              {savedPlans.length > 0 && currentPlanId && (
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography variant="body2" color="text.secondary">
+                    Delete current plan
+                  </Typography>
+                  <Button color="error" variant="outlined" size="small" onClick={() => handleDeletePlan(currentPlanId)}>
+                    Delete
+                  </Button>
+                </Stack>
+              )}
+            </Stack>
+          </Stack>
+        </Paper>
 
         {/* Instructions */}
-        <div className="panel-yellow mb-6">
-          <p className="text-sm text-yellow-800">
-            <strong>Instructions:</strong> Add foods to each meal. Use "Lunch =
-            Dinner" if lunch and dinner are identical. All weights are raw and
-            grilled unless noted.
-          </p>
-        </div>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 3,
+            backgroundColor: (theme) =>
+              theme.palette.mode === "dark" ? "rgba(245,158,11,0.08)" : "rgba(255,237,213,0.7)",
+            borderColor: "warning.main",
+          }}
+        >
+          <Typography variant="body2" fontWeight={600} color="warning.dark">
+            Instructions: Add foods to each meal. Use "Lunch = Dinner" if lunch and dinner are identical.
+            All weights are raw and grilled unless noted.
+          </Typography>
+        </Paper>
 
         {/* Ingredients Table */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Per Meal (Raw Weights)
-          </h2>
-          <div className="flex flex-col gap-2 mb-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={matchDinner}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setMatchDinner(checked);
-                  if (checked) {
-                    setMealIngredients((prev) => ({
-                      ...prev,
-                      dinner: prev.lunch.map((i) => refreshIngredientData(i)),
-                    }));
-                  }
-                }}
+        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Stack spacing={2.5}>
+            <Typography variant="h5" fontWeight={800}>
+              Per Meal (Raw Weights)
+            </Typography>
+            <Stack spacing={0.5}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={matchDinner}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setMatchDinner(checked);
+                      if (checked) {
+                        setMealIngredients((prev) => ({
+                          ...prev,
+                          dinner: prev.lunch.map((i) => refreshIngredientData(i)),
+                        }));
+                      }
+                    }}
+                  />
+                }
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography fontWeight={600}>Lunch = Dinner</Typography>
+                    {matchDinner && <Chip size="small" color="primary" label="Dinner mirrors lunch" />}
+                  </Stack>
+                }
               />
-              <span className="font-medium">Lunch = Dinner</span>
-              {matchDinner && (
-                <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
-                  Dinner mirrors lunch while enabled
-                </span>
-              )}
-            </label>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              When enabled, dinner updates follow lunch. Turn off to edit dinner separately.
-            </p>
-          </div>
+              <Typography variant="body2" color="text.secondary">
+                When enabled, dinner updates follow lunch. Turn off to edit dinner separately.
+              </Typography>
+            </Stack>
 
-          {MEALS.map((meal) => {
-            const list = mealIngredients[meal];
-            const disabled = matchDinner && meal === "dinner";
-            return (
-              <details
-                key={meal}
-                open
-                className={`mb-4 border rounded ${
-                  disabled ? "disabled-section" : ""
-                }`}
-              >
-                <summary className="cursor-pointer select-none capitalize font-semibold bg-gray-100 p-2">
-                  {meal}
-                </summary>
-                <div className="p-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <select
-                      value={selectedId}
-                      onChange={(e) => setSelectedId(e.target.value)}
-                      className="border px-2 py-1"
-                      disabled={disabled}
+            <Stack spacing={2}>
+              {MEALS.map((meal) => {
+                const list = mealIngredients[meal];
+                const disabled = matchDinner && meal === "dinner";
+                return (
+                  <Paper key={meal} variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
+                    <Box
+                      sx={{
+                        px: 2,
+                        py: 1.5,
+                        backgroundColor: "background.accent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        textTransform: "capitalize",
+                        fontWeight: 700,
+                      }}
                     >
-                      <option value="">Select ingredient</option>
-                      {allIngredients
-                        .filter((i) => !list.some((p) => p.id === i.id))
-                        .map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      className="btn-green"
-                      onClick={() => handleAddIngredient(meal)}
-                      disabled={!selectedId || disabled}
-                    >
-                      Add
-                    </button>
-                  </div>
+                      <Typography variant="subtitle1" fontWeight={700}>
+                        {meal}
+                      </Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                          <InputLabel id={`${meal}-ingredient-label`}>Select ingredient</InputLabel>
+                          <Select
+                            labelId={`${meal}-ingredient-label`}
+                            label="Select ingredient"
+                            value={selectedId}
+                            onChange={(e) => setSelectedId(e.target.value)}
+                            disabled={disabled}
+                          >
+                            <MenuItem value="">Select ingredient</MenuItem>
+                            {allIngredients
+                              .filter((i) => !list.some((p) => p.id === i.id))
+                              .map((i) => (
+                                <MenuItem key={i.id} value={i.id}>
+                                  {i.name}
+                                </MenuItem>
+                              ))}
+                          </Select>
+                        </FormControl>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          onClick={() => handleAddIngredient(meal)}
+                          disabled={!selectedId || disabled}
+                        >
+                          Add
+                        </Button>
+                      </Stack>
+                    </Box>
 
-                  {/* Table Layout */}
-                  <div className="overflow-x-auto">
-                    <table className="min-w-max w-full border-collapse border border-gray-300 rounded-lg">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 p-3 text-left">
-                            Ingredient
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            Quantity
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            Grams
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            Calories
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            Protein (g)
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            Carbs (g)
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            Fat (g)
-                          </th>
-                          <th className="border border-gray-300 p-3 text-center">
-                            -
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {list.map((ingredient) => {
-                          const nutrition = calculateNutrition(ingredient);
-                          const disabled = matchDinner && meal === "dinner";
-                          const unit = ingredient.unit || "g";
+                    <Box sx={{ overflowX: "auto", p: 0 }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Ingredient</TableCell>
+                            <TableCell align="center">Quantity</TableCell>
+                            <TableCell align="center">Grams</TableCell>
+                            <TableCell align="center">Calories</TableCell>
+                            <TableCell align="center">Protein (g)</TableCell>
+                            <TableCell align="center">Carbs (g)</TableCell>
+                            <TableCell align="center">Fat (g)</TableCell>
+                            <TableCell align="center">-</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {list.map((ingredient) => {
+                            const nutrition = calculateNutrition(ingredient);
+                            const disabledRow = matchDinner && meal === "dinner";
+                            const unit = ingredient.unit || "g";
 
-                          // For "g" type: quantity represents grams directly
-                          // For "unit" type: quantity represents number of units
-                          let displayQuantity,
-                            totalGrams,
-                            incrementStep,
-                            unitLabel;
+                            let displayQuantity, totalGrams, incrementStep, unitLabel;
 
-                          if (unit === "g") {
-                            // Gram-based: show grams directly
-                            displayQuantity = ingredient.grams || 100;
-                            totalGrams = Math.round(displayQuantity);
-                            incrementStep = 5;
-                            unitLabel = "g";
-                          } else {
-                            // Unit-based: show number of units
-                            displayQuantity = ingredient.quantity || 1;
-                            totalGrams = Math.round(
-                              displayQuantity * (ingredient.gramsPerUnit || 100)
+                            if (unit === "g") {
+                              displayQuantity = ingredient.grams || 100;
+                              totalGrams = Math.round(displayQuantity);
+                              incrementStep = 5;
+                              unitLabel = "g";
+                            } else {
+                              displayQuantity = ingredient.quantity || 1;
+                              totalGrams = Math.round(
+                                displayQuantity * (ingredient.gramsPerUnit || 100)
+                              );
+                              incrementStep = 0.5;
+                              unitLabel = "unit";
+                            }
+
+                            return (
+                              <TableRow key={ingredient.id} hover>
+                                <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
+                                  {ingredient.name}
+                                </TableCell>
+                                <TableCell>
+                                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() =>
+                                        updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
+                                      }
+                                      disabled={disabledRow}
+                                      aria-label={`Decrease ${ingredient.name} quantity`}
+                                    >
+                                      <Minus size={18} />
+                                    </IconButton>
+                                    <TextField
+                                      type="number"
+                                      size="small"
+                                      value={displayQuantity}
+                                      onChange={(e) =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      inputProps={{ min: 0, step: "any" }}
+                                      sx={{ width: 90 }}
+                                      disabled={disabledRow}
+                                    />
+                                    <Typography variant="caption" color="text.secondary" sx={{ width: 36 }}>
+                                      {unitLabel}
+                                    </Typography>
+                                    <IconButton
+                                      size="small"
+                                      color="success"
+                                      onClick={() =>
+                                        updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
+                                      }
+                                      disabled={disabledRow}
+                                      aria-label={`Increase ${ingredient.name} quantity`}
+                                    >
+                                      <Plus size={18} />
+                                    </IconButton>
+                                  </Stack>
+                                </TableCell>
+                                <TableCell align="center">{totalGrams}g</TableCell>
+                                <TableCell align="center">{nutrition.calories}</TableCell>
+                                <TableCell align="center">{nutrition.protein}</TableCell>
+                                <TableCell align="center">{nutrition.carbs}</TableCell>
+                                <TableCell align="center">{nutrition.fat}</TableCell>
+                                <TableCell align="center">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => removeIngredient(meal, ingredient.id)}
+                                    disabled={disabledRow}
+                                  >
+                                    <X size={16} />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
                             );
-                            incrementStep = 0.5;
-                            unitLabel = "unit";
-                          }
-
-                          return (
-                            <tr
-                              key={ingredient.id}
-                              className="hover:bg-gray-50"
-                            >
-                              <td className="border border-gray-300 p-3 font-medium capitalize">
-                                {ingredient.name}
-                              </td>
-                              <td className="border border-gray-300 p-3">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    onClick={() =>
-                                      updateIngredientAmount(
-                                        meal,
-                                        ingredient.id,
-                                        displayQuantity - incrementStep
-                                      )
-                                    }
-                                    className="w-11 h-11 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-700 rounded-lg font-bold touch-manipulation"
-                                    disabled={disabled}
-                                    aria-label={`Decrease ${ingredient.name} quantity`}
-                                  >
-                                    <Minus size={20} />
-                                  </button>
-                                  <input
-                                    type="number"
-                                    step="any"
-                                    value={displayQuantity}
-                                    onChange={(e) =>
-                                      updateIngredientAmount(
-                                        meal,
-                                        ingredient.id,
-                                        parseFloat(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-20 px-3 py-2 border border-gray-300 rounded text-center"
-                                    min="0"
-                                    disabled={disabled}
-                                  />
-                                  <span className="text-sm text-gray-600 w-12">
-                                    {unitLabel}
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      updateIngredientAmount(
-                                        meal,
-                                        ingredient.id,
-                                        displayQuantity + incrementStep
-                                      )
-                                    }
-                                    className="w-11 h-11 flex items-center justify-center bg-green-100 hover:bg-green-200 text-green-700 rounded-lg font-bold touch-manipulation"
-                                    disabled={disabled}
-                                    aria-label={`Increase ${ingredient.name} quantity`}
-                                  >
-                                    <Plus size={20} />
-                                  </button>
-                                </div>
-                              </td>
-                              <td className="border border-gray-300 p-3 text-center">
-                                {totalGrams}g
-                              </td>
-                              <td className="border border-gray-300 p-3 text-center">
-                                {nutrition.calories}
-                              </td>
-                              <td className="border border-gray-300 p-3 text-center">
-                                {nutrition.protein}
-                              </td>
-                              <td className="border border-gray-300 p-3 text-center">
-                                {nutrition.carbs}
-                              </td>
-                              <td className="border border-gray-300 p-3 text-center">
-                                {nutrition.fat}
-                              </td>
-                              <td className="border border-gray-300 p-3 text-center">
-                                <button
-                                  className="text-red-600"
-                                  onClick={() =>
-                                    removeIngredient(meal, ingredient.id)
-                                  }
-                                  disabled={disabled}
-                                >
-                                  x
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        <tr className="bg-blue-50 font-bold">
-                          <td className="border border-gray-300 p-3">
-                            Total/meal
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            —
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            —
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            {Math.round(calcTotals(list).calories)}
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            {Math.round(calcTotals(list).protein * 10) / 10}
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            {Math.round(calcTotals(list).carbs * 10) / 10}
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            {Math.round(calcTotals(list).fat * 10) / 10}
-                          </td>
-                          <td className="border border-gray-300 p-3 text-center">
-                            -
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </details>
-            );
-          })}
-        </div>
+                          })}
+                          <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
+                            <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
+                            <TableCell align="center">—</TableCell>
+                            <TableCell align="center">—</TableCell>
+                            <TableCell align="center">
+                              {Math.round(calcTotals(list).calories)}
+                            </TableCell>
+                            <TableCell align="center">
+                              {Math.round(calcTotals(list).protein * 10) / 10}
+                            </TableCell>
+                            <TableCell align="center">
+                              {Math.round(calcTotals(list).carbs * 10) / 10}
+                            </TableCell>
+                            <TableCell align="center">
+                              {Math.round(calcTotals(list).fat * 10) / 10}
+                            </TableCell>
+                            <TableCell align="center">-</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </Box>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </Stack>
+        </Paper>
 
         {/* Daily Totals */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <div className="panel-blue-gradient">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Per Day</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="font-medium">Calories:</span>
-                <span className="font-bold text-blue-600">
-                  {dailyTotals.calories}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Protein:</span>
-                <span className="font-bold">
-                  {dailyTotals.protein}g (
-                  {Math.round(
-                    ((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100
-                  )}
-                  %)
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Carbs:</span>
-                <span className="font-bold">
-                  {dailyTotals.carbs}g (
-                  {Math.round(
-                    ((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100
-                  )}
-                  %)
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Fat:</span>
-                <span className="font-bold">
-                  {dailyTotals.fat}g (
-                  {Math.round(
-                    ((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100
-                  )}
-                  %)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="panel-green-gradient">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
-              Target Comparison
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Calories:</span>
-                  <span
-                    className={`font-bold ${
-                      Math.abs(dailyTotals.calories - calorieTarget) <= 25
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {calorieTarget} → {dailyTotals.calories}
-                  </span>
-                </div>
-                <div className="progress-wrapper mt-1">
-                  <div
-                    className="progress-bar"
-                    style={{ width: `${progress.calories}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Protein:</span>
-                  <span
-                    className={`font-bold ${
-                      Math.abs(dailyTotals.protein - targetMacros.protein) <= 5
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {targetMacros.protein}g ({targetPercentages.protein}%) →{" "}
-                    {dailyTotals.protein}g (
-                    {Math.round(
-                      ((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100
-                    )}
-                    %)
-                  </span>
-                </div>
-                <div className="progress-wrapper mt-1">
-                  <div
-                    className="progress-bar"
-                    style={{ width: `${progress.protein}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Carbs:</span>
-                  <span
-                    className={`font-bold ${
-                      Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {targetMacros.carbs}g ({targetPercentages.carbs}%) →{" "}
-                    {dailyTotals.carbs}g (
-                    {Math.round(
-                      ((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100
-                    )}
-                    %)
-                  </span>
-                </div>
-                <div className="progress-wrapper mt-1">
-                  <div
-                    className="progress-bar"
-                    style={{ width: `${progress.carbs}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Fat:</span>
-                  <span
-                    className={`font-bold ${
-                      Math.abs(dailyTotals.fat - targetMacros.fat) <= 5
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {targetMacros.fat}g ({targetPercentages.fat}%) →{" "}
-                    {dailyTotals.fat}g (
-                    {Math.round(
-                      ((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100
-                    )}
-                    %)
-                  </span>
-                </div>
-                <div className="progress-wrapper mt-1">
-                  <div
-                    className="progress-bar"
-                    style={{ width: `${progress.fat}%` }}
-                  />
-                </div>
-              </div>
-              {withinRange && (
-                <p className="text-center text-green-600 font-medium mt-2">
-                  You nailed today's targets! 👍
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <Grid container spacing={2.5}>
+          <Grid item xs={12} md={6}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+              <Typography variant="h6" fontWeight={800} mb={2}>
+                Per Day
+              </Typography>
+              <Stack spacing={1}>
+                {[
+                  { label: "Calories", value: dailyTotals.calories, color: "primary" },
+                  { label: "Protein", value: `${dailyTotals.protein}g (${Math.round(((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100)}%)` },
+                  { label: "Carbs", value: `${dailyTotals.carbs}g (${Math.round(((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100)}%)` },
+                  { label: "Fat", value: `${dailyTotals.fat}g (${Math.round(((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100)}%)` },
+                ].map((item) => (
+                  <Stack direction="row" justifyContent="space-between" key={item.label}>
+                    <Typography fontWeight={600}>{item.label}:</Typography>
+                    <Typography fontWeight={700} color={item.color ? `${item.color}.main` : "text.primary"}>
+                      {item.value}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+              <Typography variant="h6" fontWeight={800} mb={2}>
+                Target Comparison
+              </Typography>
+              <Stack spacing={2}>
+                {[
+                  {
+                    label: "Calories",
+                    target: calorieTarget,
+                    current: dailyTotals.calories,
+                    progress: progress.calories,
+                    within: Math.abs(dailyTotals.calories - calorieTarget) <= 25,
+                  },
+                  {
+                    label: "Protein",
+                    target: `${targetMacros.protein}g (${targetPercentages.protein}%)`,
+                    current: `${dailyTotals.protein}g (${Math.round(((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100)}%)`,
+                    progress: progress.protein,
+                    within: Math.abs(dailyTotals.protein - targetMacros.protein) <= 5,
+                  },
+                  {
+                    label: "Carbs",
+                    target: `${targetMacros.carbs}g (${targetPercentages.carbs}%)`,
+                    current: `${dailyTotals.carbs}g (${Math.round(((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100)}%)`,
+                    progress: progress.carbs,
+                    within: Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5,
+                  },
+                  {
+                    label: "Fat",
+                    target: `${targetMacros.fat}g (${targetPercentages.fat}%)`,
+                    current: `${dailyTotals.fat}g (${Math.round(((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100)}%)`,
+                    progress: progress.fat,
+                    within: Math.abs(dailyTotals.fat - targetMacros.fat) <= 5,
+                  },
+                ].map((item) => (
+                  <Stack key={item.label} spacing={0.5}>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography fontWeight={600}>{item.label}:</Typography>
+                      <Typography
+                        fontWeight={700}
+                        color={item.within ? "success.main" : "error.main"}
+                      >
+                        {item.target} → {item.current}
+                      </Typography>
+                    </Stack>
+                    <Box
+                      sx={{
+                        width: "100%",
+                        height: 8,
+                        borderRadius: 999,
+                        backgroundColor: "action.hover",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: `${item.progress}%`,
+                          height: "100%",
+                          borderRadius: 999,
+                          background: (theme) =>
+                            item.within
+                              ? `linear-gradient(90deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`
+                              : `linear-gradient(90deg, ${theme.palette.error.main}, ${theme.palette.error.dark})`,
+                          transition: "width 200ms ease",
+                        }}
+                      />
+                    </Box>
+                  </Stack>
+                ))}
+                {withinRange && (
+                  <Typography textAlign="center" color="success.main" fontWeight={700} mt={1}>
+                    You nailed today's targets! 👍
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+          </Grid>
+        </Grid>
 
         {/* Shopping List */}
-        <div className="panel-gray">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
-              {prepDays}-Day Shopping List
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Prep days:</span>
-              <select
-                value={prepDays}
-                onChange={(e) => setPrepDays(Number(e.target.value))}
-                className="px-2 py-1 border border-gray-300 rounded text-sm"
-              >
-                <option value={3}>3 days</option>
-                <option value={5}>5 days</option>
-                <option value={6}>6 days</option>
-                <option value={7}>1 week</option>
-                <option value={10}>10 days</option>
-                <option value={14}>2 weeks</option>
-                <option value={21}>3 weeks</option>
-                <option value={30}>1 month</option>
-              </select>
-              <button
-                onClick={handleExportPDF}
-                className="btn-blue text-sm"
-              >
-                Export PDF
-              </button>
-              <button
-                onClick={handleShareToReminders}
-                className="btn-green text-sm"
-              >
-                Share List
-              </button>
-              <button
-                onClick={handleCopyToClipboard}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                Copy
-              </button>
-            </div>
-          </div>
+        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+          <Stack spacing={2}>
+            <Stack direction={{ xs: "column", md: "row" }} alignItems={{ md: "center" }} justifyContent="space-between" spacing={1.5}>
+              <Typography variant="h6" fontWeight={800}>
+                {prepDays}-Day Shopping List
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                <Typography variant="body2" color="text.secondary">
+                  Prep days:
+                </Typography>
+                <Select
+                  size="small"
+                  value={prepDays}
+                  onChange={(e) => setPrepDays(Number(e.target.value))}
+                  sx={{ minWidth: 140 }}
+                >
+                  {[3, 5, 6, 7, 10, 14, 21, 30].map((day) => (
+                    <MenuItem key={day} value={day}>
+                      {day === 7 ? "1 week" : day === 30 ? "1 month" : `${day} days`}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <Button size="small" variant="contained" onClick={handleExportPDF}>
+                  Export PDF
+                </Button>
+                <Button size="small" variant="contained" color="success" onClick={handleShareToReminders}>
+                  Share List
+                </Button>
+                <Button size="small" variant="outlined" onClick={handleCopyToClipboard}>
+                  Copy
+                </Button>
+              </Stack>
+            </Stack>
 
-          {prepDays > 7 && (
-            <div className="mb-4 p-3 bg-green-50 rounded-lg">
-              <h4 className="font-semibold text-green-800 mb-1">
-                🏗️ Extended Meal Prep Benefits:
-              </h4>
-              <p className="text-sm text-green-700">
-                Planning for {prepDays} days saves time and money. Consider
-                freezing portions and buying in bulk for better deals.
-              </p>
-            </div>
-          )}
+            {prepDays > 7 && (
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 2, backgroundColor: "success.light", borderColor: "success.main" }}
+              >
+                <Typography fontWeight={700} color="success.dark" mb={0.5}>
+                  🏗️ Extended Meal Prep Benefits:
+                </Typography>
+                <Typography variant="body2" color="success.dark">
+                  Planning for {prepDays} days saves time and money. Consider freezing portions and buying in bulk for better deals.
+                </Typography>
+              </Paper>
+            )}
 
-          <div className="space-y-4">
-            {Object.entries(categorizedShoppingList).map(
-              ([category, ingredients]) => (
-                <details key={category} open className="border rounded-lg">
-                  <summary className="cursor-pointer bg-gray-50 p-3 font-semibold text-gray-700 hover:bg-gray-100 rounded-t-lg">
-                    {category} ({ingredients.length} items)
-                  </summary>
-                  <div className="p-3 space-y-2">
+            <Stack spacing={1.5}>
+              {Object.entries(categorizedShoppingList).map(([category, ingredients]) => (
+                <Paper key={category} variant="outlined" sx={{ borderRadius: 2 }}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1.5,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography fontWeight={700}>{category}</Typography>
+                    <Chip size="small" label={`${ingredients.length} items`} />
+                  </Box>
+                  <Divider />
+                  <Stack spacing={1} sx={{ p: 1.5 }}>
                     {ingredients.map((ingredient) => {
-                      const totalQuantity =
-                        (ingredient.quantity || 1) * prepDays;
+                      const totalQuantity = (ingredient.quantity || 1) * prepDays;
                       const totalGrams = ingredient.grams * prepDays;
                       const pounds = (totalGrams / 453.592).toFixed(2);
                       const kilos = (totalGrams / 1000).toFixed(2);
@@ -2052,118 +1932,167 @@ const MealPrepCalculator = ({ allIngredients }) => {
                       const isGrams = unit === "g";
 
                       return (
-                        <div
+                        <Paper
                           key={ingredient.id}
-                          className="flex justify-between items-center p-2 bg-white rounded border hover:shadow-sm transition-shadow"
+                          variant="outlined"
+                          sx={{ p: 1.25, borderRadius: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
                         >
-                          <span className="font-medium capitalize">
+                          <Typography fontWeight={600} textTransform="capitalize">
                             {ingredient.name}
-                          </span>
-                          <div className="text-right">
+                          </Typography>
+                          <Box textAlign="right">
                             {isGrams ? (
                               <>
-                                <span className="text-blue-600 font-bold block">
+                                <Typography color="primary.main" fontWeight={800}>
                                   {totalGrams.toFixed(0)}g
-                                </span>
-                                <div className="text-gray-600 text-sm">
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
                                   ({pounds} lbs | {kilos} kg)
                                   {prepDays > 7 && (
-                                    <div className="text-xs text-gray-500">
-                                      {(totalGrams / prepDays).toFixed(0)}g per
-                                      day
-                                    </div>
+                                    <Box component="span" display="block">
+                                      {(totalGrams / prepDays).toFixed(0)}g per day
+                                    </Box>
                                   )}
-                                </div>
+                                </Typography>
                               </>
                             ) : (
                               <>
-                                <span className="text-blue-600 font-bold block">
+                                <Typography color="primary.main" fontWeight={800}>
                                   {totalQuantity.toFixed(1)} {unit}
-                                </span>
-                                <div className="text-gray-600 text-sm">
-                                  ({totalGrams.toFixed(0)}g | {pounds} lbs |{" "}
-                                  {kilos} kg)
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  ({totalGrams.toFixed(0)}g | {pounds} lbs | {kilos} kg)
                                   {prepDays > 7 && (
-                                    <div className="text-xs text-gray-500">
+                                    <Box component="span" display="block">
                                       {quantityPerDay.toFixed(1)} {unit} per day
-                                    </div>
+                                    </Box>
                                   )}
-                                </div>
+                                </Typography>
                               </>
                             )}
-                          </div>
-                        </div>
+                          </Box>
+                        </Paper>
                       );
                     })}
-                  </div>
-                </details>
-              )
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, borderRadius: 2, backgroundColor: "info.light", borderColor: "info.main" }}
+            >
+              <Typography fontWeight={700} color="info.dark" mb={1}>
+                💡 {prepDays > 7 ? "Extended Meal Prep" : "Shopping"} Tips:
+              </Typography>
+              <Stack component="ul" spacing={0.5} sx={{ pl: 2, m: 0 }}>
+                {(prepDays > 7
+                  ? [
+                      "Storage: Invest in quality containers and freezer bags",
+                      "Freezing: Most proteins freeze well for 3+ months",
+                      "Bulk buying: Warehouse stores offer better prices for large quantities",
+                      "Prep scheduling: Cook proteins in batches and freeze portions",
+                      "Vegetables: Frozen vegetables are perfect for extended meal prep",
+                    ]
+                  : [
+                      "Buy in bulk to save money on larger quantities",
+                      "Check for sales on protein sources first",
+                      "Frozen vegetables are nutritious and last longer",
+                      "Pre-cut vegetables save prep time",
+                    ]
+                ).map((tip) => (
+                  <Typography key={tip} component="li" variant="body2" color="info.dark">
+                    {tip}
+                  </Typography>
+                ))}
+              </Stack>
+            </Paper>
+
+            {prepDays > 14 && (
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 2, backgroundColor: "warning.light", borderColor: "warning.main" }}
+              >
+                <Typography fontWeight={700} color="warning.dark" mb={1}>
+                  ⚠️ Long-term Storage Notes:
+                </Typography>
+                <Stack component="ul" spacing={0.5} sx={{ pl: 2, m: 0 }}>
+                  {[
+                    "Label everything with dates before freezing",
+                    "Rotate stock - use oldest items first",
+                    "Consider vacuum sealing for better preservation",
+                    "Keep a freezer inventory list to track what you have",
+                  ].map((tip) => (
+                    <Typography key={tip} component="li" variant="body2" color="warning.dark">
+                      {tip}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Paper>
             )}
-          </div>
+          </Stack>
+        </Paper>
 
-          {/* Shopping Tips */}
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <h4 className="font-semibold text-blue-800 mb-2">
-              💡 {prepDays > 7 ? "Extended Meal Prep" : "Shopping"} Tips:
-            </h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              {prepDays > 7 ? (
-                <>
-                  <li>
-                    <strong>Storage:</strong> Invest in quality containers and
-                    freezer bags
-                  </li>
-                  <li>
-                    <strong>Freezing:</strong> Most proteins freeze well for 3+
-                    months
-                  </li>
-                  <li>
-                    <strong>Bulk buying:</strong> Warehouse stores offer better
-                    prices for large quantities
-                  </li>
-                  <li>
-                    <strong>Prep scheduling:</strong> Cook proteins in batches
-                    and freeze portions
-                  </li>
-                  <li>
-                    <strong>Vegetables:</strong> Frozen vegetables are perfect
-                    for extended meal prep
-                  </li>
-                </>
-              ) : (
-                <>
-                  <li>Buy in bulk to save money on larger quantities</li>
-                  <li>Check for sales on protein sources first</li>
-                  <li>Frozen vegetables are nutritious and last longer</li>
-                  <li>Pre-cut vegetables save prep time</li>
-                </>
-              )}
-            </ul>
-          </div>
+        {/* Sticky action bar */}
+        <Paper
+          elevation={6}
+          sx={{
+            position: { xs: "fixed", md: "static" },
+            bottom: { xs: 72, md: "auto" },
+            left: { xs: 0, md: "auto" },
+            right: { xs: 0, md: "auto" },
+            borderRadius: 3,
+            px: 2.5,
+            py: 2,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1.5,
+            alignItems: "center",
+            justifyContent: "space-between",
+            zIndex: (theme) => theme.zIndex.appBar - 1,
+            border: "1px solid",
+            borderColor: "divider",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center" color="text.secondary">
+            <Typography variant="subtitle2" fontWeight={700}>
+              Plan actions
+            </Typography>
+            {hasUnsavedChanges && <Chip size="small" color="warning" label="Unsaved changes" />}
+            {lastPlanSavedAt && (
+              <Typography variant="caption" color="text.secondary">
+                Last saved {lastPlanSavedAt.toLocaleTimeString()}
+              </Typography>
+            )}
+          </Stack>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Button variant="contained" onClick={handleSavePlan}>
+              {currentPlanId ? "Update Plan" : "Save Plan"}
+            </Button>
+            {currentPlanId && (
+              <Button variant="contained" color="secondary" onClick={handleSaveAsNew}>
+                Save as New
+              </Button>
+            )}
+            <Button variant="outlined" onClick={handleSaveBaseline}>
+              Set Baseline
+            </Button>
+            <Button variant="contained" color="success" onClick={handleExportPDF}>
+              Export PDF
+            </Button>
+            <Button variant="outlined" onClick={handleExportJSON}>
+              Export JSON
+            </Button>
+          </Stack>
+        </Paper>
 
-          {prepDays > 14 && (
-            <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
-              <h4 className="font-semibold text-yellow-800 mb-2">
-                ⚠️ Long-term Storage Notes:
-              </h4>
-              <ul className="text-sm text-yellow-700 space-y-1">
-                <li>Label everything with dates before freezing</li>
-                <li>Rotate stock - use oldest items first</li>
-                <li>Consider vacuum sealing for better preservation</li>
-                <li>Keep a freezer inventory list to track what you have</li>
-              </ul>
-            </div>
-          )}
-        </div>
+        <Typography textAlign="center" color="text.secondary">
+          Eat more, live mas! 🌟 Interactive meal plan calculator
+        </Typography>
+      </Stack>
 
-        {/* Footer */}
-        <div className="text-center mt-8 text-gray-600 dark:text-gray-400">
-          <p className="font-medium">Eat more, live mas! 🌟</p>
-          <p className="text-sm">Interactive meal plan calculator</p>
-        </div>
-      </div>
-
-      {/* Confirmation Dialogs */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => {
@@ -2177,7 +2106,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
         cancelText="Cancel"
         variant="danger"
       />
-    </div>
+    </Box>
   );
 };
 

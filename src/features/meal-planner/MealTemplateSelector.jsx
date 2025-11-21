@@ -63,7 +63,7 @@ const MealTemplateSelector = ({ isOpen, onClose, mealType, allIngredients, onApp
       setNewTemplateName('');
       setNewTemplateDescription('');
       onClose();
-    } catch (error) {
+    } catch {
       toast.error('Failed to save template');
     }
   };

@@ -1,6 +1,41 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Star } from "lucide-react";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  FormControl,
+  Grid,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import {
+  DataGrid,
+  GridToolbarContainer,
+  GridToolbarQuickFilter,
+} from "@mui/x-data-grid";
+import CloudOffIcon from "@mui/icons-material/CloudOff";
+import DownloadIcon from "@mui/icons-material/DownloadRounded";
+import EditIcon from "@mui/icons-material/EditOutlined";
+import GridViewIcon from "@mui/icons-material/GridViewRounded";
+import SearchIcon from "@mui/icons-material/Search";
+import StarBorderIcon from "@mui/icons-material/StarBorderRounded";
+import StarIcon from "@mui/icons-material/StarRounded";
+import SwapVertIcon from "@mui/icons-material/SwapVertRounded";
+import TableRowsIcon from "@mui/icons-material/TableRowsRounded";
+import UploadIcon from "@mui/icons-material/UploadRounded";
+import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import {
   addCustomIngredient,
   removeCustomIngredient,
@@ -27,6 +62,7 @@ const empty = {
 
 const IngredientManager = ({ onChange }) => {
   const { user } = useUser();
+  const [showTable, setShowTable] = useState(false);
   const [ingredients, setIngredients] = useState(getAllBaseIngredients());
   const [newIngredient, setNewIngredient] = useState({ ...empty });
   const [editingId, setEditingId] = useState(null);
@@ -118,7 +154,7 @@ const IngredientManager = ({ onChange }) => {
     return result;
   }, [ingredients, ingredientSearch, sortBy, sortDirection, filterType, favorites]);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!searchQuery.trim() || isOffline) return;
 
     setIsSearching(true);
@@ -132,7 +168,7 @@ const IngredientManager = ({ onChange }) => {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [searchQuery, isOffline]);
 
   // Debounce Nutritionix search to reduce API spam on quick typing
   useEffect(() => {
@@ -159,18 +195,7 @@ const IngredientManager = ({ onChange }) => {
       handleSearch();
     }, 500);
     return () => clearTimeout(searchDebounceRef.current);
-  }, [searchQuery]);
-
-  const toggleSort = (field) => {
-    if (sortBy === field) {
-      // Toggle direction
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      // New field, default to ascending
-      setSortBy(field);
-      setSortDirection("asc");
-    }
-  };
+  }, [searchQuery, handleSearch]);
 
   const addFromApi = async (item) => {
     const { name } = item;
@@ -198,10 +223,11 @@ const IngredientManager = ({ onChange }) => {
     }
   };
 
-  const refresh = () => {
-    setIngredients(getAllBaseIngredients());
-    onChange && onChange(getAllBaseIngredients());
-  };
+  const refresh = useCallback(() => {
+    const base = getAllBaseIngredients();
+    setIngredients(base);
+    onChange && onChange(base);
+  }, [onChange]);
 
   useEffect(() => {
     const load = async () => {
@@ -219,7 +245,7 @@ const IngredientManager = ({ onChange }) => {
       }
     };
     load();
-  }, [user]);
+  }, [user, refresh]);
 
   const handleAdd = async () => {
     if (!newIngredient.name.trim()) return;
@@ -404,523 +430,656 @@ const IngredientManager = ({ onChange }) => {
     event.target.value = ''; // Reset input
   };
 
+  const tableColumns = [
+    { field: "name", headerName: "Name", flex: 1.2, minWidth: 150 },
+    { field: "unit", headerName: "Unit", width: 90 },
+    {
+      field: "gramsPerUnit",
+      headerName: "g/unit",
+      width: 110,
+      valueGetter: (params) => params.row.gramsPerUnit || params.row.grams || 100,
+    },
+    { field: "calories", headerName: "Cal", width: 90, type: "number" },
+    { field: "protein", headerName: "P", width: 90, type: "number" },
+    { field: "carbs", headerName: "C", width: 90, type: "number" },
+    { field: "fat", headerName: "F", width: 90, type: "number" },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 180,
+      sortable: false,
+      filterable: false,
+      renderCell: ({ row }) => (
+        <Stack direction="row" spacing={1}>
+          <Tooltip
+            title={isFavorite(row.id) ? "Remove from favorites" : "Add to favorites"}
+          >
+            <IconButton
+              size="small"
+              color={isFavorite(row.id) ? "warning" : "default"}
+              onClick={() => handleToggleFavorite(row.id)}
+            >
+              {isFavorite(row.id) ? (
+                <StarIcon fontSize="small" />
+              ) : (
+                <StarBorderIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Edit">
+            <IconButton size="small" onClick={() => startEdit(row)}>
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {row.id >= 1000 && (
+            <Tooltip title="Delete">
+              <IconButton size="small" color="error" onClick={() => handleRemove(row.id)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
+      ),
+    },
+  ];
+
+  const gridRows = filteredIngredients.map((ing) => ({
+    ...ing,
+    gramsPerUnit: ing.gramsPerUnit || ing.grams || 100,
+  }));
+
+  const totalCustomIngredients = ingredients.filter((i) => i.id >= 1000).length;
+
+  const DataGridToolbar = () => (
+    <GridToolbarContainer
+      sx={{ justifyContent: "space-between", px: 1, py: 0.5, gap: 1, flexWrap: "wrap" }}
+    >
+      <GridToolbarQuickFilter quickFilterProps={{ debounceMs: 300 }} />
+      <Typography variant="caption" color="text.secondary">
+        {filteredIngredients.length} items
+      </Typography>
+    </GridToolbarContainer>
+  );
+
+  const formState = editingId ? editData : newIngredient;
+  const formSetter = editingId ? setEditData : setNewIngredient;
+
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Ingredient Manager</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={handleExportCSV}
-            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Stack spacing={3}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 3,
+            boxShadow: "0 16px 40px rgba(15,23,42,0.08)",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
           >
-            📥 Export CSV
-          </button>
-          <button
-            onClick={() => csvImportRef.current?.click()}
-            className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
-          >
-            📤 Import CSV
-          </button>
+            <Box>
+              <Typography variant="h4" fontWeight={800} gutterBottom>
+                Ingredient Manager
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Search, import, and curate your base and custom ingredients.
+              </Typography>
+            </Box>
+            <Stack
+              direction="row"
+              spacing={1}
+              flexWrap="wrap"
+              justifyContent={{ xs: "flex-start", sm: "flex-end" }}
+            >
+              <Button
+                variant="contained"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportCSV}
+              >
+                Export CSV
+              </Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<UploadIcon />}
+                onClick={() => csvImportRef.current?.click()}
+              >
+                Import CSV
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={showTable ? <GridViewIcon /> : <TableRowsIcon />}
+                onClick={() => setShowTable((prev) => !prev)}
+              >
+                {showTable ? "Card View" : "Table View"}
+              </Button>
+            </Stack>
+          </Stack>
           <input
             ref={csvImportRef}
             type="file"
             accept=".csv,text/csv"
             onChange={handleImportCSV}
-            style={{ display: 'none' }}
+            style={{ display: "none" }}
             aria-label="Import ingredients from CSV file"
           />
-        </div>
-      </div>
+        </Paper>
 
-      {/* Search, Sort, Filter Controls */}
-      <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-3">
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Search Box */}
-          <div className="flex-1 min-w-[200px]">
-            <input
-              type="text"
-              value={ingredientSearch}
-              onChange={(e) => setIngredientSearch(e.target.value)}
-              placeholder="🔍 Search ingredients..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Filter by Type */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All ({ingredients.length})</option>
-              <option value="favorites">⭐ Favorites ({favorites.length})</option>
-              <option value="custom">Custom Only ({ingredients.filter(i => i.id >= 1000).length})</option>
-              <option value="standard">Standard Only ({ingredients.filter(i => i.id < 1000).length})</option>
-            </select>
-          </div>
-
-          {/* Sort Controls */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="name">Name</option>
-              <option value="calories">Calories</option>
-              <option value="protein">Protein</option>
-              <option value="carbs">Carbs</option>
-              <option value="fat">Fat</option>
-            </select>
-            <button
-              onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-              className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-md font-medium text-sm"
-              title={sortDirection === "asc" ? "Ascending" : "Descending"}
-            >
-              {sortDirection === "asc" ? "↑" : "↓"}
-            </button>
-          </div>
-        </div>
-
-        {/* Results count */}
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Showing {filteredIngredients.length} of {ingredients.length} ingredients
-          {ingredientSearch && ` matching "${ingredientSearch}"`}
-        </div>
-      </div>
-
-      {/* API Search */}
-      <div className="space-y-2 mb-6">
-        <h3 className="font-semibold">Add from Nutritionix</h3>
-        <div className="flex items-center gap-2">
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search"
-            className="border px-2 py-1 rounded-md dark:bg-gray-800 dark:border-gray-700"
-            disabled={isOffline}
-          />
-          <button className="btn-blue" type="button" onClick={handleSearch} disabled={isSearching || isOffline}>
-            {isOffline ? 'Offline' : isSearching ? 'Searching...' : 'Search'}
-          </button>
-        </div>
-        {isOffline && (
-          <p className="text-sm text-amber-600">Offline: Nutritionix search is disabled until you reconnect.</p>
-        )}
-        {isSearching && (
-          <LoadingSpinner message="Searching for ingredients..." size="small" />
-        )}
-        {!isSearching && hasSearched && searchResults.length === 0 && (
-          <p className="text-sm text-gray-600 dark:text-gray-400">No ingredients found for “{searchQuery}”. Try another term.</p>
-        )}
-        {!isSearching && searchResults.length > 0 && (
-          <>
-            <div className="overflow-x-auto hidden md:block">
-              <table className="min-w-max w-full border-collapse border dark:border-gray-700">
-                <thead>
-                  <tr className="bg-gray-100 dark:bg-gray-800">
-                    <th className="border p-1">Name</th>
-                    <th className="border p-1">Unit</th>
-                    <th className="border p-1">g/unit</th>
-                    <th className="border p-1">Cal</th>
-                    <th className="border p-1">P</th>
-                    <th className="border p-1">C</th>
-                    <th className="border p-1">F</th>
-                    <th className="border p-1">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {searchResults.map((res) => (
-                    <tr key={res.id} className="border-t">
-                      <td className="border p-1 capitalize">{res.name}</td>
-                      <td className="border p-1 text-center">{res.unit || "g"}</td>
-                      <td className="border p-1 text-center">{res.gramsPerUnit || res.grams || "-"}</td>
-                      <td className="border p-1 text-center">{res.calories !== undefined ? res.calories : "-"}</td>
-                      <td className="border p-1 text-center">{res.protein !== undefined ? res.protein : "-"}</td>
-                      <td className="border p-1 text-center">{res.carbs !== undefined ? res.carbs : "-"}</td>
-                      <td className="border p-1 text-center">{res.fat !== undefined ? res.fat : "-"}</td>
-                      <td className="border p-1 text-center">
-                        <button className="btn-green" type="button" onClick={() => addFromApi(res)}>
-                          Add
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="md:hidden space-y-2">
-            {searchResults.map((res) => (
-              <div key={res.id} className="border rounded-lg p-3 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold capitalize">{res.name}</p>
-                    <p className="text-xs text-gray-500">{res.unit || 'g'} • {res.gramsPerUnit || res.grams || '-'}g</p>
-                  </div>
-                  <button className="btn-green text-sm" type="button" onClick={() => addFromApi(res)}>
-                    Add
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
-                  <div>
-                    <p className="text-gray-500">Cal</p>
-                    <p className="font-semibold">{res.calories ?? '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">P</p>
-                    <p className="font-semibold">{res.protein ?? '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">C</p>
-                    <p className="font-semibold">{res.carbs ?? '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">F</p>
-                    <p className="font-semibold">{res.fat ?? '-'}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Manual Entry */}
-      <div className="space-y-2 mb-6">
-        <h3 className="font-semibold">Add Custom Ingredient</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-max w-full border-collapse border">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-1">Name</th>
-                <th className="border p-1">Unit</th>
-                <th className="border p-1">g/unit</th>
-                <th className="border p-1">Cal</th>
-                <th className="border p-1">P</th>
-                <th className="border p-1">C</th>
-                <th className="border p-1">F</th>
-                <th className="border p-1">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border p-1">
-                  <input
-                    name="name"
-                    value={newIngredient.name}
-                    onChange={handleChange(setNewIngredient)}
-                    placeholder="Name"
-                    className="border px-1 w-full"
-                  />
-                </td>
-                <td className="border p-1">
-                  <select
-                    name="unit"
-                    value={newIngredient.unit}
-                    onChange={handleChange(setNewIngredient)}
-                    className="border px-1 w-full"
-                  >
-                    <option value="g">g</option>
-                    <option value="unit">unit</option>
-                  </select>
-                </td>
-                <td className="border p-1">
-                  <input
-                    name="gramsPerUnit"
-                    type="number"
-                    value={newIngredient.gramsPerUnit}
-                    onChange={handleChange(setNewIngredient)}
-                    className="border px-1 w-full"
-                    placeholder="100"
-                  />
-                </td>
-                <td className="border p-1">
-                  <input
-                    name="calories"
-                    type="number"
-                    value={newIngredient.calories}
-                    onChange={handleChange(setNewIngredient)}
-                    className="border px-1 w-full"
-                  />
-                </td>
-                <td className="border p-1">
-                  <input
-                    name="protein"
-                    type="number"
-                    value={newIngredient.protein}
-                    onChange={handleChange(setNewIngredient)}
-                    className="border px-1 w-full"
-                  />
-                </td>
-                <td className="border p-1">
-                  <input
-                    name="carbs"
-                    type="number"
-                    value={newIngredient.carbs}
-                    onChange={handleChange(setNewIngredient)}
-                    className="border px-1 w-full"
-                  />
-                </td>
-                <td className="border p-1">
-                  <input
-                    name="fat"
-                    type="number"
-                    value={newIngredient.fat}
-                    onChange={handleChange(setNewIngredient)}
-                    className="border px-1 w-full"
-                  />
-                </td>
-                <td className="border p-1 text-center">
-                  <button className="btn-green" onClick={handleAdd}>
-                    Add
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className="overflow-x-auto hidden md:block">
-      <table className="min-w-max w-full border-collapse border">
-        <thead>
-          <tr className="bg-gray-100">
-            <th
-              className="border p-1 cursor-pointer hover:bg-gray-200"
-              onClick={() => toggleSort("name")}
-              title="Click to sort by name"
-            >
-              Name {sortBy === "name" && (sortDirection === "asc" ? "↑" : "↓")}
-            </th>
-            <th className="border p-1">Unit</th>
-            <th className="border p-1">g/unit</th>
-            <th
-              className="border p-1 cursor-pointer hover:bg-gray-200"
-              onClick={() => toggleSort("calories")}
-              title="Click to sort by calories"
-            >
-              Cal {sortBy === "calories" && (sortDirection === "asc" ? "↑" : "↓")}
-            </th>
-            <th
-              className="border p-1 cursor-pointer hover:bg-gray-200"
-              onClick={() => toggleSort("protein")}
-              title="Click to sort by protein"
-            >
-              P {sortBy === "protein" && (sortDirection === "asc" ? "↑" : "↓")}
-            </th>
-            <th
-              className="border p-1 cursor-pointer hover:bg-gray-200"
-              onClick={() => toggleSort("carbs")}
-              title="Click to sort by carbs"
-            >
-              C {sortBy === "carbs" && (sortDirection === "asc" ? "↑" : "↓")}
-            </th>
-            <th
-              className="border p-1 cursor-pointer hover:bg-gray-200"
-              onClick={() => toggleSort("fat")}
-              title="Click to sort by fat"
-            >
-              F {sortBy === "fat" && (sortDirection === "asc" ? "↑" : "↓")}
-            </th>
-            <th className="border p-1">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredIngredients.map((ing) => (
-            <tr key={ing.id} className="border-t">
-              {editingId === ing.id ? (
-                <>
-                  <td className="border p-1">
-                    <input
-                      name="name"
-                      value={editData.name}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    />
-                  </td>
-                  <td className="border p-1">
-                    <select
-                      name="unit"
-                      value={editData.unit || "g"}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    >
-                      <option value="g">g</option>
-                      <option value="unit">unit</option>
-                    </select>
-                  </td>
-                  <td className="border p-1">
-                    <input
-                      name="gramsPerUnit"
-                      type="number"
-                      value={editData.gramsPerUnit || editData.grams || 100}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    />
-                  </td>
-                  <td className="border p-1">
-                    <input
-                      name="calories"
-                      type="number"
-                      value={editData.calories}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    />
-                  </td>
-                  <td className="border p-1">
-                    <input
-                      name="protein"
-                      type="number"
-                      value={editData.protein}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    />
-                  </td>
-                  <td className="border p-1">
-                    <input
-                      name="carbs"
-                      type="number"
-                      value={editData.carbs}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    />
-                  </td>
-                  <td className="border p-1">
-                    <input
-                      name="fat"
-                      type="number"
-                      value={editData.fat}
-                      onChange={handleChange(setEditData)}
-                      className="border px-1 w-full"
-                    />
-                  </td>
-                  <td className="border p-1">
-                    <button className="text-green-600 mr-1" onClick={saveEdit}>
-                      Save
-                    </button>
-                    <button
-                      className="text-red-600"
-                      onClick={() => setEditingId(null)}
-                    >
-                      Cancel
-                    </button>
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td className="border p-1 capitalize">{ing.name}</td>
-                  <td className="border p-1 text-center">{ing.unit || "g"}</td>
-                  <td className="border p-1 text-center">{ing.gramsPerUnit || ing.grams || 100}</td>
-                  <td className="border p-1 text-center">{ing.calories}</td>
-                  <td className="border p-1 text-center">{ing.protein}</td>
-                  <td className="border p-1 text-center">{ing.carbs}</td>
-                  <td className="border p-1 text-center">{ing.fat}</td>
-                  <td className="border p-1 text-center space-x-1">
-                    <button
-                      onClick={() => handleToggleFavorite(ing.id)}
-                      className={`${
-                        isFavorite(ing.id)
-                          ? "text-yellow-500"
-                          : "text-gray-400 dark:text-gray-600"
-                      } hover:text-yellow-500 transition-colors`}
-                      aria-label={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
-                      title={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
-                    >
-                      <Star size={16} fill={isFavorite(ing.id) ? "currentColor" : "none"} />
-                    </button>
-                    <button
-                      className="text-blue-600"
-                      onClick={() => startEdit(ing)}
-                    >
-                      Edit
-                    </button>
-                    {ing.id >= 1000 && (
-                      <button
-                        className="text-red-600"
-                        onClick={() => handleRemove(ing.id)}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </td>
-                </>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-
-      {/* Mobile card layout */}
-      <div className="md:hidden space-y-3">
-        {filteredIngredients.length === 0 && (
-          <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded border dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300">
-            No ingredients yet. Add one above or import/search to get started.
-          </div>
-        )}
-        {filteredIngredients.map((ing) => (
-          <div key={ing.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="font-semibold capitalize">{ing.name}</p>
-                <p className="text-xs text-gray-500">{ing.unit || 'g'} • {ing.gramsPerUnit || ing.grams || 100}g/unit</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleToggleFavorite(ing.id)}
-                  className={`${isFavorite(ing.id) ? "text-yellow-500" : "text-gray-400 dark:text-gray-500"}`}
-                  aria-label={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
-                  title={isFavorite(ing.id) ? "Remove from favorites" : "Add to favorites"}
-                >
-                  <Star size={16} fill={isFavorite(ing.id) ? "currentColor" : "none"} />
-                </button>
-                {ing.id >= 1000 && (
-                  <button className="text-red-600 text-sm" onClick={() => handleRemove(ing.id)}>
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-4 gap-2 text-center text-xs mt-3">
-              <div>
-                <p className="text-gray-500">Cal</p>
-                <p className="font-semibold">{ing.calories}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">P</p>
-                <p className="font-semibold">{ing.protein}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">C</p>
-                <p className="font-semibold">{ing.carbs}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">F</p>
-                <p className="font-semibold">{ing.fat}</p>
-              </div>
-            </div>
-            {ing.id >= 1000 && (
-              <button
-                className="mt-3 w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-                onClick={() => startEdit(ing)}
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={5} lg={4}>
+            <Stack spacing={2.5}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                }}
               >
-                Edit
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={700}>
+                      Search & Filter
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Narrow down ingredients by name, type, and sort order.
+                    </Typography>
+                  </Box>
+                  <TextField
+                    label="Search ingredients"
+                    value={ingredientSearch}
+                    onChange={(e) => setIngredientSearch(e.target.value)}
+                    placeholder="Search by name"
+                    fullWidth
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  <Grid container spacing={1.5}>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel id="filter-type-label">Filter</InputLabel>
+                        <Select
+                          labelId="filter-type-label"
+                          label="Filter"
+                          value={filterType}
+                          onChange={(e) => setFilterType(e.target.value)}
+                        >
+                          <MenuItem value="all">All ({ingredients.length})</MenuItem>
+                          <MenuItem value="favorites">Favorites ({favorites.length})</MenuItem>
+                          <MenuItem value="custom">Custom Only ({totalCustomIngredients})</MenuItem>
+                          <MenuItem value="standard">
+                            Standard Only ({ingredients.filter((i) => i.id < 1000).length})
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel id="sort-by-label">Sort</InputLabel>
+                        <Select
+                          labelId="sort-by-label"
+                          label="Sort"
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                        >
+                          <MenuItem value="name">Name</MenuItem>
+                          <MenuItem value="calories">Calories</MenuItem>
+                          <MenuItem value="protein">Protein</MenuItem>
+                          <MenuItem value="carbs">Carbs</MenuItem>
+                          <MenuItem value="fat">Fat</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Tooltip
+                      title={`Toggle ${sortDirection === "asc" ? "descending" : "ascending"}`}
+                    >
+                      <IconButton
+                        onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+                        color="primary"
+                        size="small"
+                        sx={{ border: "1px solid", borderColor: "divider" }}
+                      >
+                        <SwapVertIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Typography variant="body2" color="text.secondary">
+                      {sortDirection === "asc" ? "Ascending" : "Descending"}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {filteredIngredients.length} of {ingredients.length} ingredients
+                    {ingredientSearch && ` matching “${ingredientSearch}”`}
+                  </Typography>
+                </Stack>
+              </Paper>
 
-      {filteredIngredients.length === 0 && (
-        <div className="hidden md:block p-4 bg-gray-50 dark:bg-gray-800 rounded border dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 mt-3">
-          No ingredients found. Adjust filters or add a custom ingredient to begin.
-        </div>
-      )}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={2}
+                  mb={1}
+                >
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Add from Nutritionix
+                  </Typography>
+                  {isOffline && (
+                    <Chip
+                      icon={<CloudOffIcon fontSize="small" />}
+                      label="Offline"
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                    />
+                  )}
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField
+                    fullWidth
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search foods..."
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                    disabled={isOffline}
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<SearchIcon />}
+                    onClick={handleSearch}
+                    disabled={isSearching || isOffline}
+                  >
+                    {isOffline ? "Offline" : isSearching ? "Searching..." : "Search"}
+                  </Button>
+                </Stack>
+                {isSearching && (
+                  <LoadingSpinner message="Searching for ingredients..." size="small" />
+                )}
+                {!isSearching && hasSearched && searchResults.length === 0 && (
+                  <Typography variant="body2" color="text.secondary" mt={1}>
+                    No ingredients found for “{searchQuery}”. Try another term.
+                  </Typography>
+                )}
+                {!isSearching && searchResults.length > 0 && (
+                  <Stack spacing={1.25} mt={1}>
+                    {searchResults.map((res) => (
+                      <Paper
+                        key={res.id}
+                        variant="outlined"
+                        sx={{ p: 1.5, borderRadius: 2, borderColor: "divider" }}
+                      >
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="flex-start"
+                          spacing={2}
+                        >
+                          <Box>
+                            <Typography variant="subtitle2" fontWeight={700} textTransform="capitalize">
+                              {res.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {res.unit || "g"} • {res.gramsPerUnit || res.grams || "-"} g
+                            </Typography>
+                          </Box>
+                          <Button size="small" variant="contained" onClick={() => addFromApi(res)}>
+                            Add
+                          </Button>
+                        </Stack>
+                        <Grid container spacing={1} mt={1}>
+                          {[
+                            { label: "Cal", value: res.calories },
+                            { label: "P", value: res.protein },
+                            { label: "C", value: res.carbs },
+                            { label: "F", value: res.fat },
+                          ].map((item) => (
+                            <Grid item xs={3} key={item.label}>
+                              <Typography variant="caption" color="text.secondary">
+                                {item.label}
+                              </Typography>
+                              <Typography variant="body2" fontWeight={600}>
+                                {item.value ?? "-"}
+                              </Typography>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Paper>
+                    ))}
+                  </Stack>
+                )}
+              </Paper>
 
-      {/* Confirmation Dialogs */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={2}
+                  mb={1.5}
+                >
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={700}>
+                      {editingId ? "Edit Ingredient" : "Add Custom Ingredient"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Custom items start at ID 1000
+                    </Typography>
+                  </Box>
+                  {editingId && (
+                    <Chip label={`Editing #${editingId}`} size="small" color="primary" variant="outlined" />
+                  )}
+                </Stack>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      name="name"
+                      label="Name"
+                      value={formState.name}
+                      onChange={handleChange(formSetter)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel id="unit-label">Unit</InputLabel>
+                      <Select
+                        labelId="unit-label"
+                        label="Unit"
+                        name="unit"
+                        value={formState.unit}
+                        onChange={handleChange(formSetter)}
+                      >
+                        <MenuItem value="g">g</MenuItem>
+                        <MenuItem value="unit">unit</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      name="gramsPerUnit"
+                      label="g/unit"
+                      type="number"
+                      value={formState.gramsPerUnit}
+                      onChange={handleChange(formSetter)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      fullWidth
+                      name="calories"
+                      label="Calories"
+                      type="number"
+                      value={formState.calories}
+                      onChange={handleChange(formSetter)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      fullWidth
+                      name="protein"
+                      label="Protein"
+                      type="number"
+                      value={formState.protein}
+                      onChange={handleChange(formSetter)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      fullWidth
+                      name="carbs"
+                      label="Carbs"
+                      type="number"
+                      value={formState.carbs}
+                      onChange={handleChange(formSetter)}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <TextField
+                      fullWidth
+                      name="fat"
+                      label="Fat"
+                      type="number"
+                      value={formState.fat}
+                      onChange={handleChange(formSetter)}
+                    />
+                  </Grid>
+                </Grid>
+                <Stack direction="row" spacing={1} justifyContent="flex-end" mt={2}>
+                  {editingId ? (
+                    <>
+                      <Button variant="contained" onClick={saveEdit}>
+                        Save changes
+                      </Button>
+                      <Button
+                        variant="text"
+                        color="inherit"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditData({ ...empty });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="contained" onClick={handleAdd}>
+                      Add ingredient
+                    </Button>
+                  )}
+                </Stack>
+              </Paper>
+            </Stack>
+          </Grid>
+
+          <Grid item xs={12} md={7} lg={8}>
+            <Stack spacing={2.5}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 2,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    All Ingredients
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Favorites: {favorites.length} • Custom: {totalCustomIngredients}
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${filteredIngredients.length} shown`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+              </Paper>
+
+              {!showTable ? (
+                <Grid container spacing={2}>
+                  {filteredIngredients.length === 0 ? (
+                    <Grid item xs={12}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 3,
+                          border: "1px dashed",
+                          borderColor: "divider",
+                          borderRadius: 3,
+                          textAlign: "center",
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          No ingredients yet. Add one above or import/search to get started.
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ) : (
+                    filteredIngredients.map((ing) => (
+                      <Grid item xs={12} sm={6} md={4} key={ing.id}>
+                        <Card variant="outlined" sx={{ height: "100%", borderRadius: 3 }}>
+                          <CardContent
+                            sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
+                          >
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="flex-start"
+                            >
+                              <Box>
+                                <Typography
+                                  variant="subtitle1"
+                                  fontWeight={700}
+                                  textTransform="capitalize"
+                                >
+                                  {ing.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {ing.unit || "g"} • {ing.gramsPerUnit || ing.grams || 100} g/unit
+                                </Typography>
+                              </Box>
+                              <Stack direction="row" spacing={0.5}>
+                                <IconButton
+                                  size="small"
+                                  color={isFavorite(ing.id) ? "warning" : "default"}
+                                  onClick={() => handleToggleFavorite(ing.id)}
+                                  aria-label="Toggle favorite"
+                                >
+                                  {isFavorite(ing.id) ? (
+                                    <StarIcon fontSize="small" />
+                                  ) : (
+                                    <StarBorderIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                                {ing.id >= 1000 && (
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                      setShowTable(true);
+                                      startEdit(ing);
+                                    }}
+                                  >
+                                    <EditIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </Stack>
+                            </Stack>
+                            <Grid container spacing={1}>
+                              {[
+                                { label: "Cal", value: ing.calories },
+                                { label: "P", value: ing.protein },
+                                { label: "C", value: ing.carbs },
+                                { label: "F", value: ing.fat },
+                              ].map((item) => (
+                                <Grid item xs={3} key={item.label}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {item.label}
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {item.value}
+                                  </Typography>
+                                </Grid>
+                              ))}
+                            </Grid>
+                            {ing.id >= 1000 && (
+                              <Stack direction="row" spacing={1} mt={1}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    setShowTable(true);
+                                    startEdit(ing);
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  variant="outlined"
+                                  onClick={() => handleRemove(ing.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </Stack>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))
+                  )}
+                </Grid>
+              ) : (
+                <Paper
+                  elevation={0}
+                  sx={{ p: 1, border: "1px solid", borderColor: "divider", borderRadius: 3 }}
+                >
+                  <DataGrid
+                    autoHeight
+                    rows={gridRows}
+                    columns={tableColumns}
+                    density="comfortable"
+                    disableRowSelectionOnClick
+                    pageSizeOptions={[10, 25, 50]}
+                    initialState={{
+                      pagination: { paginationModel: { pageSize: 10, page: 0 } },
+                    }}
+                    getRowId={(row) => row.id}
+                    slots={{ toolbar: DataGridToolbar }}
+                  />
+                </Paper>
+              )}
+            </Stack>
+          </Grid>
+        </Grid>
+      </Stack>
+
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => {
@@ -934,7 +1093,7 @@ const IngredientManager = ({ onChange }) => {
         cancelText="Cancel"
         variant="danger"
       />
-    </div>
+    </Container>
   );
 };
 

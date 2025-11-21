@@ -1,5 +1,6 @@
 // src/app/App.jsx
 import React from 'react';
+import { Box, Container } from '@mui/material';
 import { Toaster } from 'react-hot-toast';
 import MealPrep from '../shared/components/layout/MealPrep';
 import Login from '../features/auth/Login';
@@ -10,26 +11,35 @@ import ErrorBoundary from '../shared/components/ui/ErrorBoundary';
 import OfflineBanner from '../shared/components/layout/OfflineBanner';
 
 const AppContent = () => {
-  const { user, logout } = useUser();
+  const { user } = useUser();
   return (
-    <main className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+    <Box
+      component="main"
+      sx={(theme) => ({
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        color: 'text.primary',
+        transition: theme.transitions.create('background-color', {
+          duration: theme.transitions.duration.standard,
+        }),
+      })}
+    >
       <OfflineBanner />
-      <ThemeToggle />
       {user ? (
-        <>
-          <button className="absolute top-2 left-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded z-40" onClick={logout}>
-            Logout
-          </button>
-          <ErrorBoundary message="An error occurred in the meal planning app. Please try refreshing the page.">
-            <MealPrep />
-          </ErrorBoundary>
-        </>
-      ) : (
-        <ErrorBoundary message="An error occurred during login. Please try refreshing the page.">
-          <Login />
+        <ErrorBoundary message="An error occurred in the meal planning app. Please try refreshing the page.">
+          <MealPrep />
         </ErrorBoundary>
+      ) : (
+        <Container maxWidth="sm" sx={{ py: 4 }}>
+          <Box display="flex" justifyContent="flex-end" mb={3}>
+            <ThemeToggle />
+          </Box>
+          <ErrorBoundary message="An error occurred during login. Please try refreshing the page.">
+            <Login />
+          </ErrorBoundary>
+        </Container>
       )}
-    </main>
+    </Box>
   );
 };
 

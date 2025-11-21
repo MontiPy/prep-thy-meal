@@ -1,15 +1,39 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Chip,
+  Grid,
+  Stack,
+  Typography
+} from '@mui/material';
 import { useUser } from '../auth/UserContext.jsx';
 import ConfirmDialog from '../../shared/components/ui/ConfirmDialog';
+
+const FeatureCard = ({ title, description, status }) => (
+  <Card variant="outlined" sx={{ borderRadius: 2 }}>
+    <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Box>
+        <Typography fontWeight={700}>{title}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {description}
+        </Typography>
+      </Box>
+      <Chip label={status} color="success" size="small" />
+    </CardContent>
+  </Card>
+);
 
 const AccountPage = () => {
   const { user, logout } = useUser();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleDeleteAccount = async () => {
-    // TODO: Implement actual account deletion with Firebase
-    // For now, just clear local data to avoid misleading deletion promises
     try {
       localStorage.clear();
       await logout();
@@ -21,176 +45,174 @@ const AccountPage = () => {
   };
 
   return (
-    <div className="calculator">
-      <div className="card">
-        <div className="center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-            <span className="wiggle">👤</span> Account Settings
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your account and preferences
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* User Info */}
-          <div className="panel-blue">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Profile Information</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                {user?.photoURL && (
-                  <img
-                    src={user.photoURL}
-                    alt="Profile"
-                    className="w-12 h-12 rounded-full"
+    <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 1.5, md: 3 } }}>
+      <Stack spacing={2.5}>
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
+          <CardHeader
+            title={
+              <Stack spacing={0.5} alignItems="center" textAlign="center">
+                <Typography variant="h5" fontWeight={800}>
+                  <span className="wiggle">👤</span> Account Settings
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage your account and preferences
+                </Typography>
+              </Stack>
+            }
+          />
+          <CardContent>
+            <Grid container spacing={2}>
+              {/* Profile */}
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+                  <CardHeader
+                    title={<Typography variant="h6" fontWeight={800}>Profile Information</Typography>}
                   />
-                )}
-                <div>
-                  <p className="font-semibold dark:text-gray-200">{user?.displayName || 'User'}</p>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">{user?.email}</p>
-                </div>
-              </div>
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar
+                          src={user?.photoURL || ''}
+                          alt={user?.displayName || 'Profile'}
+                          sx={{ width: 48, height: 48 }}
+                        >
+                          {(user?.displayName || 'U').charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box>
+                          <Typography fontWeight={700}>{user?.displayName || 'User'}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {user?.email}
+                          </Typography>
+                        </Box>
+                      </Stack>
 
-              <div className="space-y-2 pt-4">
-                <div className="flex justify-between">
-                  <span className="font-medium dark:text-gray-300">Account ID:</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{user?.uid?.slice(0, 8)}...</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium dark:text-gray-300">Sign-in Provider:</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Google</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium dark:text-gray-300">Account Created:</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {user?.metadata?.creationTime ?
-                      new Date(user.metadata.creationTime).toLocaleDateString() :
-                      'Unknown'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+                      <Stack spacing={0.75}>
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography fontWeight={600}>Account ID:</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {user?.uid?.slice(0, 8)}...
+                          </Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography fontWeight={600}>Sign-in Provider:</Typography>
+                          <Typography variant="body2" color="text.secondary">Google</Typography>
+                        </Stack>
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography fontWeight={600}>Account Created:</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {user?.metadata?.creationTime
+                              ? new Date(user.metadata.creationTime).toLocaleDateString()
+                              : 'Unknown'}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          {/* App Features */}
-          <div className="panel-green">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">App Features</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-                <div>
-                  <p className="font-medium dark:text-gray-200">Cloud Sync</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Your data syncs across devices</p>
-                </div>
-                <span className="text-green-600 dark:text-green-400 font-medium">✓ Enabled</span>
-              </div>
+              {/* Features */}
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+                  <CardHeader title={<Typography variant="h6" fontWeight={800}>App Features</Typography>} />
+                  <CardContent>
+                    <Stack spacing={1.25}>
+                      <FeatureCard title="Cloud Sync" description="Your data syncs across devices" status="Enabled" />
+                      <FeatureCard title="Meal Plans" description="Save unlimited meal plans" status="Available" />
+                      <FeatureCard title="Custom Ingredients" description="Add your own ingredients" status="Available" />
+                      <FeatureCard title="PDF Export" description="Export shopping lists" status="Available" />
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
 
-              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-                <div>
-                  <p className="font-medium dark:text-gray-200">Meal Plans</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Save unlimited meal plans</p>
-                </div>
-                <span className="text-green-600 dark:text-green-400 font-medium">✓ Available</span>
-              </div>
+            {/* Data Management */}
+            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
+              <CardHeader title={<Typography variant="h6" fontWeight={800}>Data Management</Typography>} />
+              <CardContent>
+                <Grid container spacing={2}>
+                  {[
+                    { title: 'Storage Used', value: '~1KB', detail: 'Per saved plan', color: 'primary.main' },
+                    { title: 'Backup Status', value: '✓', detail: 'Auto-backup enabled', color: 'success.main' },
+                    { title: 'Data Location', value: '🌐', detail: 'Cloud & Local', color: 'text.primary' },
+                  ].map((item) => (
+                    <Grid item xs={12} md={4} key={item.title}>
+                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
+                        <CardContent sx={{ textAlign: 'center' }}>
+                          <Typography fontWeight={700}>{item.title}</Typography>
+                          <Typography variant="h5" fontWeight={800} color={item.color}>
+                            {item.value}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.detail}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
 
-              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-                <div>
-                  <p className="font-medium dark:text-gray-200">Custom Ingredients</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Add your own ingredients</p>
-                </div>
-                <span className="text-green-600 dark:text-green-400 font-medium">✓ Available</span>
-              </div>
+            {/* Support */}
+            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
+              <CardHeader title={<Typography variant="h6" fontWeight={800}>Support & Feedback</Typography>} />
+              <CardContent>
+                <Stack spacing={1.5}>
+                  <Typography variant="body2" color="text.secondary">
+                    Need help or have suggestions? We'd love to hear from you!
+                  </Typography>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <Button variant="contained">📧 Contact Support</Button>
+                    <Button variant="outlined">💡 Send Feedback</Button>
+                    <Button variant="contained" color="success">⭐ Rate App</Button>
+                  </Stack>
+                </Stack>
+              </CardContent>
+            </Card>
 
-              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-                <div>
-                  <p className="font-medium dark:text-gray-200">PDF Export</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Export shopping lists</p>
-                </div>
-                <span className="text-green-600 dark:text-green-400 font-medium">✓ Available</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Data Management */}
-        <div className="mt-6 panel-gray">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Data Management</h3>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-              <p className="font-medium text-gray-800 dark:text-gray-200">Storage Used</p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">~1KB</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Per saved plan</p>
-            </div>
-
-            <div className="text-center p-4 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-              <p className="font-medium text-gray-800 dark:text-gray-200">Backup Status</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">✓</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Auto-backup enabled</p>
-            </div>
-
-            <div className="text-center p-4 bg-white dark:bg-gray-700 rounded border dark:border-gray-600">
-              <p className="font-medium text-gray-800 dark:text-gray-200">Data Location</p>
-              <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">🌐</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Cloud & Local</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Support */}
-        <div className="mt-6 panel-yellow">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Support & Feedback</h3>
-          <div className="space-y-3">
-            <p className="text-gray-700 dark:text-gray-300">
-              Need help or have suggestions? We'd love to hear from you!
-            </p>
-            <div className="flex gap-3 flex-wrap">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                📧 Contact Support
-              </button>
-              <button className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
-                💡 Send Feedback
-              </button>
-              <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
-                ⭐ Rate App
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Logout */}
-        <div className="mt-6 panel-red">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Account Actions</h3>
-          <div className="flex gap-3">
-            <button
-              onClick={logout}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            {/* Logout */}
+            <Card
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+                mt: 2,
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(248,113,113,0.08)' : 'rgba(254,226,226,0.7)',
+                borderColor: 'error.light',
+              }}
             >
-              🚪 Sign Out
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 bg-gray-600 dark:bg-gray-700 text-white rounded hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
-            >
-              🗑️ Reset Local Data
-            </button>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            Signing out keeps your data safe in the cloud. Reset Local Data only clears this device.
-          </p>
-        </div>
-      </div>
+              <CardHeader title={<Typography variant="h6" fontWeight={800}>Account Actions</Typography>} />
+              <CardContent>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                  <Button variant="contained" color="error" onClick={logout}>
+                    🚪 Sign Out
+                  </Button>
+                  <Button variant="outlined" color="inherit" onClick={() => setShowDeleteConfirm(true)}>
+                    🗑️ Reset Local Data
+                  </Button>
+                </Stack>
+                <Typography variant="body2" color="text.secondary" mt={1}>
+                  Signing out keeps your data safe in the cloud. Reset Local Data only clears this device.
+                </Typography>
+              </CardContent>
+            </Card>
+          </CardContent>
+        </Card>
 
-      {/* Confirmation Dialogs */}
-      <ConfirmDialog
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={handleDeleteAccount}
-        title="Reset Local Data?"
-        message={`This will clear all saved plans and ingredients on this device.\n\nCloud data in your account will resync after sign-in.\n\nProceed?`}
-        confirmText="Clear Local Data"
-        cancelText="Keep Data"
-        variant="warning"
-      />
-    </div>
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDeleteAccount}
+          title="Reset Local Data?"
+          message={`This will clear all saved plans and ingredients on this device.\n\nCloud data in your account will resync after sign-in.\n\nProceed?`}
+          confirmText="Clear Local Data"
+          cancelText="Keep Data"
+          variant="warning"
+        />
+      </Stack>
+    </Box>
   );
 };
 

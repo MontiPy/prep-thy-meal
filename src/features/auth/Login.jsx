@@ -1,4 +1,12 @@
 import React, { useState } from 'react';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Stack,
+  Typography
+} from '@mui/material';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../../shared/services/firebase.js';
 
@@ -9,23 +17,44 @@ const Login = () => {
     setError('');
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
+    } catch {
       setError('Login failed');
     }
   };
 
   return (
-    <div className="calculator flex items-center justify-center">
-      <div className="card w-full max-w-sm">
-        <div className="center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Sign In</h2>
-        </div>
-        {error && <p className="text-red-600 dark:text-red-400 text-sm mb-3">{error}</p>}
-        <button className="btn-green w-full" onClick={handleGoogleLogin}>
-          Sign in with Google
-        </button>
-      </div>
-    </div>
+    <Box
+      sx={{
+        minHeight: '70vh',
+        display: 'grid',
+        placeItems: 'center',
+        px: 2,
+      }}
+    >
+      <Card sx={{ maxWidth: 400, width: '100%', borderRadius: 3 }} variant="outlined">
+        <CardContent>
+          <Stack spacing={2.5} alignItems="center">
+            <Typography variant="h5" fontWeight={800}>
+              Sign In
+            </Typography>
+            {error && (
+              <Typography variant="body2" color="error">
+                {error}
+              </Typography>
+            )}
+            <Button
+              fullWidth
+              size="large"
+              variant="contained"
+              color="primary"
+              onClick={handleGoogleLogin}
+            >
+              Sign in with Google
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 

@@ -1,115 +1,72 @@
 // src/components/MealPrepInstructions.jsx
 import React from "react";
+import { Card, CardContent, Stack, Typography } from "@mui/material";
+
+const Section = ({ title, children }) => (
+  <Stack spacing={1.25}>
+    <Typography variant="subtitle1" fontWeight={700}>
+      {title}
+    </Typography>
+    <Stack component="ul" spacing={0.75} sx={{ pl: 2, m: 0 }}>
+      {children}
+    </Stack>
+  </Stack>
+);
 
 const MealPrepInstructions = () => (
-  <div className="instruction-box mt-8">
-    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">
-      How to Prep Like a Pro (and Have Fun Doing It!)
-    </h2>
+  <Card
+    variant="outlined"
+    sx={{
+      mt: 3,
+      borderRadius: 3,
+      backgroundColor: (theme) =>
+        theme.palette.mode === "dark" ? "rgba(34,197,94,0.08)" : "rgba(220,252,231,0.7)",
+      borderColor: "success.light",
+    }}
+  >
+    <CardContent>
+      <Stack spacing={3}>
+        <Typography variant="h5" fontWeight={800}>
+          How to Prep Like a Pro (and Have Fun Doing It!)
+        </Typography>
 
-    {/* Chicken Breast */}
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green">
-        🍗 Chicken Breast
-      </h3>
-      <ul className="list">
-        <li>
-          Pat the chicken dry and pound it to even thickness (bonus: stress
-          relief!).
-        </li>
-        <li>
-          Rub with half your olive oil, then season with salt, pepper, garlic
-          powder, and herbs.
-        </li>
-        <li>
-          Grill over medium-high (400°F / 205°C) for 6–7 min per side, lid
-          closed. Flip once.
-        </li>
-        <li>
-          Check with a thermometer: aim for 165°F (74°C) and clear juices.
-        </li>
-        <li>
-          Let it rest 2–3 min so it stays juicy. Slice and celebrate your grill
-          skills!
-        </li>
-      </ul>
-    </div>
+        <Section title="🍗 Chicken Breast">
+          <Typography component="li" variant="body2">Pat the chicken dry and pound it to even thickness (bonus: stress relief!).</Typography>
+          <Typography component="li" variant="body2">Rub with half your olive oil, then season with salt, pepper, garlic powder, and herbs.</Typography>
+          <Typography component="li" variant="body2">Grill over medium-high (400°F / 205°C) for 6–7 min per side, lid closed. Flip once.</Typography>
+          <Typography component="li" variant="body2">Check with a thermometer: aim for 165°F (74°C) and clear juices.</Typography>
+          <Typography component="li" variant="body2">Let it rest 2–3 min so it stays juicy. Slice and celebrate your grill skills!</Typography>
+        </Section>
 
-    {/* Salmon */}
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green">🐟 Salmon</h3>
-      <ul className="list">
-        <li>Pat salmon dry, brush with the rest of your olive oil.</li>
-        <li>
-          Season with salt, pepper, and a sprinkle of lemon zest or dill if
-          you're feeling fancy.
-        </li>
-        <li>
-          Grill skin-side down (or on foil/grill mat) over medium-high for 3–4
-          min per side.
-        </li>
-        <li>Fish is done when it flakes easily and hits 145°F (63°C).</li>
-        <li>Squeeze fresh lemon over the top and bask in your omega-3 glow!</li>
-      </ul>
-    </div>
+        <Section title="🐟 Salmon">
+          <Typography component="li" variant="body2">Pat salmon dry, brush with the rest of your olive oil.</Typography>
+          <Typography component="li" variant="body2">Season with salt, pepper, and a sprinkle of lemon zest or dill if you're feeling fancy.</Typography>
+          <Typography component="li" variant="body2">Grill skin-side down (or on foil/grill mat) over medium-high for 3–4 min per side.</Typography>
+          <Typography component="li" variant="body2">Fish is done when it flakes easily and hits 145°F (63°C).</Typography>
+          <Typography component="li" variant="body2">Squeeze fresh lemon over the top and bask in your omega-3 glow!</Typography>
+        </Section>
 
-    {/* Broccoli */}
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green">🥦 Broccoli</h3>
-      <ul className="list">
-        <li>
-          Toss florets with olive oil, salt, and pepper. Optional: chili flakes
-          or lemon juice for kick.
-        </li>
-        <li>
-          Grill in a basket or on foil over medium-high for 7–10 min, turning a
-          couple times.
-        </li>
-        <li>
-          You want char and tender-crisp vibes. Snack a piece right off the
-          grill—chef’s privilege!
-        </li>
-      </ul>
-    </div>
+        <Section title="🥦 Broccoli">
+          <Typography component="li" variant="body2">Toss florets with olive oil, salt, and pepper. Optional: chili flakes or lemon juice for kick.</Typography>
+          <Typography component="li" variant="body2">Grill in a basket or on foil over medium-high for 7–10 min, turning a couple times.</Typography>
+          <Typography component="li" variant="body2">You want char and tender-crisp vibes. Snack a piece right off the grill—chef’s privilege!</Typography>
+        </Section>
 
-    {/* Rice */}
-    <div className="mb-6">
-      <h3 className="text-lg font-semibold text-green">🍚 Rice</h3>
-      <ul className="list">
-        <li>
-          Rinse rice in cold water until it runs clear (seriously, don’t skip
-          this).
-        </li>
-        <li>
-          Cook with a 2:1 water to rice ratio. Starting with 100g of dry rice
-          is about half a cup, so use roughly 1 cup of water per batch.
-        </li>
-        <li>
-          Bring to boil, cover, simmer 15–18 min. Don’t peek. Let rest 5 min,
-          then fluff with a fork.
-        </li>
-        <li>Rice doesn’t need to be grilled to be awesome.</li>
-      </ul>
-    </div>
+        <Section title="🍚 Rice">
+          <Typography component="li" variant="body2">Rinse rice in cold water until it runs clear (seriously, don’t skip this).</Typography>
+          <Typography component="li" variant="body2">Cook with a 2:1 water to rice ratio. Starting with 100g of dry rice is about half a cup, so use roughly 1 cup of water per batch.</Typography>
+          <Typography component="li" variant="body2">Bring to boil, cover, simmer 15–18 min. Don’t peek. Let rest 5 min, then fluff with a fork.</Typography>
+          <Typography component="li" variant="body2">Rice doesn’t need to be grilled to be awesome.</Typography>
+        </Section>
 
-    {/* Meal Prep Summary */}
-    <div>
-      <h3 className="text-lg font-semibold text-green">
-        🥗 Meal Prep for the Win
-      </h3>
-      <ul className="list">
-        <li>Weigh everything raw and portion for the day or week.</li>
-        <li>
-          Grill, cook, and portion meals into containers—lunch and dinner,
-          sorted!
-        </li>
-        <li>
-          Repeat daily. High fives and muscle gains are optional (but
-          recommended).
-        </li>
-      </ul>
-    </div>
-  </div>
+        <Section title="🥗 Meal Prep for the Win">
+          <Typography component="li" variant="body2">Weigh everything raw and portion for the day or week.</Typography>
+          <Typography component="li" variant="body2">Grill, cook, and portion meals into containers—lunch and dinner, sorted!</Typography>
+          <Typography component="li" variant="body2">Repeat daily. High fives and muscle gains are optional (but recommended).</Typography>
+        </Section>
+      </Stack>
+    </CardContent>
+  </Card>
 );
 
 export default MealPrepInstructions;

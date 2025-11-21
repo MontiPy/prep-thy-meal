@@ -1,5 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Divider,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Select,
+  Slider,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { useUser } from '../auth/UserContext.jsx';
 
 const CalorieCalculator = () => {
@@ -100,7 +117,7 @@ const CalorieCalculator = () => {
   };
 
   // Load profile from localStorage/cloud
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       let profile = null;
 
@@ -144,12 +161,12 @@ const CalorieCalculator = () => {
     } catch (error) {
       console.error('Error loading profile:', error);
     }
-  };
+  }, [user]);
 
   // Load profile on component mount
   useEffect(() => {
     loadProfile();
-  }, [user]);
+  }, [loadProfile]);
   
   const goalCalories = getGoalCalories();
   
@@ -162,219 +179,212 @@ const CalorieCalculator = () => {
   ];
 
   return (
-    <div className="calculator">
-      <div className="card">
-        <div className="center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-200 mb-2">
-            <span className="wiggle">🧮</span> Calorie Calculator
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Calculate your BMR and TDEE to determine your daily calorie needs
-          </p>
-        </div>
+    <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 1.5, md: 3 } }}>
+      <Card sx={{ borderRadius: 3 }} variant="outlined">
+        <CardHeader
+          title={
+            <Stack spacing={1} alignItems="center" textAlign="center">
+              <Typography variant="h5" fontWeight={800}>
+                <span className="wiggle">🧮</span> Calorie Calculator
+              </Typography>
+              <Typography variant="body2" color="text.secondary" maxWidth={520}>
+                Calculate your BMR and TDEE to determine your daily calorie needs
+              </Typography>
+            </Stack>
+          }
+        />
+        <CardContent>
+          <Grid container spacing={3}>
+            {/* Input Form */}
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
+                <CardHeader title={<Typography variant="h6" fontWeight={800}>Your Information</Typography>} />
+                <CardContent>
+                  <Stack spacing={2}>
+                    <FormControl fullWidth>
+                      <InputLabel id="units-label">Units</InputLabel>
+                      <Select
+                        labelId="units-label"
+                        label="Units"
+                        value={units}
+                        onChange={(e) => handleUnitsChange(e.target.value)}
+                      >
+                        <MenuItem value="metric">Metric (kg, cm)</MenuItem>
+                        <MenuItem value="imperial">Imperial (lbs, inches)</MenuItem>
+                      </Select>
+                    </FormControl>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Input Form */}
-          <div className="panel-blue">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Your Information</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Units
-                </label>
-                <select
-                  value={units}
-                  onChange={(e) => handleUnitsChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md"
-                >
-                  <option value="metric">Metric (kg, cm)</option>
-                  <option value="imperial">Imperial (lbs, inches)</option>
-                </select>
-              </div>
+                    <FormControl fullWidth>
+                      <InputLabel id="gender-label">Gender</InputLabel>
+                      <Select
+                        labelId="gender-label"
+                        label="Gender"
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value)}
+                      >
+                        <MenuItem value="male">Male</MenuItem>
+                        <MenuItem value="female">Female</MenuItem>
+                      </Select>
+                    </FormControl>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Gender
-                </label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
+                    <TextField
+                      type="number"
+                      label="Age (years)"
+                      value={age}
+                      onChange={(e) => setAge(Number(e.target.value))}
+                      inputProps={{ min: 10, max: 100 }}
+                    />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Age (years)
-                </label>
-                <input
-                  type="number"
-                  value={age}
-                  onChange={(e) => setAge(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md"
-                  min="10"
-                  max="100"
-                />
-              </div>
+                    <TextField
+                      type="number"
+                      label={`Weight (${units === 'metric' ? 'kg' : 'lbs'})`}
+                      value={weight}
+                      onChange={(e) => setWeight(Number(e.target.value))}
+                      inputProps={{
+                        min: units === 'metric' ? 30 : 66,
+                        max: units === 'metric' ? 300 : 660,
+                        step: 0.1,
+                      }}
+                    />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Weight ({units === 'metric' ? 'kg' : 'lbs'})
-                </label>
-                <input
-                  type="number"
-                  value={weight}
-                  onChange={(e) => setWeight(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md"
-                  min={units === 'metric' ? '30' : '66'}
-                  max={units === 'metric' ? '300' : '660'}
-                  step="0.1"
-                />
-              </div>
+                    <TextField
+                      type="number"
+                      label={`Height (${units === 'metric' ? 'cm' : 'inches'})`}
+                      value={height}
+                      onChange={(e) => setHeight(Number(e.target.value))}
+                      inputProps={{ min: units === 'metric' ? 100 : 39, max: units === 'metric' ? 250 : 98 }}
+                    />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Height ({units === 'metric' ? 'cm' : 'inches'})
-                </label>
-                <input
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md"
-                  min={units === 'metric' ? '100' : '39'}
-                  max={units === 'metric' ? '250' : '98'}
-                />
-              </div>
+                    <FormControl fullWidth>
+                      <InputLabel id="activity-label">Activity Level</InputLabel>
+                      <Select
+                        labelId="activity-label"
+                        label="Activity Level"
+                        value={activityLevel}
+                        onChange={(e) => setActivityLevel(e.target.value)}
+                      >
+                        {activityLevels.map((level) => (
+                          <MenuItem key={level.value} value={level.value}>
+                            {level.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Activity Level
-                </label>
-                <select
-                  value={activityLevel}
-                  onChange={(e) => setActivityLevel(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md"
-                >
-                  {activityLevels.map((level) => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                    <Box>
+                      <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                        Weight Change Goal: {weightChangeRate > 0 ? '+' : ''}{weightChangeRate} lbs/week
+                      </Typography>
+                      <Slider
+                        min={-3}
+                        max={3}
+                        step={0.5}
+                        value={weightChangeRate}
+                        onChange={(_, value) => setWeightChangeRate(value)}
+                        marks={[
+                          { value: -3, label: 'Lose 3' },
+                          { value: 0, label: 'Maintain' },
+                          { value: 3, label: 'Gain 3' },
+                        ]}
+                      />
+                    </Box>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Weight Change Goal: {weightChangeRate > 0 ? '+' : ''}{weightChangeRate} lbs/week
-                </label>
-                <input
-                  type="range"
-                  min="-3"
-                  max="3"
-                  step="0.5"
-                  value={weightChangeRate}
-                  onChange={(e) => setWeightChangeRate(Number(e.target.value))}
-                  className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  <span>Lose 3 lbs/week</span>
-                  <span>Maintain</span>
-                  <span>Gain 3 lbs/week</span>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={saveProfile}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                >
-                  💾 Save Profile
-                </button>
-                <button
-                  onClick={loadProfile}
-                  className="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-                >
-                  📂 Load Profile
-                </button>
-              </div>
-              {lastProfileSavedAt && (
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  Last saved: {lastProfileSavedAt.toLocaleTimeString()}
-                </p>
-              )}
-            </div>
-          </div>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <Button fullWidth variant="contained" onClick={saveProfile}>
+                        💾 Save Profile
+                      </Button>
+                      <Button fullWidth variant="outlined" onClick={loadProfile}>
+                        📂 Load Profile
+                      </Button>
+                    </Stack>
+                    {lastProfileSavedAt && (
+                      <Typography variant="caption" color="text.secondary">
+                        Last saved: {lastProfileSavedAt.toLocaleTimeString()}
+                      </Typography>
+                    )}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
 
-          {/* Results */}
-          <div className="space-y-4">
-            <div className="panel-green">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">Your Results</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="font-medium">BMR (Base Metabolic Rate):</span>
-                  <span className="font-bold text-blue-600">{Math.round(bmr)} kcal/day</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">TDEE (Total Daily Energy):</span>
-                  <span className="font-bold text-green-600">{Math.round(tdee)} kcal/day</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Target Daily Calories:</span>
-                  <span className="font-bold text-orange-600">{Math.round(goalCalories)} kcal/day</span>
-                </div>
-                {weightChangeRate !== 0 && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Weekly Weight Change:</span>
-                    <span className={`font-bold ${weightChangeRate > 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      {weightChangeRate > 0 ? '+' : ''}{weightChangeRate} lbs/week
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="font-medium">Calorie Adjustment:</span>
-                  <span className={`font-bold ${weightChangeRate > 0 ? 'text-blue-600' : weightChangeRate < 0 ? 'text-red-600' : 'text-gray-600'}`}>
-                    {weightChangeRate > 0 ? '+' : ''}{Math.round(weightChangeRate * 500)} kcal/day
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Macros Recommendation */}
-            <div className="panel-yellow">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-3">Recommended Macros</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Protein (30%):</span>
-                  <span className="font-medium">{Math.round(goalCalories * 0.3 / 4)}g</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Carbs (40%):</span>
-                  <span className="font-medium">{Math.round(goalCalories * 0.4 / 4)}g</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Fat (30%):</span>
-                  <span className="font-medium">{Math.round(goalCalories * 0.3 / 9)}g</span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Info */}
-            <div className="panel-gray">
-              <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">ℹ️ Understanding the Numbers</h4>
-              <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
-                <li><strong>BMR:</strong> Calories your body needs at rest</li>
-                <li><strong>TDEE:</strong> BMR + calories burned through activity</li>
-                <li><strong>Goal Calories:</strong> Daily intake for your fitness goal</li>
-                <li><strong>±500 calories:</strong> Approximately 1 lb weight change/week</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            {/* Results */}
+            <Grid item xs={12} md={6}>
+              <Stack spacing={2}>
+                <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                  <CardHeader title={<Typography variant="h6" fontWeight={800}>Your Results</Typography>} />
+                  <CardContent>
+                    <Stack spacing={1.5}>
+                      {[
+                        { label: 'BMR (Base Metabolic Rate)', value: `${Math.round(bmr)} kcal/day`, color: 'primary.main' },
+                        { label: 'TDEE (Total Daily Energy)', value: `${Math.round(tdee)} kcal/day`, color: 'success.main' },
+                        { label: 'Target Daily Calories', value: `${Math.round(goalCalories)} kcal/day`, color: 'warning.main' },
+                        ...(weightChangeRate !== 0
+                          ? [{
+                              label: 'Weekly Weight Change',
+                              value: `${weightChangeRate > 0 ? '+' : ''}${weightChangeRate} lbs/week`,
+                              color: weightChangeRate > 0 ? 'primary.main' : 'error.main',
+                            }]
+                          : []),
+                        {
+                          label: 'Calorie Adjustment',
+                          value: `${weightChangeRate > 0 ? '+' : ''}${Math.round(weightChangeRate * 500)} kcal/day`,
+                          color: weightChangeRate > 0 ? 'primary.main' : weightChangeRate < 0 ? 'error.main' : 'text.primary',
+                        },
+                      ].map((item) => (
+                        <Stack direction="row" justifyContent="space-between" key={item.label}>
+                          <Typography fontWeight={600}>{item.label}:</Typography>
+                          <Typography fontWeight={800} color={item.color}>
+                            {item.value}
+                          </Typography>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                {/* Macros */}
+                <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                  <CardHeader title={<Typography variant="h6" fontWeight={800}>Recommended Macros</Typography>} />
+                  <CardContent>
+                    <Stack spacing={1}>
+                      {[
+                        { label: 'Protein (30%)', grams: Math.round(goalCalories * 0.3 / 4) },
+                        { label: 'Carbs (40%)', grams: Math.round(goalCalories * 0.4 / 4) },
+                        { label: 'Fat (30%)', grams: Math.round(goalCalories * 0.3 / 9) },
+                      ].map((item) => (
+                        <Stack direction="row" justifyContent="space-between" key={item.label}>
+                          <Typography>{item.label}</Typography>
+                          <Typography fontWeight={700}>{item.grams}g</Typography>
+                        </Stack>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                {/* Info */}
+                <Card variant="outlined" sx={{ borderRadius: 3 }}>
+                  <CardHeader title={<Typography variant="h6" fontWeight={800}>ℹ️ Understanding the Numbers</Typography>} />
+                  <CardContent>
+                    <Stack spacing={0.75}>
+                      {[
+                        'BMR: Calories your body needs at rest',
+                        'TDEE: BMR + calories burned through activity',
+                        'Goal Calories: Daily intake for your fitness goal',
+                        '±500 calories: Approximately 1 lb weight change/week',
+                      ].map((item) => (
+                        <Typography key={item} variant="body2" color="text.secondary">
+                          {item}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Stack>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+    </Box>
   );
 };
 
