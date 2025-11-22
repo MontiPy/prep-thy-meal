@@ -67,6 +67,13 @@ const MealPrep = () => {
     setAllIngredients(list);
   };
 
+  // Refresh ingredients when switching to Planner tab to pick up any changes
+  useEffect(() => {
+    if (activeTab === TABS.CALCULATOR) {
+      setAllIngredients(getAllBaseIngredients());
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     if (user) {
       syncFromRemote(user.uid).then(() => {

@@ -8,6 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { calculateNutrition } from '../ingredients/nutritionHelpers';
 
 const IngredientCard = ({
   ingredient,
@@ -18,6 +19,7 @@ const IngredientCard = ({
 }) => {
   const totalGrams = ingredient.grams || ingredient.gramsPerUnit || 100;
   const quantity = ingredient.quantity || 1;
+  const nutrition = calculateNutrition(ingredient);
 
   const NutritionBox = ({ label, value, color }) => (
     <Box
@@ -120,22 +122,22 @@ const IngredientCard = ({
       >
         <NutritionBox
           label="Cal"
-          value={Math.round(ingredient.calories * quantity)}
+          value={Math.round(nutrition.calories)}
           color="primary"
         />
         <NutritionBox
           label="P"
-          value={`${Math.round(ingredient.protein * quantity)}g`}
+          value={`${Math.round(nutrition.protein)}g`}
           color="error"
         />
         <NutritionBox
           label="C"
-          value={`${Math.round(ingredient.carbs * quantity)}g`}
+          value={`${Math.round(nutrition.carbs)}g`}
           color="warning"
         />
         <NutritionBox
           label="F"
-          value={`${Math.round(ingredient.fat * quantity)}g`}
+          value={`${Math.round(nutrition.fat)}g`}
           color="success"
         />
       </Box>

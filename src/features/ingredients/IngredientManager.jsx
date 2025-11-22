@@ -43,7 +43,8 @@ import {
 import { useUser } from '../auth/UserContext.jsx';
 import { getAllBaseIngredients } from './nutritionHelpers';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
-import { searchFoods } from '../../shared/services/fatsecret';
+import { searchFoods, getFoodDetails } from '../../shared/services/usda';
+import ServingSizePreviewModal from './ServingSizePreviewModal';
 
 const CATEGORIES = [
   "Produce - Vegetables",
@@ -58,9 +59,12 @@ const CATEGORIES = [
 const emptyForm = {
   name: "",
   category: CATEGORIES[0],
-  unit: "g",
-  gramsPerUnit: 100,
-  grams: 100,
+  // New serving model
+  servingSize: 100,       // Amount for which nutrition is entered (e.g., 46 for 46g)
+  servingUnit: "g",       // "g", "ml", or "unit"
+  servingLabel: "",       // Optional human-readable label (e.g., "1 egg", "1 scoop")
+  weightPerServing: "",   // Optional weight in grams for unit-based items (for display)
+  // Nutrition values (per servingSize)
   calories: 0,
   protein: 0,
   carbs: 0,
@@ -80,6 +84,7 @@ const IngredientManager = ({ onChange }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [ingredientToDelete, setIngredientToDelete] = useState(null);
   const jsonImportRef = useRef(null);
+  const lastEditingIdRef = useRef(null); // Track last editingId to prevent duplicate syncs
 
   // Search/filter state
   const [query, setQuery] = useState("");
@@ -87,30 +92,63 @@ const IngredientManager = ({ onChange }) => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
 
-  // Nutritionix API search state
+  // USDA FoodData Central API search state
   const [apiResults, setApiResults] = useState([]);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiSearched, setApiSearched] = useState(false);
 
-  // Editing item reference
-  const editingItem = useMemo(() => ingredients.find((i) => i.id === editingId) || null, [ingredients, editingId]);
+  // Serving size preview modal state
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewFood, setPreviewFood] = useState(null);
+  const [previewServingSizes, setPreviewServingSizes] = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
-  // Sync form when editing item changes
+  // Sync form when editingId changes (only on initial edit, not on every ingredient refresh)
   useEffect(() => {
-    if (!editingItem) return;
+    // Only sync if editingId actually changed (not just a re-render)
+    if (editingId === lastEditingIdRef.current) return;
+    lastEditingIdRef.current = editingId;
+
+    if (!editingId) return;
+
+    // Find the item to edit from current ingredients
+    const itemToEdit = ingredients.find((i) => i.id === editingId);
+    if (!itemToEdit) return;
+
+    // Handle migration from old format
+    let servingSize = itemToEdit.servingSize;
+    let servingUnit = itemToEdit.servingUnit;
+    let servingLabel = itemToEdit.servingLabel || "";
+    let weightPerServing = itemToEdit.weightPerServing?.toString() || "";
+
+    // Migrate from old format if needed
+    if (servingSize === undefined || servingUnit === undefined) {
+      const isPerServing = itemToEdit.nutritionPer === "serving";
+      if (isPerServing) {
+        servingSize = 1;
+        servingUnit = "unit";
+        weightPerServing = itemToEdit.weightPerUnit?.toString() || "";
+      } else {
+        servingSize = 100;
+        servingUnit = "g";
+      }
+    }
+
     setForm({
-      name: editingItem.name || "",
-      category: editingItem.category || CATEGORIES[0],
-      unit: editingItem.unit || "g",
-      gramsPerUnit: editingItem.gramsPerUnit || editingItem.grams || 100,
-      grams: editingItem.grams || editingItem.gramsPerUnit || 100,
-      calories: editingItem.calories || 0,
-      protein: editingItem.protein || 0,
-      carbs: editingItem.carbs || 0,
-      fat: editingItem.fat || 0,
-      notes: editingItem.notes || "",
+      name: itemToEdit.name || "",
+      category: itemToEdit.category || CATEGORIES[0],
+      servingSize: servingSize || 100,
+      servingUnit: servingUnit || "g",
+      servingLabel: servingLabel || "",
+      weightPerServing: weightPerServing || "",
+      calories: itemToEdit.calories || 0,
+      protein: itemToEdit.protein || 0,
+      carbs: itemToEdit.carbs || 0,
+      fat: itemToEdit.fat || 0,
+      notes: itemToEdit.notes || "",
     });
-  }, [editingId, editingItem]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId, ingredients]); // Re-run when editingId changes, but ref prevents duplicate syncs
 
   // Filtered and sorted ingredients
   const filtered = useMemo(() => {
@@ -133,8 +171,8 @@ const IngredientManager = ({ onChange }) => {
     onChange && onChange(base);
   }, [onChange]);
 
-  // Nutritionix API search function
-  const searchNutritionixAPI = useCallback(async (searchQuery) => {
+  // USDA FoodData Central API search function
+  const searchUSDAAPI = useCallback(async (searchQuery) => {
     if (!searchQuery || searchQuery.length < 2) {
       setApiResults([]);
       setApiSearched(false);
@@ -142,7 +180,7 @@ const IngredientManager = ({ onChange }) => {
     }
 
     if (!navigator.onLine) {
-      toast.error("You're offline. Nutritionix search unavailable.");
+      toast.error("You're offline. Food search unavailable.");
       return;
     }
 
@@ -155,16 +193,16 @@ const IngredientManager = ({ onChange }) => {
         // No results is okay, just show empty state
       }
     } catch (err) {
-      console.error("Nutritionix search failed:", err);
-      toast.error("Failed to search Nutritionix API");
+      console.error("USDA search failed:", err);
+      toast.error("Failed to search USDA database");
       setApiResults([]);
     } finally {
       setApiLoading(false);
     }
   }, []);
 
-  // Add API result as custom ingredient
-  const addFromApi = async (apiItem) => {
+  // Open serving size preview modal before adding from API
+  const openServingPreview = async (apiItem) => {
     // Check if ingredient with same name already exists
     const existing = ingredients.find(
       (i) => i.name.toLowerCase() === apiItem.name.toLowerCase()
@@ -174,32 +212,75 @@ const IngredientManager = ({ onChange }) => {
       return;
     }
 
-    // FatSecret provides per-100g values directly
+    // Open modal and fetch detailed info with serving sizes
+    setPreviewFood(apiItem);
+    setPreviewModalOpen(true);
+    setPreviewLoading(true);
+
+    try {
+      const details = await getFoodDetails(apiItem.id);
+      if (details?.servingSizes) {
+        setPreviewServingSizes(details.servingSizes);
+      } else {
+        setPreviewServingSizes([{ name: '100g', grams: 100, isDefault: true }]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch food details:", err);
+      setPreviewServingSizes([{ name: '100g', grams: 100, isDefault: true }]);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // Confirm adding ingredient from API with selected serving sizes
+  const confirmAddFromApi = async (servingSizes) => {
+    if (!previewFood) return;
+
+    // USDA provides per-100g values directly - use new serving model
     const ingredientToAdd = {
-      name: apiItem.name,
+      name: previewFood.name,
       category: "Other", // User can edit later
+      // New serving model - USDA is always per 100g
+      servingSize: 100,
+      servingUnit: "g",
+      servingLabel: null,
+      weightPerServing: null,
+      servingSizes: servingSizes,
+      // Nutrition values per 100g
+      calories: previewFood.calories || 0,
+      protein: previewFood.protein || 0,
+      carbs: previewFood.carbs || 0,
+      fat: previewFood.fat || 0,
+      // Backward compatibility fields
       unit: "g",
       gramsPerUnit: 100,
       grams: 100,
-      calories: apiItem.caloriesPer100g || apiItem.calories || 0,
-      protein: apiItem.proteinPer100g || apiItem.protein || 0,
-      carbs: apiItem.carbsPer100g || apiItem.carbs || 0,
-      fat: apiItem.fatPer100g || apiItem.fat || 0,
-      notes: apiItem.brandName
-        ? `${apiItem.brandName} (via FatSecret)`
-        : `Added from FatSecret`,
+      notes: previewFood.brandName
+        ? `${previewFood.brandName} (via USDA)`
+        : `Added from USDA FoodData Central`,
     };
 
     try {
       await addCustomIngredient(ingredientToAdd, user?.uid);
-      toast.success(`Added "${apiItem.name}" to your ingredients`);
+      toast.success(`Added "${previewFood.name}" to your ingredients`);
       refresh();
       // Remove from API results
-      setApiResults((prev) => prev.filter((r) => r.id !== apiItem.id));
+      setApiResults((prev) => prev.filter((r) => r.id !== previewFood.id));
+      // Close modal
+      setPreviewModalOpen(false);
+      setPreviewFood(null);
+      setPreviewServingSizes([]);
     } catch (err) {
       console.error("Failed to add ingredient:", err);
       toast.error("Failed to add ingredient");
     }
+  };
+
+  // Close preview modal
+  const closePreviewModal = () => {
+    setPreviewModalOpen(false);
+    setPreviewFood(null);
+    setPreviewServingSizes([]);
   };
 
   useEffect(() => {
@@ -222,23 +303,72 @@ const IngredientManager = ({ onChange }) => {
 
   const resetForm = () => {
     setEditingId(null);
+    lastEditingIdRef.current = null; // Reset the ref so next edit will sync
     setForm({ ...emptyForm });
   };
 
   const saveIngredient = async () => {
     if (!form.name.trim()) return;
 
+    const servingSize = Number(form.servingSize) || 100;
+    const servingUnit = form.servingUnit || "g";
+    const servingLabel = form.servingLabel?.trim() || null;
+    const weightPerServing = form.weightPerServing ? Number(form.weightPerServing) : null;
+
+    // Build servingSizes array for UI convenience
+    let servingSizes = [];
+    if (servingUnit === "unit") {
+      // Unit-based: show the unit serving
+      const label = servingLabel || "1 serving";
+      servingSizes = [
+        { name: weightPerServing ? `${label} (${weightPerServing}g)` : label, grams: weightPerServing || 0, isDefault: true },
+      ];
+      // Add 100g option if we know the weight
+      if (weightPerServing) {
+        servingSizes.push({ name: "100g", grams: 100, isDefault: false });
+      }
+    } else {
+      // Gram/ml-based: show the serving size
+      if (servingSize === 100) {
+        servingSizes = [{ name: "100g", grams: 100, isDefault: true }];
+      } else {
+        // If custom label provided, include grams for clarity (e.g., "1 container (46g)")
+        // Otherwise just show the size (e.g., "46g")
+        const name = servingLabel
+          ? `${servingLabel} (${servingSize}${servingUnit})`
+          : `${servingSize}${servingUnit}`;
+        servingSizes = [
+          { name, grams: servingSize, isDefault: true },
+          { name: "100g", grams: 100, isDefault: false },
+        ];
+      }
+    }
+
+    // Calculate gramsPerUnit for backward compatibility with meal planner
+    const displayUnit = servingUnit === "unit" ? "unit" : "g";
+    const gramsPerUnit = servingUnit === "unit"
+      ? (weightPerServing || servingSize)
+      : servingSize;
+
     const ingredientToSave = {
       id: editingId || undefined,
       name: form.name.trim(),
       category: form.category,
-      unit: form.unit,
-      gramsPerUnit: 100,
-      grams: 100,
+      // New serving model fields
+      servingSize,
+      servingUnit,
+      servingLabel,
+      weightPerServing,
+      servingSizes,
+      // Nutrition values (per servingSize)
       calories: Number(form.calories) || 0,
       protein: Number(form.protein) || 0,
       carbs: Number(form.carbs) || 0,
       fat: Number(form.fat) || 0,
+      // Backward compatibility fields
+      unit: displayUnit,
+      gramsPerUnit,
+      grams: gramsPerUnit,
       notes: form.notes || "",
     };
 
@@ -311,16 +441,27 @@ const IngredientManager = ({ onChange }) => {
         for (const ing of ingredientsToImport) {
           try {
             if (!ing.name) continue;
+            // Support both old and new format imports
+            const servingSize = ing.servingSize || 100;
+            const servingUnit = ing.servingUnit || (ing.nutritionPer === "serving" ? "unit" : "g");
             const ingredient = {
               name: ing.name,
               category: ing.category || CATEGORIES[6],
-              unit: ing.unit || 'g',
-              gramsPerUnit: 100,
-              grams: 100,
+              // New serving model
+              servingSize,
+              servingUnit,
+              servingLabel: ing.servingLabel || null,
+              weightPerServing: ing.weightPerServing || ing.weightPerUnit || null,
+              servingSizes: ing.servingSizes || [{ name: "100g", grams: 100, isDefault: true }],
+              // Nutrition values
               calories: Math.max(0, parseFloat(ing.calories) || 0),
               protein: Math.max(0, parseFloat(ing.protein) || 0),
               carbs: Math.max(0, parseFloat(ing.carbs) || 0),
               fat: Math.max(0, parseFloat(ing.fat) || 0),
+              // Backward compatibility
+              unit: servingUnit === "unit" ? "unit" : "g",
+              gramsPerUnit: servingSize,
+              grams: servingSize,
               notes: ing.notes || "",
             };
             await addCustomIngredient(ingredient, user?.uid);
@@ -414,40 +555,114 @@ const IngredientManager = ({ onChange }) => {
                 />
               </Box>
 
-              <Grid container spacing={1.5}>
-                <Grid size={6}>
-                  <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
-                    Category
-                  </Typography>
-                  <FormControl fullWidth size="small">
-                    <Select
-                      value={form.category}
-                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      {CATEGORIES.map((cat) => (
-                        <MenuItem key={cat} value={cat}>{cat}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+              <Box>
+                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                  Category
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={form.category}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* Serving Size Section */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: "#f0fdf4",
+                  borderColor: "#bbf7d0",
+                }}
+              >
+                <Typography variant="body2" fontWeight={600} sx={{ color: "#166534", mb: 1.5 }}>
+                  Serving Size
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                  Enter the serving size for which you'll provide nutrition values.
+                </Typography>
+
+                <Grid container spacing={1.5}>
+                  <Grid size={4}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Amount
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={form.servingSize}
+                      onChange={(e) => setForm((f) => ({ ...f, servingSize: e.target.value }))}
+                      placeholder="100"
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                    />
+                  </Grid>
+                  <Grid size={4}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Unit
+                    </Typography>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={form.servingUnit}
+                        onChange={(e) => setForm((f) => ({ ...f, servingUnit: e.target.value }))}
+                        sx={{ borderRadius: 2, bgcolor: "#fff" }}
+                      >
+                        <MenuItem value="g">grams (g)</MenuItem>
+                        <MenuItem value="ml">milliliters (ml)</MenuItem>
+                        <MenuItem value="unit">unit (e.g., 1 egg)</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={4}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Label (optional)
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={form.servingLabel}
+                      onChange={(e) => setForm((f) => ({ ...f, servingLabel: e.target.value }))}
+                      placeholder="e.g., 1 egg"
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                    />
+                  </Grid>
                 </Grid>
-                <Grid size={6}>
-                  <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
-                    Default unit
-                  </Typography>
-                  <FormControl fullWidth size="small">
-                    <Select
-                      value={form.unit}
-                      onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      <MenuItem value="g">g</MenuItem>
-                      <MenuItem value="ml">ml</MenuItem>
-                      <MenuItem value="unit">unit</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
+
+                {/* Optional weight per serving for unit-based items */}
+                {form.servingUnit === "unit" && (
+                  <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "#fef3c7", borderRadius: 1.5 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                      <Typography variant="caption" color="#92400e" fontWeight={500}>
+                        Weight per unit (optional):
+                      </Typography>
+                      <TextField
+                        size="small"
+                        type="number"
+                        placeholder="e.g., 50"
+                        value={form.weightPerServing}
+                        onChange={(e) => setForm((f) => ({ ...f, weightPerServing: e.target.value }))}
+                        InputProps={{
+                          endAdornment: <InputAdornment position="end">g</InputAdornment>,
+                        }}
+                        sx={{
+                          width: 120,
+                          "& .MuiOutlinedInput-root": { borderRadius: 1.5, bgcolor: "#fff" },
+                        }}
+                      />
+                    </Stack>
+                    <Typography variant="caption" color="#92400e" sx={{ display: "block", mt: 0.5 }}>
+                      Used for display only. Nutrition scales by unit quantity.
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
 
               {/* Macros Section */}
               <Paper
@@ -460,7 +675,7 @@ const IngredientManager = ({ onChange }) => {
                 }}
               >
                 <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a", mb: 1.5 }}>
-                  Macros per 100g
+                  Nutrition per {form.servingUnit === "unit" ? (form.servingLabel || "1 unit") : `${form.servingSize}${form.servingUnit}`}
                 </Typography>
                 <Grid container spacing={1.5}>
                   <Grid size={6}>
@@ -528,7 +743,7 @@ const IngredientManager = ({ onChange }) => {
                   size="small"
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  placeholder="e.g., 1 unit = 57g, cooked weight differs"
+                  placeholder="e.g., cooked weight differs from raw"
                   multiline
                   rows={2}
                   sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
@@ -661,7 +876,7 @@ const IngredientManager = ({ onChange }) => {
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && query.length >= 2) {
-                        searchNutritionixAPI(query);
+                        searchUSDAAPI(query);
                       }
                     }}
                     placeholder="Search ingredients..."
@@ -677,12 +892,12 @@ const IngredientManager = ({ onChange }) => {
                       ),
                     }}
                   />
-                  <Tooltip title="Search Nutritionix food database">
+                  <Tooltip title="Search USDA food database">
                     <Button
                       variant="outlined"
                       size="small"
                       startIcon={apiLoading ? <CircularProgress size={16} /> : <CloudSearchIcon />}
-                      onClick={() => searchNutritionixAPI(query)}
+                      onClick={() => searchUSDAAPI(query)}
                       disabled={query.length < 2 || apiLoading}
                       sx={{
                         textTransform: "none",
@@ -749,7 +964,7 @@ const IngredientManager = ({ onChange }) => {
               </Stack>
             </Paper>
 
-            {/* FatSecret API Results */}
+            {/* USDA FoodData Central API Results */}
             {(apiSearched || apiLoading) && (
               <Paper
                 elevation={0}
@@ -764,7 +979,7 @@ const IngredientManager = ({ onChange }) => {
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                   <CloudSearchIcon sx={{ color: "#4f46e5", fontSize: 20 }} />
                   <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#1e1b4b" }}>
-                    FatSecret Results
+                    USDA Results
                   </Typography>
                   {apiLoading && <CircularProgress size={18} sx={{ ml: 1 }} />}
                   {!apiLoading && apiResults.length > 0 && (
@@ -780,7 +995,7 @@ const IngredientManager = ({ onChange }) => {
                   <Box sx={{ textAlign: "center", py: 3 }}>
                     <CircularProgress size={32} />
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Searching FatSecret database...
+                      Searching USDA database...
                     </Typography>
                   </Box>
                 ) : apiResults.length === 0 ? (
@@ -841,7 +1056,7 @@ const IngredientManager = ({ onChange }) => {
                           variant="contained"
                           size="small"
                           startIcon={<AddIcon />}
-                          onClick={() => addFromApi(item)}
+                          onClick={() => openServingPreview(item)}
                           sx={{
                             bgcolor: "#4f46e5",
                             "&:hover": { bgcolor: "#4338ca" },
@@ -859,7 +1074,7 @@ const IngredientManager = ({ onChange }) => {
                 )}
 
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2, textAlign: "center" }}>
-                  Data provided by FatSecret. Values normalized to per 100g when added to your library.
+                  Data provided by USDA FoodData Central. Values are per 100g.
                 </Typography>
               </Paper>
             )}
@@ -1054,6 +1269,15 @@ const IngredientManager = ({ onChange }) => {
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      <ServingSizePreviewModal
+        open={previewModalOpen}
+        onClose={closePreviewModal}
+        food={previewFood}
+        servingSizes={previewServingSizes}
+        loading={previewLoading}
+        onConfirm={confirmAddFromApi}
       />
     </Box>
   );

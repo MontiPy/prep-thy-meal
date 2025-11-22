@@ -42,6 +42,7 @@ import autoTable from "jspdf-autotable";
 import {
   calculateNutrition,
   normalizeIngredient,
+  getServingSizes,
 } from '../ingredients/nutritionHelpers';
 import {
   loadPlans,
@@ -393,6 +394,36 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
         }
 
         return { ...ingredient, quantity, grams, gramsPerUnit };
+      });
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => refreshIngredientData(i));
+      }
+      return updated;
+    });
+  };
+
+  // Update the selected serving size for an ingredient
+  const updateIngredientServing = (meal, id, servingName) => {
+    setMealIngredients((prev) => {
+      const list = prev[meal].map((ingredient) => {
+        if (ingredient.id !== id) return ingredient;
+
+        // Get servingSizes for this ingredient
+        const servingSizes = getServingSizes(id);
+        const selectedServing = servingSizes.find(s => s.name === servingName);
+
+        if (!selectedServing) return ingredient;
+
+        // Update the ingredient with the selected serving
+        // Keep quantity as 1 when switching servings, update grams based on serving
+        return {
+          ...ingredient,
+          selectedServing: servingName,
+          grams: selectedServing.grams,
+          quantity: 1,
+          gramsPerUnit: selectedServing.grams,
+        };
       });
       const updated = { ...prev, [meal]: list };
       if (meal === "lunch" && matchDinner) {
@@ -1617,6 +1648,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                             <TableHead>
                               <TableRow>
                                 <TableCell>Ingredient</TableCell>
+                                <TableCell align="center">Serving</TableCell>
                                 <TableCell align="center">Quantity</TableCell>
                                 <TableCell align="center">Grams</TableCell>
                                 <TableCell align="center">Calories</TableCell>
@@ -1648,10 +1680,39 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                                   unitLabel = "unit";
                                 }
 
+                                // Get available serving sizes for this ingredient
+                                const servingSizes = getServingSizes(ingredient.id);
+                                const currentServing = ingredient.selectedServing || servingSizes[0]?.name || '100g';
+
                                 return (
                                   <TableRow key={ingredient.id} hover>
                                     <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
                                       {ingredient.name}
+                                    </TableCell>
+                                    <TableCell align="center">
+                                      {servingSizes.length > 1 ? (
+                                        <Select
+                                          size="small"
+                                          value={currentServing}
+                                          onChange={(e) => updateIngredientServing(meal, ingredient.id, e.target.value)}
+                                          disabled={disabledRow}
+                                          sx={{
+                                            minWidth: 100,
+                                            fontSize: '0.75rem',
+                                            '& .MuiSelect-select': { py: 0.5, px: 1 },
+                                          }}
+                                        >
+                                          {servingSizes.map((serving) => (
+                                            <MenuItem key={serving.name} value={serving.name} sx={{ fontSize: '0.75rem' }}>
+                                              {serving.name}
+                                            </MenuItem>
+                                          ))}
+                                        </Select>
+                                      ) : (
+                                        <Typography variant="caption" color="text.secondary">
+                                          {servingSizes[0]?.name || '100g'}
+                                        </Typography>
+                                      )}
                                     </TableCell>
                                     <TableCell>
                                       <Stack
@@ -1774,6 +1835,11 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                                 incrementStep = 0.5;
                                 unitLabel = "unit";
                               }
+
+                              // Get serving sizes for mobile view
+                              const mobileServingSizes = getServingSizes(ingredient.id);
+                              const mobileCurrentServing = ingredient.selectedServing || mobileServingSizes[0]?.name || '100g';
+
                               return (
                                 <Paper key={ingredient.id} variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
@@ -1794,6 +1860,29 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                                       <X size={16} />
                                     </IconButton>
                                   </Stack>
+
+                                  {/* Serving size selector for mobile */}
+                                  {mobileServingSizes.length > 1 && (
+                                    <Select
+                                      size="small"
+                                      value={mobileCurrentServing}
+                                      onChange={(e) => updateIngredientServing(meal, ingredient.id, e.target.value)}
+                                      disabled={disabledRow}
+                                      fullWidth
+                                      sx={{
+                                        mt: 1,
+                                        fontSize: '0.75rem',
+                                        '& .MuiSelect-select': { py: 0.5 },
+                                      }}
+                                    >
+                                      {mobileServingSizes.map((serving) => (
+                                        <MenuItem key={serving.name} value={serving.name} sx={{ fontSize: '0.75rem' }}>
+                                          {serving.name}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  )}
+
                                   <Stack
                                     direction="row"
                                     spacing={0.75}

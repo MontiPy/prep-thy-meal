@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Architecture
 
-This is a React + Vite meal preparation application with Firebase authentication and Nutritionix API integration.
+This is a React + Vite meal preparation application with Firebase authentication and USDA FoodData Central API integration.
 
 ### Core Structure
 - **React 19** frontend with modern JSX and ES modules
@@ -24,7 +24,7 @@ This is a React + Vite meal preparation application with Firebase authentication
 - **Tailwind CSS v4** for styling with class-based dark mode support
 - **Vitest** with @testing-library/react for unit and component testing
 - **Firebase** for user authentication (Google provider) and Firestore database
-- **Nutritionix API** for ingredient nutrition data lookup
+- **USDA FoodData Central API** for ingredient nutrition data lookup (free API key required)
 - **react-hot-toast** for user notifications and feedback
 - **Mobile-responsive** design with Tailwind's responsive utilities
 
@@ -80,7 +80,7 @@ src/
 │   ├── services/                 # External services
 │   │   ├── firebase.js           # Firebase config
 │   │   ├── firestore.js          # Firestore operations
-│   │   ├── nutritionix.js        # Nutritionix API
+│   │   ├── usda.js               # USDA FoodData Central API
 │   │   ├── storage.js            # Storage facade
 │   │   └── onboarding.js         # Onboarding storage
 │   └── utils/                    # Shared utilities
@@ -107,7 +107,7 @@ src/
 **Feature Components:**
 - `MealPrepCalculator.jsx` - Core meal planning and calculation logic with multi-meal support (breakfast, lunch, dinner, snack)
 - `CalorieCalculator.jsx` - Standalone calorie/macronutrient calculator with user profile persistence
-- `IngredientManager.jsx` - Ingredient search and management interface with Nutritionix integration
+- `IngredientManager.jsx` - Ingredient search and management interface with USDA FoodData Central integration
 - `MealPrepInstructions.jsx` - Static instructions and guidance
 - `AccountPage.jsx` - User account management
 
@@ -137,15 +137,15 @@ src/
    - Stores baseline configuration in `settings/{uid}` document
    - All writes trigger local → remote sync
 
-3. **External API Layer** (`src/shared/services/nutritionix.js`)
-   - Searches Nutritionix API for ingredient nutrition data
-   - Two endpoints: instant search and natural language nutrients
+3. **External API Layer** (`src/shared/services/usda.js`)
+   - Searches USDA FoodData Central API for ingredient nutrition data
+   - Returns Foundation, SR Legacy, and Branded food data with nutrition per 100g
    - Results are added to local/remote storage for future use
 
 **Data Flow:**
 - User auth → `syncFromRemote()` pulls Firestore data → merges with local custom ingredients (remote wins on conflicts)
 - Ingredient changes (via IngredientManager) → save to localStorage → persist to Firestore through `saveCustomIngredients()`
-- New ingredients via Nutritionix → added as custom ingredients (local + Firestore)
+- New ingredients via USDA FoodData Central → added as custom ingredients (local + Firestore)
 
 **Additional Storage Systems:**
 - **Favorites** (`src/features/ingredients/favorites.js`): localStorage-based favorites system for frequently used ingredients
@@ -242,15 +242,14 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
-VITE_NUTRITIONIX_APP_ID=
-VITE_NUTRITIONIX_API_KEY=
+VITE_USDA_API_KEY=
 ```
 
 Setup requirements:
 1. Copy `.env.example` to `.env`
 2. Create Firebase project and enable Google authentication provider
 3. Add Firebase config values to `.env`
-4. Sign up for Nutritionix API and add credentials
+4. Get free USDA API key from https://fdc.nal.usda.gov/api-key-signup.html
 
 ### Testing Infrastructure
 
@@ -318,7 +317,7 @@ Setup requirements:
 - Responsive breakpoints handled via Tailwind CSS utilities
 - Share functionality uses Web Share API for mobile integration (shopping list → Reminders)
 - Dark mode automatically adapts to system preference on first load
-- Offline banner appears when `navigator.onLine` is false; Nutritionix search is disabled offline
+- Offline banner appears when `navigator.onLine` is false; food search is disabled offline
 
 ## User Experience Improvement Roadmap
 
@@ -331,7 +330,7 @@ This section documents planned and potential UX improvements based on comprehens
 - Offline detection and banner
 - PDF export functionality
 - Multi-plan management
-- Nutritionix API integration
+- USDA FoodData Central API integration
 - Toast notifications for feedback
 - **NEW: Keyboard shortcuts system** with help modal (press `?`)
 - **NEW: Undo/Redo functionality** via `useUndoRedo` hook

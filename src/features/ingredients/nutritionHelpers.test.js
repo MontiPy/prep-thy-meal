@@ -41,7 +41,8 @@ describe('normalizeIngredient', () => {
 
     const result = normalizeIngredient(input);
 
-    expect(result.grams).toBe(0);
+    // New model: grams defaults to gramsPerUnit (which defaults to servingSize, typically 100)
+    expect(result.grams).toBe(100);
     expect(result.calories).toBe(0);
     expect(result.protein).toBe(0);
     expect(result.carbs).toBe(0);
@@ -51,16 +52,20 @@ describe('normalizeIngredient', () => {
     expect(result.quantity).toBe(1);
   });
 
-  it('should use grams as fallback for gramsPerUnit', () => {
+  it('should use servingSize as the basis for gramsPerUnit', () => {
+    // New model: gramsPerUnit is based on servingSize, not grams
     const input = {
       id: 1,
       name: 'Test',
-      grams: 150
+      servingSize: 150,
+      servingUnit: 'g',
+      grams: 300 // User has 300g in their plan
     };
 
     const result = normalizeIngredient(input);
 
-    expect(result.gramsPerUnit).toBe(150);
+    expect(result.gramsPerUnit).toBe(150); // Based on servingSize
+    expect(result.grams).toBe(300); // Preserved from input
   });
 });
 

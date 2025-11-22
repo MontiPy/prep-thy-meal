@@ -44,11 +44,13 @@ describe('Ingredient Unit Conversions', () => {
 
   describe('Unit-based ingredients (unit="unit")', () => {
     it('should handle unit-based ingredient correctly', () => {
+      // New model: unit-based ingredients use servingUnit: "unit"
       const ingredient = {
         id: 2,
         name: 'Chicken Breast',
-        unit: 'unit',
-        gramsPerUnit: 150, // 1 breast = 150g
+        servingSize: 1, // 1 unit
+        servingUnit: 'unit', // This makes it unit-based
+        weightPerServing: 150, // 1 breast = 150g (for display)
         quantity: 2, // 2 breasts
         grams: 300, // total grams
         calories: 165,
@@ -60,7 +62,7 @@ describe('Ingredient Unit Conversions', () => {
       const normalized = normalizeIngredient(ingredient);
 
       expect(normalized.unit).toBe('unit');
-      expect(normalized.gramsPerUnit).toBe(150);
+      expect(normalized.gramsPerUnit).toBe(150); // weightPerServing or servingSize
       expect(normalized.quantity).toBe(2);
       expect(normalized.grams).toBe(300);
     });
@@ -87,8 +89,8 @@ describe('Ingredient Unit Conversions', () => {
       const ingredient = {
         id: 3,
         name: 'Test',
-        unit: 'g',
-        gramsPerUnit: 100,
+        servingSize: 100,
+        servingUnit: 'g',
         quantity: 0,
         grams: 0
       };
@@ -96,6 +98,7 @@ describe('Ingredient Unit Conversions', () => {
       const normalized = normalizeIngredient(ingredient);
 
       expect(normalized.quantity).toBe(0);
+      // grams: 0 is explicitly preserved when grams is provided
       expect(normalized.grams).toBe(0);
     });
 
@@ -103,8 +106,8 @@ describe('Ingredient Unit Conversions', () => {
       const ingredient = {
         id: 4,
         name: 'Test',
-        unit: 'unit',
-        gramsPerUnit: 100,
+        servingSize: 1,
+        servingUnit: 'unit',
         quantity: 0,
         grams: 0
       };
@@ -112,21 +115,24 @@ describe('Ingredient Unit Conversions', () => {
       const normalized = normalizeIngredient(ingredient);
 
       expect(normalized.quantity).toBe(0);
+      // grams: 0 is explicitly preserved when grams is provided
       expect(normalized.grams).toBe(0);
     });
 
-    it('should use grams as fallback for missing gramsPerUnit', () => {
+    it('should use servingSize as the basis for gramsPerUnit', () => {
+      // New model: gramsPerUnit is based on servingSize, not the old grams fallback
       const ingredient = {
         id: 5,
         name: 'Test',
-        grams: 150,
-        // gramsPerUnit is missing
-        quantity: 1
+        servingSize: 150, // This determines gramsPerUnit
+        servingUnit: 'g',
+        grams: 300, // Current amount in plan
+        quantity: 2
       };
 
       const normalized = normalizeIngredient(ingredient);
 
-      // Should fallback to grams value
+      // gramsPerUnit comes from servingSize
       expect(normalized.gramsPerUnit).toBe(150);
     });
 
@@ -152,18 +158,20 @@ describe('Ingredient Unit Conversions', () => {
     });
 
     it('should handle large gramsPerUnit values', () => {
+      // New model: use servingSize for unit-based ingredients with weightPerServing
       const ingredient = {
         id: 7,
         name: 'Whole Chicken',
-        unit: 'unit',
-        gramsPerUnit: 1500, // 1.5kg chicken
+        servingSize: 1, // 1 chicken
+        servingUnit: 'unit',
+        weightPerServing: 1500, // 1.5kg chicken (for display)
         quantity: 1,
         grams: 1500
       };
 
       const normalized = normalizeIngredient(ingredient);
 
-      expect(normalized.gramsPerUnit).toBe(1500);
+      expect(normalized.gramsPerUnit).toBe(1500); // weightPerServing
       expect(normalized.quantity).toBe(1);
       expect(normalized.grams).toBe(1500);
     });
