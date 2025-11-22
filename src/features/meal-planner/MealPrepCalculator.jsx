@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Plus, Minus, Edit2, Check, X } from "lucide-react";
+import { Plus, Minus, Edit2, Check, X, Link2, Undo2, Redo2 } from "lucide-react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -12,9 +16,14 @@ import {
   Grid,
   IconButton,
   InputLabel,
+  InputAdornment,
+  Menu,
   MenuItem,
+  InputBase,
+  Popover,
   Paper,
   Select,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -22,8 +31,12 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { useTheme } from "@mui/material/styles";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -35,17 +48,30 @@ import {
   addPlan,
   removePlan,
   updatePlan,
-  loadBaseline,
-  saveBaseline,
 } from '../../shared/services/storage';
 import { useUser } from '../auth/UserContext.jsx';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+import { useUndoRedo } from "../../shared/hooks/useUndoRedo";
+import { addToRecentIngredients } from '../ingredients/recentIngredients';
+import {
+  CALORIE_LIMITS,
+  MACRO_TOLERANCE,
+  DEFAULT_CALORIE_TARGET,
+  UI_LIMITS,
+  getCalorieWarning,
+  isValidCalorieTarget,
+  isWithinMacroTargets,
+} from "../../shared/constants/validation";
+import MacroTargetPopover from "./MacroTargetPopover";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
+const roundVal = (n) => Math.round(Number(n) || 0);
 
-const MealPrepCalculator = ({ allIngredients }) => {
+const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
   const { user } = useUser();
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [calorieTarget, setCalorieTarget] = useState(1400);
   const [editingTarget, setEditingTarget] = useState(false);
@@ -57,27 +83,32 @@ const MealPrepCalculator = ({ allIngredients }) => {
     fat: 25,
     carbs: 35,
   });
-  const [editingPercentages, setEditingPercentages] = useState(false);
-  const [tempPercentages, setTempPercentages] = useState({
-    protein: 40,
-    fat: 25,
-    carbs: 35,
-  });
-  const [percentageWarning, setPercentageWarning] = useState("");
+  const [macroAnchor, setMacroAnchor] = useState(null);
 
   const [prepDays, setPrepDays] = useState(6);
   const [matchDinner, setMatchDinner] = useState(false);
-  const [mealIngredients, setMealIngredients] = useState({
+
+  // Use undo/redo for meal ingredients
+  const {
+    state: mealIngredients,
+    setState: setMealIngredients,
+    undo: undoMealChange,
+    redo: redoMealChange,
+    canUndo,
+    canRedo,
+  } = useUndoRedo({
     breakfast: [],
     lunch: allIngredients.map((ingredient) => normalizeIngredient(ingredient)),
     dinner: [],
     snack: [],
-  });
+  }, UI_LIMITS.UNDO_HISTORY_MAX);
+
   const [selectedId, setSelectedId] = useState("");
 
   const [cheer, setCheer] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [goalConfetti, setGoalConfetti] = useState(false);
+  const lastPlanKey = user?.uid ? `lastPlan:${user.uid}` : null;
 
   // Saved plans
   const [savedPlans, setSavedPlans] = useState([]);
@@ -86,15 +117,94 @@ const MealPrepCalculator = ({ allIngredients }) => {
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
-  const [lastBaselineSavedAt, setLastBaselineSavedAt] = useState(null);
-  const [lastExportedAt, setLastExportedAt] = useState(null);
+  const isHydratingRef = useRef(false);
+  const skipUnsavedRef = useRef(false);
 
   // Confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [planToDelete, setPlanToDelete] = useState(null);
+  const [actionsAnchor, setActionsAnchor] = useState(null);
+  const actionsMenuOpen = Boolean(actionsAnchor);
 
   // Import file input ref
   const importFileRef = useRef(null);
+
+  // Pending targets from Calorie Calculator
+  const [pendingTargets, setPendingTargets] = useState(null);
+  const [showTargetsPrompt, setShowTargetsPrompt] = useState(false);
+
+  // Check for pending targets from Calorie Calculator
+  useEffect(() => {
+    // Only check when tab becomes active
+    if (!isActive) return;
+
+    const checkPendingTargets = () => {
+      const stored = localStorage.getItem("plannerTargetsFromCalculator");
+      if (stored) {
+        try {
+          const targets = JSON.parse(stored);
+          // Only show if saved within last 5 minutes
+          const savedAt = new Date(targets.savedAt);
+          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+          if (savedAt > fiveMinutesAgo) {
+            setPendingTargets(targets);
+            setShowTargetsPrompt(true);
+          } else {
+            // Clear old targets
+            localStorage.removeItem("plannerTargetsFromCalculator");
+          }
+        } catch (e) {
+          console.error("Error parsing pending targets:", e);
+          localStorage.removeItem("plannerTargetsFromCalculator");
+        }
+      }
+    };
+
+    // Check when tab becomes active
+    checkPendingTargets();
+
+    // Also listen for storage events (in case another tab updates)
+    const handleStorage = (e) => {
+      if (e.key === "plannerTargetsFromCalculator") {
+        checkPendingTargets();
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [isActive]);
+
+  // Apply pending targets from Calorie Calculator
+  const applyPendingTargets = () => {
+    if (!pendingTargets) return;
+
+    setCalorieTarget(pendingTargets.calorieTarget);
+    setTempTarget(pendingTargets.calorieTarget);
+    setTargetPercentages(pendingTargets.targetPercentages);
+    setHasUnsavedChanges(true);
+
+    // Clear the pending targets
+    localStorage.removeItem("plannerTargetsFromCalculator");
+    setPendingTargets(null);
+    setShowTargetsPrompt(false);
+
+    toast.success(`Applied ${pendingTargets.calorieTarget} kcal target with new macro split!`);
+  };
+
+  // Dismiss pending targets
+  const dismissPendingTargets = () => {
+    localStorage.removeItem("plannerTargetsFromCalculator");
+    setPendingTargets(null);
+    setShowTargetsPrompt(false);
+  };
+
+  const rememberLastPlan = useCallback(
+    (planId) => {
+      if (lastPlanKey && typeof localStorage !== "undefined") {
+        localStorage.setItem(lastPlanKey, planId || "");
+      }
+    },
+    [lastPlanKey]
+  );
 
   // Helper to refresh ingredient from base list while preserving quantity/grams
   const refreshIngredientData = useCallback((ingredient) => {
@@ -108,6 +218,74 @@ const MealPrepCalculator = ({ allIngredients }) => {
     });
   }, [allIngredients]);
 
+  const loadPlan = useCallback(
+    (id) => {
+      const plan = savedPlans.find((p) => p.id === id);
+      if (!plan) return;
+      isHydratingRef.current = true;
+      skipUnsavedRef.current = true;
+      setMacroAnchor(null);
+      setCurrentPlanId(plan.id);
+      setPlanName(plan.name);
+      setSelectedPlanId(plan.id);
+      rememberLastPlan(plan.id);
+      setHasUnsavedChanges(false);
+      setCalorieTarget(plan.calorieTarget);
+      setTempTarget(plan.calorieTarget);
+
+      const shouldMatchDinner = plan.matchDinner || false;
+      setMatchDinner(shouldMatchDinner);
+
+      const planPerc = {
+        protein: plan.targetPercentages.protein,
+        fat: plan.targetPercentages.fat,
+        carbs: 100 - plan.targetPercentages.protein - plan.targetPercentages.fat,
+      };
+      setTargetPercentages(planPerc);
+
+      const loadMealIngredients = (mealData) => {
+        if (!mealData || !Array.isArray(mealData)) return [];
+        return mealData
+          .map(({ id, grams, quantity }) => {
+            const base = allIngredients.find((i) => i.id === id);
+            return base ? normalizeIngredient({ ...base, grams, quantity }) : null;
+          })
+          .filter(Boolean);
+      };
+
+      let mealData = {};
+      if (plan.meals) {
+        mealData = {
+          breakfast: loadMealIngredients(plan.meals.breakfast),
+          lunch: loadMealIngredients(plan.meals.lunch),
+          dinner: loadMealIngredients(plan.meals.dinner),
+          snack: loadMealIngredients(plan.meals.snack),
+        };
+      } else {
+        const lunchIngredients = loadMealIngredients(plan.ingredients);
+        mealData = {
+          breakfast: [],
+          lunch: lunchIngredients,
+          dinner: shouldMatchDinner
+            ? lunchIngredients.map((i) => refreshIngredientData(i))
+            : [],
+          snack: [],
+        };
+      }
+
+      if (shouldMatchDinner && mealData.lunch) {
+        mealData.dinner = mealData.lunch.map((i) => refreshIngredientData(i));
+      }
+
+      setMealIngredients(mealData);
+      setTimeout(() => {
+        isHydratingRef.current = false;
+      }, 0);
+    },
+    [allIngredients, refreshIngredientData, rememberLastPlan, savedPlans]
+  );
+
+
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) {
@@ -118,89 +296,32 @@ const MealPrepCalculator = ({ allIngredients }) => {
     const loadData = async () => {
       try {
         const plans = await loadPlans(uid);
-        // Bail if user switched during async work
         if (uid !== user?.uid) return;
         setSavedPlans(plans);
+
+        if (plans.length > 0) {
+          const stored =
+            lastPlanKey && typeof localStorage !== "undefined"
+              ? localStorage.getItem(lastPlanKey)
+              : null;
+          const fallbackPlanId =
+            plans.find((p) => p.id === stored)?.id || plans[0].id;
+          if (fallbackPlanId) {
+            loadPlan(fallbackPlanId);
+          }
+        }
       } catch (err) {
         console.error("Failed to load plans", err);
         toast.error("Could not load your saved plans. Please retry.");
-      }
-
-      try {
-        const baseline = await loadBaseline(uid);
-        if (!baseline || uid !== user?.uid) return;
-        setCalorieTarget(baseline.calorieTarget);
-        setTempTarget(baseline.calorieTarget);
-
-        // Load matchDinner setting from baseline (default to false for older baselines)
-        const shouldMatchDinner = baseline.matchDinner || false;
-        setMatchDinner(shouldMatchDinner);
-
-        const basePerc = {
-          protein: baseline.targetPercentages.protein,
-          fat: baseline.targetPercentages.fat,
-          carbs:
-            100 -
-            baseline.targetPercentages.protein -
-            baseline.targetPercentages.fat,
-        };
-        setTargetPercentages(basePerc);
-        setTempPercentages(basePerc);
-
-        // Load all meals from baseline if available
-        const loadMealIngredients = (mealData) => {
-          if (!mealData || !Array.isArray(mealData)) return [];
-          return mealData
-            .map(({ id, grams, quantity }) => {
-              const base = allIngredients.find((ing) => ing.id === id);
-              return base
-                ? normalizeIngredient({ ...base, grams, quantity })
-                : null;
-            })
-            .filter(Boolean);
-        };
-
-        let mealData = {};
-        if (baseline.meals) {
-          // New format with all meals
-          mealData = {
-            breakfast: loadMealIngredients(baseline.meals.breakfast),
-            lunch: loadMealIngredients(baseline.meals.lunch),
-            dinner: loadMealIngredients(baseline.meals.dinner),
-            snack: loadMealIngredients(baseline.meals.snack),
-          };
-        } else {
-          // Legacy format - only lunch ingredients
-          const lunchIngredients = loadMealIngredients(baseline.ingredients);
-          mealData = {
-            breakfast: [],
-            lunch: lunchIngredients,
-            dinner: shouldMatchDinner
-              ? lunchIngredients.map((i) => refreshIngredientData(i))
-              : [],
-            snack: [],
-          };
-        }
-
-        // Apply matchDinner logic if enabled
-        if (shouldMatchDinner && mealData.lunch) {
-          mealData.dinner = mealData.lunch.map((i) => refreshIngredientData(i));
-        }
-
-        setMealIngredients((prev) => ({
-          ...prev,
-          ...mealData,
-        }));
-      } catch (err) {
-        console.error("Failed to load baseline", err);
-        toast.error("Could not load your baseline settings.");
       } finally {
         setIsLoadingData(false);
       }
     };
 
     loadData();
-  }, [user, allIngredients, refreshIngredientData]);
+    // We intentionally avoid adding loadPlan to deps to prevent reloading after edits
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, allIngredients, refreshIngredientData, lastPlanKey]);
 
   useEffect(() => {
     setMealIngredients((prev) => {
@@ -224,6 +345,12 @@ const MealPrepCalculator = ({ allIngredients }) => {
 
   // Track changes to detect unsaved modifications
   useEffect(() => {
+    if (skipUnsavedRef.current) {
+      skipUnsavedRef.current = false;
+      isHydratingRef.current = false;
+      return;
+    }
+    if (isHydratingRef.current) return;
     if (currentPlanId && user) {
       setHasUnsavedChanges(true);
     }
@@ -290,6 +417,9 @@ const MealPrepCalculator = ({ allIngredients }) => {
     const id = parseInt(selectedId);
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
+
+    // Track this ingredient as recently used
+    addToRecentIngredients(id);
 
     // Ensure gramsPerUnit is set to match grams for proper scaling
     const ingredientToAdd = normalizeIngredient({
@@ -370,6 +500,10 @@ const MealPrepCalculator = ({ allIngredients }) => {
       if (uid !== user?.uid) return;
       setSavedPlans(plans);
       setPlanName(name);
+      const activeId = currentPlanId || (plans.length > 0 ? plans[plans.length - 1].id : null);
+      if (activeId) {
+        rememberLastPlan(activeId);
+      }
       setHasUnsavedChanges(false);
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2000);
@@ -382,70 +516,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
     }
   };
 
-  const loadPlan = (id) => {
-    const plan = savedPlans.find((p) => p.id === id);
-    if (!plan) return;
-    setCurrentPlanId(plan.id);
-    setPlanName(plan.name);
-    setSelectedPlanId(plan.id);
-    setHasUnsavedChanges(false);
-    setCalorieTarget(plan.calorieTarget);
-    setTempTarget(plan.calorieTarget);
-
-    // Load matchDinner setting (default to false for older plans)
-    const shouldMatchDinner = plan.matchDinner || false;
-    setMatchDinner(shouldMatchDinner);
-
-    const planPerc = {
-      protein: plan.targetPercentages.protein,
-      fat: plan.targetPercentages.fat,
-      carbs: 100 - plan.targetPercentages.protein - plan.targetPercentages.fat,
-    };
-    setTargetPercentages(planPerc);
-    setTempPercentages(planPerc);
-
-    // Load all meals if available (new format), otherwise fall back to legacy format
-    const loadMealIngredients = (mealData) => {
-      if (!mealData || !Array.isArray(mealData)) return [];
-      return mealData
-        .map(({ id, grams, quantity }) => {
-          const base = allIngredients.find((i) => i.id === id);
-          return base
-            ? normalizeIngredient({ ...base, grams, quantity })
-            : null;
-        })
-        .filter(Boolean);
-    };
-
-    let mealData = {};
-    if (plan.meals) {
-      // New format with all meals
-      mealData = {
-        breakfast: loadMealIngredients(plan.meals.breakfast),
-        lunch: loadMealIngredients(plan.meals.lunch),
-        dinner: loadMealIngredients(plan.meals.dinner),
-        snack: loadMealIngredients(plan.meals.snack),
-      };
-    } else {
-      // Legacy format - only lunch ingredients
-      const lunchIngredients = loadMealIngredients(plan.ingredients);
-      mealData = {
-        breakfast: [],
-        lunch: lunchIngredients,
-        dinner: shouldMatchDinner
-          ? lunchIngredients.map((i) => refreshIngredientData(i))
-          : [],
-        snack: [],
-      };
-    }
-
-    // Apply matchDinner logic if enabled
-    if (shouldMatchDinner && mealData.lunch) {
-      mealData.dinner = mealData.lunch.map((i) => refreshIngredientData(i));
-    }
-
-    setMealIngredients(mealData);
-  };
 
   const handlePlanDropdownChange = (e) => {
     const planId = e.target.value;
@@ -457,6 +527,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       setCurrentPlanId(null);
       setPlanName("");
       setHasUnsavedChanges(false);
+      rememberLastPlan("");
     }
   };
 
@@ -513,6 +584,7 @@ const MealPrepCalculator = ({ allIngredients }) => {
       const newPlanId = plans[plans.length - 1].id;
       setCurrentPlanId(newPlanId);
       setSelectedPlanId(newPlanId);
+      rememberLastPlan(newPlanId);
       setPlanName(newName);
       setHasUnsavedChanges(false);
       setShowConfetti(true);
@@ -582,11 +654,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
         setCalorieTarget(plan.calorieTarget || 2000);
         setTempTarget(plan.calorieTarget || 2000);
         setTargetPercentages({
-          protein: plan.targetPercentages?.protein || 40,
-          fat: plan.targetPercentages?.fat || 25,
-          carbs: plan.targetPercentages?.carbs || 35,
-        });
-        setTempPercentages({
           protein: plan.targetPercentages?.protein || 40,
           fat: plan.targetPercentages?.fat || 25,
           carbs: plan.targetPercentages?.carbs || 35,
@@ -721,7 +788,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setLastExportedAt(new Date());
     toast.success('Meal plan exported as JSON!');
   };
 
@@ -862,7 +928,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
     });
 
     doc.save(`${title.replace(/\s+/g, "_").toLowerCase()}.pdf`);
-    setLastExportedAt(new Date());
   };
 
   const handleShareToReminders = async () => {
@@ -932,61 +997,6 @@ const MealPrepCalculator = ({ allIngredients }) => {
     }
   };
 
-  const handleSaveBaseline = async () => {
-    const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to save a baseline.");
-      return;
-    }
-    const baseline = {
-      calorieTarget,
-      targetPercentages: {
-        protein: targetPercentages.protein,
-        fat: targetPercentages.fat,
-        carbs: 100 - targetPercentages.protein - targetPercentages.fat,
-      },
-      // Save all meals in baseline
-      meals: {
-        breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({
-          id,
-          grams,
-          quantity,
-        })),
-        lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
-          id,
-          grams,
-          quantity,
-        })),
-        dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({
-          id,
-          grams,
-          quantity,
-        })),
-        snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({
-          id,
-          grams,
-          quantity,
-        })),
-      },
-      matchDinner,
-      // Keep legacy ingredients field for backward compatibility
-      ingredients: mealIngredients.lunch.map(({ id, grams, quantity }) => ({
-        id,
-        grams,
-        quantity,
-      })),
-    };
-    try {
-      await saveBaseline(uid, baseline);
-      if (uid !== user?.uid) return;
-      setLastBaselineSavedAt(new Date());
-      toast.success("Baseline saved");
-    } catch (err) {
-      console.error("Error saving baseline", err);
-      toast.error(err?.message || "Could not save baseline.");
-    }
-  };
-
   const calcTotals = (list) =>
     list.reduce(
       (totals, ingredient) => {
@@ -1000,6 +1010,16 @@ const MealPrepCalculator = ({ allIngredients }) => {
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
+
+  const calcTotalsRounded = (list) => {
+    const totals = calcTotals(list);
+    return {
+      calories: roundVal(totals.calories),
+      protein: roundVal(totals.protein),
+      carbs: roundVal(totals.carbs),
+      fat: roundVal(totals.fat),
+    };
+  };
 
   // Daily totals across all meals
   const dailyTotals = MEALS.reduce(
@@ -1015,10 +1035,10 @@ const MealPrepCalculator = ({ allIngredients }) => {
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   );
-  dailyTotals.calories = Math.round(dailyTotals.calories);
-  dailyTotals.protein = Math.round(dailyTotals.protein * 10) / 10;
-  dailyTotals.carbs = Math.round(dailyTotals.carbs * 10) / 10;
-  dailyTotals.fat = Math.round(dailyTotals.fat * 10) / 10;
+  dailyTotals.calories = roundVal(dailyTotals.calories);
+  dailyTotals.protein = roundVal(dailyTotals.protein);
+  dailyTotals.carbs = roundVal(dailyTotals.carbs);
+  dailyTotals.fat = roundVal(dailyTotals.fat);
 
   // Categorize ingredients by store section
   const categorizeIngredient = (name) => {
@@ -1157,35 +1177,21 @@ const MealPrepCalculator = ({ allIngredients }) => {
   }, [aggregatedIngredients]);
 
   // Calculate target macros based on calorie target and percentages
-  const targetMacros = {
-    protein: Math.round(
-      (calorieTarget * (targetPercentages.protein / 100)) / 4
-    ),
-    carbs: Math.round((calorieTarget * (targetPercentages.carbs / 100)) / 4),
-    fat: Math.round((calorieTarget * (targetPercentages.fat / 100)) / 9),
-  };
+  const targetMacros = useMemo(
+    () => ({
+      protein: Math.round(
+        (calorieTarget * (targetPercentages.protein / 100)) / 4
+      ),
+      carbs: Math.round((calorieTarget * (targetPercentages.carbs / 100)) / 4),
+      fat: Math.round((calorieTarget * (targetPercentages.fat / 100)) / 9),
+    }),
+    [calorieTarget, targetPercentages]
+  );
 
-  const progress = {
-    calories: Math.min(
-      100,
-      Math.round((dailyTotals.calories / calorieTarget) * 100)
-    ),
-    protein: Math.min(
-      100,
-      Math.round((dailyTotals.protein / targetMacros.protein) * 100)
-    ),
-    carbs: Math.min(
-      100,
-      Math.round((dailyTotals.carbs / targetMacros.carbs) * 100)
-    ),
-    fat: Math.min(100, Math.round((dailyTotals.fat / targetMacros.fat) * 100)),
-  };
-
-  const withinRange =
-    Math.abs(dailyTotals.calories - calorieTarget) <= 25 &&
-    Math.abs(dailyTotals.protein - targetMacros.protein) <= 5 &&
-    Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5 &&
-    Math.abs(dailyTotals.fat - targetMacros.fat) <= 5;
+  const withinRange = isWithinMacroTargets(
+    { calories: dailyTotals.calories, protein: dailyTotals.protein, carbs: dailyTotals.carbs, fat: dailyTotals.fat },
+    { calories: calorieTarget, protein: targetMacros.protein, carbs: targetMacros.carbs, fat: targetMacros.fat }
+  );
 
   const lastRange = useRef(false);
 
@@ -1198,28 +1204,18 @@ const MealPrepCalculator = ({ allIngredients }) => {
   }, [withinRange]);
 
   const validateCalorieTarget = (value) => {
-    if (value < 800) {
-      setTargetWarning("⚠️ Very low calorie target. Consider consulting a healthcare professional.");
-    } else if (value < 1200) {
-      setTargetWarning("⚠️ Low calorie target. Ensure adequate nutrition.");
-    } else if (value > 5000) {
-      setTargetWarning("⚠️ Very high calorie target. Verify this is correct.");
-    } else if (value > 3500) {
-      setTargetWarning("💡 High calorie target for muscle gain or athletic training.");
-    } else {
-      setTargetWarning("");
-    }
+    setTargetWarning(getCalorieWarning(value));
   };
 
   const handleTargetChange = (value) => {
-    const numValue = parseInt(value) || 0;
+    const numValue = parseInt(value, 10) || 0;
     setTempTarget(numValue);
     validateCalorieTarget(numValue);
   };
 
   const handleTargetEdit = () => {
-    if (tempTarget < 500 || tempTarget > 10000) {
-      setTargetWarning("❌ Calorie target must be between 500 and 10,000 kcal.");
+    if (!isValidCalorieTarget(tempTarget)) {
+      setTargetWarning(`❌ Calorie target must be between ${CALORIE_LIMITS.MIN} and ${CALORIE_LIMITS.MAX} kcal.`);
       return;
     }
     setCalorieTarget(tempTarget);
@@ -1233,453 +1229,457 @@ const MealPrepCalculator = ({ allIngredients }) => {
     setTargetWarning("");
   };
 
-  const validateMacroPercentages = (protein, fat, carbs) => {
-    const total = protein + fat;
-    if (total > 100) {
-      setPercentageWarning("❌ Protein + Fat cannot exceed 100%. Carbs will be negative!");
-      return false;
-    } else if (carbs < 5) {
-      setPercentageWarning("⚠️ Very low carb diet (< 5%). Typical for ketogenic diets.");
-    } else if (protein < 10) {
-      setPercentageWarning("⚠️ Very low protein (< 10%). Consider increasing for muscle health.");
-    } else if (fat < 15) {
-      setPercentageWarning("⚠️ Very low fat (< 15%). Fats are essential for hormone health.");
-    } else if (protein > 40) {
-      setPercentageWarning("💡 High protein diet. Good for muscle building or weight loss.");
-    } else {
-      setPercentageWarning("");
-    }
-    return true;
-  };
-
-  const handlePercentageEdit = () => {
-    const cleaned = {
-      protein: tempPercentages.protein,
-      fat: tempPercentages.fat,
-      carbs: Math.max(0, 100 - tempPercentages.protein - tempPercentages.fat),
-    };
-
-    if (!validateMacroPercentages(cleaned.protein, cleaned.fat, cleaned.carbs)) {
-      return; // Don't save if validation fails
-    }
-
-    setTargetPercentages(cleaned);
-    setTempPercentages(cleaned);
-    setEditingPercentages(false);
-    setPercentageWarning("");
-  };
-
-  const handlePercentageCancel = () => {
-    setTempPercentages(targetPercentages);
-    setEditingPercentages(false);
-    setPercentageWarning("");
-  };
-
-  const updateTempPercentage = (macro, value) => {
-    let protein = macro === "protein" ? value : tempPercentages.protein;
-    let fat = macro === "fat" ? value : tempPercentages.fat;
-    protein = Math.max(0, Math.min(100, protein));
-    fat = Math.max(0, Math.min(100, fat)); // Allow fat to go up to 100 temporarily
-    const carbs = Math.max(0, 100 - protein - fat);
-    setTempPercentages({ protein, fat, carbs });
-    validateMacroPercentages(protein, fat, carbs);
-  };
-
   if (isLoadingData) {
     return <LoadingSpinner message="Loading your meal plan..." size="large" />;
   }
 
+  const handleOpenActionsMenu = (event) => setActionsAnchor(event.currentTarget);
+  const handleCloseActionsMenu = () => setActionsAnchor(null);
+
   return (
-    <Box sx={{ maxWidth: 1440, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ maxWidth: 1440, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}>
       {(showConfetti || goalConfetti) && <div className="confetti">🎉🎉🎉</div>}
       {cheer && <div className="cheer">{cheer}</div>}
 
-      <Stack spacing={3}>
-        {/* Header + Targets */}
-        <Paper sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 3 }}>
-          <Stack spacing={2.5} alignItems="center" textAlign="center">
-            <Typography variant="h4" fontWeight={800}>
-              <span className="wiggle">🥗</span> Interactive Grilled Meal Plan
+      {/* Header */}
+      <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ md: "flex-start" }}>
+          <Stack spacing={0.5}>
+            <Typography variant="h5" fontWeight={800}>
+              <span className="wiggle">🥗</span> Prep Thy Meal
             </Typography>
-
-            {/* Calorie target */}
-            {editingTarget ? (
-              <Stack spacing={1} alignItems="center">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <TextField
-                    type="number"
-                    value={tempTarget}
-                    onChange={(e) => handleTargetChange(e.target.value)}
-                    size="small"
-                    inputProps={{ min: 500, max: 10000 }}
-                    sx={{ width: 110 }}
-                  />
-                  <Typography fontWeight={700} color="primary.main">
-                    kcal/day Target
-                  </Typography>
-                  <IconButton color="success" onClick={handleTargetEdit} aria-label="Save calorie target">
-                    <Check size={18} />
-                  </IconButton>
-                  <IconButton color="error" onClick={handleTargetCancel} aria-label="Cancel editing">
-                    <X size={18} />
-                  </IconButton>
-                </Stack>
-                {targetWarning && (
-                  <Typography variant="body2" color="warning.main">
-                    {targetWarning}
-                  </Typography>
-                )}
-              </Stack>
-            ) : (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="h6" color="primary.main" fontWeight={800}>
-                  {calorieTarget} kcal/day Target
-                </Typography>
-                <IconButton onClick={() => setEditingTarget(true)} aria-label="Edit target">
-                  <Edit2 size={18} />
-                </IconButton>
-              </Stack>
+            <Typography variant="body2" color="text.secondary">
+              Plan your meals, hit your macros, and generate shopping lists.
+            </Typography>
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} flexWrap="wrap" useFlexGap>
+            {/* Saved Plans Dropdown */}
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="header-plan-select">Saved plans</InputLabel>
+              <Select
+                labelId="header-plan-select"
+                label="Saved plans"
+                value={selectedPlanId}
+                onChange={handlePlanDropdownChange}
+              >
+                <MenuItem value="">
+                  <em>New plan</em>
+                </MenuItem>
+                {savedPlans.map((plan) => (
+                  <MenuItem key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {/* Plan Name Input */}
+            <TextField
+              size="small"
+              label="Plan name"
+              value={planName}
+              onChange={(e) => setPlanName(e.target.value)}
+              placeholder="Enter plan name..."
+              sx={{ minWidth: 180 }}
+            />
+            {hasUnsavedChanges && (
+              <Chip size="small" color="warning" label="Unsaved" sx={{ fontWeight: 600 }} />
             )}
+            <Stack direction="row" spacing={0.5}>
+              <Tooltip title="Undo">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={undoMealChange}
+                    disabled={!canUndo}
+                    color="default"
+                  >
+                    <Undo2 size={18} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Redo">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={redoMealChange}
+                    disabled={!canRedo}
+                    color="default"
+                  >
+                    <Redo2 size={18} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
+            <Button variant="contained" onClick={handleSavePlan}>
+              {currentPlanId ? "Update Plan" : "Save Plan"}
+            </Button>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={handleOpenActionsMenu}
+              endIcon={<ExpandMoreIcon />}
+            >
+              Plan actions
+            </Button>
+            <Menu
+              anchorEl={actionsAnchor}
+              open={actionsMenuOpen}
+              onClose={handleCloseActionsMenu}
+            >
+              {currentPlanId && (
+                <MenuItem
+                  onClick={() => {
+                    handleSaveAsNew();
+                    handleCloseActionsMenu();
+                  }}
+                >
+                  Save as new
+                </MenuItem>
+              )}
+              {currentPlanId && (
+                <MenuItem
+                  onClick={() => {
+                    handleDeletePlan(currentPlanId);
+                    handleCloseActionsMenu();
+                  }}
+                  sx={{ color: "error.main" }}
+                >
+                  Delete current plan
+                </MenuItem>
+              )}
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  handleExportPDF();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Export PDF
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleExportJSON();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Export JSON
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  importFileRef.current?.click();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Import JSON
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleCopyToClipboard();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Copy shopping list
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleShareToReminders();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Share list
+              </MenuItem>
+            </Menu>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleImportJSON}
+              style={{ display: "none" }}
+              aria-label="Import meal plan from JSON file"
+            />
+          </Stack>
+        </Stack>
 
-            {/* Macro Targets */}
+        <Divider sx={{ my: 2 }} />
+
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Paper
               variant="outlined"
               sx={{
-                p: 2.5,
-                maxWidth: 520,
-                width: "100%",
+                p: 2,
                 borderRadius: 2,
                 backgroundColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(59,130,246,0.07)" : "rgba(59,130,246,0.06)",
+                  theme.palette.mode === "dark" ? "rgba(37,99,235,0.08)" : "rgba(226,235,255,0.6)",
               }}
             >
-              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Macro Targets
-                </Typography>
-                {!editingPercentages && (
-                  <IconButton onClick={() => setEditingPercentages(true)} aria-label="Edit macro targets">
-                    <Edit2 size={16} />
-                  </IconButton>
-                )}
-              </Stack>
-              {editingPercentages ? (
-                <Stack spacing={2}>
-                  {[
-                    { key: "protein", label: "Protein" },
-                    { key: "fat", label: "Fat" },
-                  ].map(({ key, label }) => (
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" key={key}>
-                      <Typography fontWeight={600}>{label}:</Typography>
-                      <TextField
-                        type="number"
-                        value={tempPercentages[key]}
-                        onChange={(e) =>
-                          updateTempPercentage(key, parseFloat(e.target.value) || 0)
-                        }
-                        size="small"
-                        inputProps={{ min: 0, max: 100, step: 0.5 }}
-                        sx={{ width: 90 }}
-                      />
-                    </Stack>
-                  ))}
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                    <Typography fontWeight={600}>Carbs:</Typography>
-                    <Typography fontWeight={700}>{tempPercentages.carbs.toFixed(1)}%</Typography>
-                  </Stack>
-                  {percentageWarning && (
-                    <Typography variant="body2" color="warning.main" textAlign="center">
-                      {percentageWarning}
-                    </Typography>
+              <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Macro budget
+                  </Typography>
+                  {!editingTarget && (
+                    <IconButton size="small" onClick={() => setEditingTarget(true)} aria-label="Edit target">
+                      <Edit2 size={16} />
+                    </IconButton>
                   )}
-                  <Stack direction="row" spacing={1} justifyContent="center">
-                    <Button size="small" color="success" variant="contained" onClick={handlePercentageEdit}>
-                      Save
-                    </Button>
-                    <Button size="small" color="inherit" onClick={handlePercentageCancel}>
-                      Cancel
-                    </Button>
+                </Stack>
+                {editingTarget ? (
+                  <Stack spacing={1}>
+                    <TextField
+                      type="number"
+                      size="small"
+                      value={tempTarget}
+                      onChange={(e) => handleTargetChange(e.target.value)}
+                      inputProps={{ min: 500, max: 10000 }}
+                      label="kcal/day target"
+                    />
+                    {targetWarning && (
+                      <Typography variant="caption" color="warning.main">
+                        {targetWarning}
+                      </Typography>
+                    )}
+                    <Stack direction="row" spacing={1}>
+                      <Button size="small" variant="contained" color="success" onClick={handleTargetEdit}>
+                        Save
+                      </Button>
+                      <Button size="small" color="inherit" onClick={handleTargetCancel}>
+                        Cancel
+                      </Button>
+                    </Stack>
                   </Stack>
-                </Stack>
-              ) : (
-                <Stack direction="row" spacing={3}>
-                  <Chip label={`Protein: ${targetPercentages.protein}%`} />
-                  <Chip label={`Carbs: ${targetPercentages.carbs}%`} />
-                  <Chip label={`Fat: ${targetPercentages.fat}%`} />
-                </Stack>
-              )}
+                ) : (
+                  <Stack spacing={0.5}>
+                    <Typography variant="h6" fontWeight={800} color="primary.main">
+                      {calorieTarget} kcal
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      justifyContent="space-between"
+                      flexWrap="wrap"
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {targetMacros.protein}g P · {targetMacros.carbs}g C · {targetMacros.fat}g F
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={(e) => setMacroAnchor(e.currentTarget)}
+                      >
+                        Edit macros
+                      </Button>
+                    </Stack>
+                  </Stack>
+                )}
+              </Stack>
             </Paper>
-
-            <Typography variant="body2" color="text.secondary" maxWidth={640}>
-              Simple. Delicious. Healthy. Adjust portions below to customize your meal prep!
-            </Typography>
-          </Stack>
-        </Paper>
-
-        {/* Plan Manager */}
-        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-          <Stack spacing={2}>
-            <Stack spacing={0.5}>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
-                Current Plan
+                Planned so far
               </Typography>
-              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                <Typography fontWeight={700} color={currentPlanId ? "primary.main" : "text.secondary"}>
-                  {currentPlanId ? planName || "Saved Plan" : "New Plan"}
-                </Typography>
-                {hasUnsavedChanges && <Chip size="small" color="warning" label="Unsaved changes" />}
-              </Stack>
-              <FormControl fullWidth size="small">
-                <InputLabel id="plan-select-label">Saved plans</InputLabel>
-                <Select
-                  labelId="plan-select-label"
-                  label="Saved plans"
-                  value={selectedPlanId}
-                  onChange={handlePlanDropdownChange}
-                >
-                  <MenuItem value="">Create new plan...</MenuItem>
-                  {savedPlans.map((plan) => (
-                    <MenuItem key={plan.id} value={plan.id}>
-                      {plan.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              {(lastPlanSavedAt || lastBaselineSavedAt) && (
-                <Typography variant="caption" color="text.secondary">
-                  {lastPlanSavedAt && `Last plan save: ${lastPlanSavedAt.toLocaleTimeString()}`}{" "}
-                  {lastBaselineSavedAt && `• Baseline saved: ${lastBaselineSavedAt.toLocaleTimeString()}`}
-                </Typography>
-              )}
-            </Stack>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Plan name (optional)"
-                value={planName}
-                onChange={(e) => setPlanName(e.target.value)}
-              />
-              <Stack direction="row" spacing={1}>
-                <Button variant="contained" onClick={handleSavePlan}>
-                  {currentPlanId ? `Update ${planName || "Plan"}` : "Save Plan"}
-                </Button>
-                {currentPlanId && (
-                  <Button variant="contained" color="success" onClick={handleSaveAsNew}>
-                    Save As New
-                  </Button>
-                )}
-              </Stack>
-            </Stack>
-
-            <Divider />
-            <Stack spacing={1.5}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  💾 Backup & Restore
-                </Typography>
-                {lastExportedAt && (
-                  <Typography variant="caption" color="text.secondary">
-                    Last export: {lastExportedAt.toLocaleTimeString()}
-                  </Typography>
-                )}
-              </Stack>
-              <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Button variant="contained" onClick={handleExportJSON}>
-                  Export JSON
-                </Button>
-                <Button variant="contained" color="success" onClick={() => importFileRef.current?.click()}>
-                  Import JSON
-                </Button>
-                <input
-                  ref={importFileRef}
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={handleImportJSON}
-                  style={{ display: "none" }}
-                  aria-label="Import meal plan from JSON file"
-                />
-                <Button variant="outlined" onClick={handleSaveBaseline}>
-                  Set as Baseline
-                </Button>
-              </Stack>
-              {savedPlans.length > 0 && currentPlanId && (
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="body2" color="text.secondary">
-                    Delete current plan
-                  </Typography>
-                  <Button color="error" variant="outlined" size="small" onClick={() => handleDeletePlan(currentPlanId)}>
-                    Delete
-                  </Button>
-                </Stack>
-              )}
-            </Stack>
-          </Stack>
-        </Paper>
-
-        {/* Instructions */}
-        <Paper
-          variant="outlined"
-          sx={{
-            p: 2,
-            borderRadius: 3,
-            backgroundColor: (theme) =>
-              theme.palette.mode === "dark" ? "rgba(245,158,11,0.08)" : "rgba(255,237,213,0.7)",
-            borderColor: "warning.main",
-          }}
-        >
-          <Typography variant="body2" fontWeight={600} color="warning.dark">
-            Instructions: Add foods to each meal. Use "Lunch = Dinner" if lunch and dinner are identical.
-            All weights are raw and grilled unless noted.
-          </Typography>
-        </Paper>
-
-        {/* Ingredients Table */}
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Stack spacing={2.5}>
-            <Typography variant="h5" fontWeight={800}>
-              Per Meal (Raw Weights)
-            </Typography>
-            <Stack spacing={0.5}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={matchDinner}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setMatchDinner(checked);
-                      if (checked) {
-                        setMealIngredients((prev) => ({
-                          ...prev,
-                          dinner: prev.lunch.map((i) => refreshIngredientData(i)),
-                        }));
-                      }
-                    }}
-                  />
-                }
-                label={
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography fontWeight={600}>Lunch = Dinner</Typography>
-                    {matchDinner && <Chip size="small" color="primary" label="Dinner mirrors lunch" />}
-                  </Stack>
-                }
-              />
+              <Typography variant="h6" fontWeight={800} mt={0.5}>
+                {dailyTotals.calories} kcal
+              </Typography>
               <Typography variant="body2" color="text.secondary">
-                When enabled, dinner updates follow lunch. Turn off to edit dinner separately.
+                {dailyTotals.protein}g P · {dailyTotals.carbs}g C · {dailyTotals.fat}g F
               </Typography>
-            </Stack>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                borderColor:
+                  (dailyTotals.calories - calorieTarget > 0 || dailyTotals.fat - targetMacros.fat > 0)
+                    ? "error.light"
+                    : "success.light",
+              }}
+            >
+              <Typography variant="subtitle2" color="text.secondary">
+                Over / under budget
+              </Typography>
+              <Typography
+                variant="h6"
+                fontWeight={800}
+                color={dailyTotals.calories - calorieTarget > 0 ? "error.main" : "success.main"}
+                mt={0.5}
+              >
+                {dailyTotals.calories - calorieTarget >= 0 ? "+" : ""}
+                {dailyTotals.calories - calorieTarget} kcal
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {dailyTotals.protein - targetMacros.protein >= 0 ? "+" : ""}
+                {(dailyTotals.protein - targetMacros.protein).toFixed(1)}g P · {dailyTotals.carbs - targetMacros.carbs >= 0 ? "+" : ""}
+                {(dailyTotals.carbs - targetMacros.carbs).toFixed(1)}g C · {dailyTotals.fat - targetMacros.fat >= 0 ? "+" : ""}
+                {(dailyTotals.fat - targetMacros.fat).toFixed(1)}g F
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Paper>
 
-            <Stack spacing={2}>
-              {MEALS.map((meal) => {
+      <MacroTargetPopover
+        anchorEl={macroAnchor}
+        onClose={() => setMacroAnchor(null)}
+        targetPercentages={targetPercentages}
+        onPercentagesChange={setTargetPercentages}
+      />
+
+      <Grid container spacing={2.5}>
+        <Grid size={{ xs: 12, md: 8 }}>
+          <Stack spacing={2.5}>
+            {/* Meal sections */}
+            <Stack spacing={1.5}>
+              {MEALS.map((meal, idx) => {
                 const list = mealIngredients[meal];
                 const disabled = matchDinner && meal === "dinner";
+                const mealTotals = calcTotals(list);
                 return (
-                  <Paper key={meal} variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
-                    <Box
-                      sx={{
-                        px: 2,
-                        py: 1.5,
-                        backgroundColor: "background.accent",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        textTransform: "capitalize",
-                        fontWeight: 700,
-                      }}
-                    >
-                      <Typography variant="subtitle1" fontWeight={700}>
-                        {meal}
-                      </Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
-                          <InputLabel id={`${meal}-ingredient-label`}>Select ingredient</InputLabel>
-                          <Select
-                            labelId={`${meal}-ingredient-label`}
-                            label="Select ingredient"
-                            value={selectedId}
-                            onChange={(e) => setSelectedId(e.target.value)}
-                            disabled={disabled}
-                          >
-                            <MenuItem value="">Select ingredient</MenuItem>
-                            {allIngredients
-                              .filter((i) => !list.some((p) => p.id === i.id))
-                              .map((i) => (
-                                <MenuItem key={i.id} value={i.id}>
-                                  {i.name}
-                                </MenuItem>
-                              ))}
-                          </Select>
-                        </FormControl>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          onClick={() => handleAddIngredient(meal)}
-                          disabled={!selectedId || disabled}
-                        >
-                          Add
-                        </Button>
+                  <Accordion key={meal} defaultExpanded={idx === 1} disableGutters>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Stack spacing={0.5} sx={{ width: "100%" }}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="subtitle1" fontWeight={800} textTransform="capitalize">
+                              {meal}
+                            </Typography>
+                            {meal === "dinner" && matchDinner && (
+                              <Chip size="small" icon={<Link2 size={14} />} label="Mirroring Lunch" />
+                            )}
+                          </Stack>
+                          {meal === "dinner" && (
+                            <FormControlLabel
+                              sx={{ ml: "auto" }}
+                              control={
+                                <Checkbox
+                                  checked={matchDinner}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setMatchDinner(checked);
+                                    if (checked) {
+                                      setMealIngredients((prev) => ({
+                                        ...prev,
+                                        dinner: prev.lunch.map((i) => refreshIngredientData(i)),
+                                      }));
+                                    }
+                                  }}
+                                />
+                              }
+                              label="Mirror lunch"
+                            />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {roundVal(mealTotals.calories)} kcal · {roundVal(mealTotals.protein)}g P · {roundVal(mealTotals.carbs)}g C · {roundVal(mealTotals.fat)}g F
+                        </Typography>
                       </Stack>
-                    </Box>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Stack spacing={1.5}>
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 220 } }}>
+                            <InputLabel id={`${meal}-ingredient-label`}>Select ingredient</InputLabel>
+                            <Select
+                              labelId={`${meal}-ingredient-label`}
+                              label="Select ingredient"
+                              value={selectedId}
+                              onChange={(e) => setSelectedId(e.target.value)}
+                              disabled={disabled}
+                            >
+                              <MenuItem value="">Select ingredient</MenuItem>
+                              {allIngredients
+                                .filter((i) => !list.some((p) => p.id === i.id))
+                                .map((i) => (
+                                  <MenuItem key={i.id} value={i.id}>
+                                    {i.name}
+                                  </MenuItem>
+                                ))}
+                            </Select>
+                          </FormControl>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            onClick={() => handleAddIngredient(meal)}
+                            disabled={!selectedId || disabled}
+                          >
+                            Add ingredient
+                          </Button>
+                        </Stack>
 
-                    <Box sx={{ overflowX: "auto", p: 0 }}>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Ingredient</TableCell>
-                            <TableCell align="center">Quantity</TableCell>
-                            <TableCell align="center">Grams</TableCell>
-                            <TableCell align="center">Calories</TableCell>
-                            <TableCell align="center">Protein (g)</TableCell>
-                            <TableCell align="center">Carbs (g)</TableCell>
-                            <TableCell align="center">Fat (g)</TableCell>
-                            <TableCell align="center">-</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {list.map((ingredient) => {
-                            const nutrition = calculateNutrition(ingredient);
-                            const disabledRow = matchDinner && meal === "dinner";
-                            const unit = ingredient.unit || "g";
+                        {isDesktop ? (
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Ingredient</TableCell>
+                                <TableCell align="center">Quantity</TableCell>
+                                <TableCell align="center">Grams</TableCell>
+                                <TableCell align="center">Calories</TableCell>
+                                <TableCell align="center">Protein (g)</TableCell>
+                                <TableCell align="center">Carbs (g)</TableCell>
+                                <TableCell align="center">Fat (g)</TableCell>
+                                <TableCell align="center">-</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {list.map((ingredient) => {
+                                const nutrition = calculateNutrition(ingredient);
+                                const disabledRow = matchDinner && meal === "dinner";
+                                const unit = ingredient.unit || "g";
 
-                            let displayQuantity, totalGrams, incrementStep, unitLabel;
+                                let displayQuantity, totalGrams, incrementStep, unitLabel;
 
-                            if (unit === "g") {
-                              displayQuantity = ingredient.grams || 100;
-                              totalGrams = Math.round(displayQuantity);
-                              incrementStep = 5;
-                              unitLabel = "g";
-                            } else {
-                              displayQuantity = ingredient.quantity || 1;
-                              totalGrams = Math.round(
-                                displayQuantity * (ingredient.gramsPerUnit || 100)
-                              );
-                              incrementStep = 0.5;
-                              unitLabel = "unit";
-                            }
+                                if (unit === "g") {
+                                  displayQuantity = ingredient.grams || 100;
+                                  totalGrams = Math.round(displayQuantity);
+                                  incrementStep = 5;
+                                  unitLabel = "g";
+                                } else {
+                                  displayQuantity = ingredient.quantity || 1;
+                                  totalGrams = Math.round(
+                                    displayQuantity * (ingredient.gramsPerUnit || 100)
+                                  );
+                                  incrementStep = 0.5;
+                                  unitLabel = "unit";
+                                }
 
-                            return (
-                              <TableRow key={ingredient.id} hover>
-                                <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
-                                  {ingredient.name}
-                                </TableCell>
-                                <TableCell>
-                                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+                                return (
+                                  <TableRow key={ingredient.id} hover>
+                                    <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
+                                      {ingredient.name}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Stack
+                                        direction="row"
+                                        spacing={0.5}
+                                        alignItems="center"
+                                        justifyContent="center"
+                                        sx={{
+                                          border: "1px solid",
+                                          borderColor: "divider",
+                                          borderRadius: 999,
+                                          px: 0.5,
+                                          backgroundColor: "background.paper",
+                                        }}
+                                      >
                                     <IconButton
                                       size="small"
-                                      color="error"
+                                      color="inherit"
                                       onClick={() =>
                                         updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
                                       }
                                       disabled={disabledRow}
-                                      aria-label={`Decrease ${ingredient.name} quantity`}
                                     >
                                       <Minus size={18} />
                                     </IconButton>
-                                    <TextField
-                                      type="number"
-                                      size="small"
+                                    <InputBase
                                       value={displayQuantity}
+                                      type="number"
                                       onChange={(e) =>
                                         updateIngredientAmount(
                                           meal,
@@ -1687,411 +1687,432 @@ const MealPrepCalculator = ({ allIngredients }) => {
                                           parseFloat(e.target.value) || 0
                                         )
                                       }
-                                      inputProps={{ min: 0, step: "any" }}
-                                      sx={{ width: 90 }}
+                                      inputProps={{
+                                        min: 0,
+                                        step: unitLabel === "g" ? 1 : 0.1,
+                                        style: { textAlign: "center" },
+                                      }}
                                       disabled={disabledRow}
+                                      sx={{
+                                        width: 60,
+                                        px: 0.5,
+                                        py: 0.25,
+                                        borderRadius: 999,
+                                        bgcolor: "transparent",
+                                      }}
                                     />
-                                    <Typography variant="caption" color="text.secondary" sx={{ width: 36 }}>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ minWidth: 24 }}
+                                    >
                                       {unitLabel}
                                     </Typography>
                                     <IconButton
                                       size="small"
-                                      color="success"
+                                      color="inherit"
                                       onClick={() =>
                                         updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
                                       }
                                       disabled={disabledRow}
-                                      aria-label={`Increase ${ingredient.name} quantity`}
+                                        >
+                                          <Plus size={18} />
+                                        </IconButton>
+                                      </Stack>
+                                    </TableCell>
+                                    <TableCell align="center">{totalGrams}g</TableCell>
+                                    <TableCell align="center">{roundVal(nutrition.calories)}</TableCell>
+                                    <TableCell align="center">{roundVal(nutrition.protein)}</TableCell>
+                                    <TableCell align="center">{roundVal(nutrition.carbs)}</TableCell>
+                                    <TableCell align="center">{roundVal(nutrition.fat)}</TableCell>
+                                    <TableCell align="center">
+                                      <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => removeIngredient(meal, ingredient.id)}
+                                        disabled={disabledRow}
+                                      >
+                                        <X size={16} />
+                                      </IconButton>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
+                                <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
+                                <TableCell align="center">—</TableCell>
+                                <TableCell align="center">—</TableCell>
+                                <TableCell align="center">
+                                  {calcTotalsRounded(list).calories}
+                                </TableCell>
+                                <TableCell align="center">
+                                  {calcTotalsRounded(list).protein}
+                                </TableCell>
+                                <TableCell align="center">
+                                  {calcTotalsRounded(list).carbs}
+                                </TableCell>
+                                <TableCell align="center">
+                                  {calcTotalsRounded(list).fat}
+                                </TableCell>
+                                <TableCell align="center">-</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <Stack spacing={1}>
+                            {list.map((ingredient) => {
+                              const nutrition = calculateNutrition(ingredient);
+                              const disabledRow = matchDinner && meal === "dinner";
+                              const unit = ingredient.unit || "g";
+                              let displayQuantity, incrementStep, unitLabel;
+                              if (unit === "g") {
+                                displayQuantity = ingredient.grams || 100;
+                                incrementStep = 5;
+                                unitLabel = "g";
+                              } else {
+                                displayQuantity = ingredient.quantity || 1;
+                                incrementStep = 0.5;
+                                unitLabel = "unit";
+                              }
+                              return (
+                                <Paper key={ingredient.id} variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
+                                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                    <Box>
+                                      <Typography fontWeight={700} textTransform="capitalize">
+                                        {ingredient.name}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {roundVal(nutrition.calories)} kcal · {roundVal(nutrition.protein)}g P · {roundVal(nutrition.carbs)}g C · {roundVal(nutrition.fat)}g F
+                                      </Typography>
+                                    </Box>
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => removeIngredient(meal, ingredient.id)}
+                                      disabled={disabledRow}
                                     >
-                                      <Plus size={18} />
+                                      <X size={16} />
                                     </IconButton>
                                   </Stack>
-                                </TableCell>
-                                <TableCell align="center">{totalGrams}g</TableCell>
-                                <TableCell align="center">{nutrition.calories}</TableCell>
-                                <TableCell align="center">{nutrition.protein}</TableCell>
-                                <TableCell align="center">{nutrition.carbs}</TableCell>
-                                <TableCell align="center">{nutrition.fat}</TableCell>
-                                <TableCell align="center">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => removeIngredient(meal, ingredient.id)}
-                                    disabled={disabledRow}
+                                  <Stack
+                                    direction="row"
+                                    spacing={0.75}
+                                    alignItems="center"
+                                    justifyContent="flex-start"
+                                    mt={1}
+                                    sx={{
+                                      border: "1px solid",
+                                      borderColor: "divider",
+                                      borderRadius: 999,
+                                      px: 0.75,
+                                      backgroundColor: "background.paper",
+                                    }}
                                   >
-                                    <X size={16} />
-                                  </IconButton>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                          <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
-                            <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
-                            <TableCell align="center">—</TableCell>
-                            <TableCell align="center">—</TableCell>
-                            <TableCell align="center">
-                              {Math.round(calcTotals(list).calories)}
-                            </TableCell>
-                            <TableCell align="center">
-                              {Math.round(calcTotals(list).protein * 10) / 10}
-                            </TableCell>
-                            <TableCell align="center">
-                              {Math.round(calcTotals(list).carbs * 10) / 10}
-                            </TableCell>
-                            <TableCell align="center">
-                              {Math.round(calcTotals(list).fat * 10) / 10}
-                            </TableCell>
-                            <TableCell align="center">-</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </Box>
-                  </Paper>
+                                    <IconButton
+                                      size="small"
+                                      color="inherit"
+                                      onClick={() =>
+                                        updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
+                                      }
+                                      disabled={disabledRow}
+                                    >
+                                      <Minus size={16} />
+                                    </IconButton>
+                                    <InputBase
+                                      value={displayQuantity}
+                                      type="number"
+                                      onChange={(e) =>
+                                        updateIngredientAmount(
+                                          meal,
+                                          ingredient.id,
+                                          parseFloat(e.target.value) || 0
+                                        )
+                                      }
+                                      inputProps={{
+                                        min: 0,
+                                        step: unitLabel === "g" ? 1 : 0.1,
+                                        style: { textAlign: "center" },
+                                      }}
+                                      disabled={disabledRow}
+                                      sx={{
+                                        width: 60,
+                                        px: 0.5,
+                                        py: 0.25,
+                                        borderRadius: 999,
+                                        bgcolor: "transparent",
+                                      }}
+                                    />
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ minWidth: 24 }}
+                                    >
+                                      {unitLabel}
+                                    </Typography>
+                                    <IconButton
+                                      size="small"
+                                      color="inherit"
+                                      onClick={() =>
+                                        updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
+                                      }
+                                      disabled={disabledRow}
+                                    >
+                                      <Plus size={16} />
+                                    </IconButton>
+                                  </Stack>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                      </Stack>
+                    </AccordionDetails>
+                  </Accordion>
                 );
               })}
             </Stack>
-          </Stack>
-        </Paper>
 
-        {/* Daily Totals */}
-        <Grid container spacing={2.5}>
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-              <Typography variant="h6" fontWeight={800} mb={2}>
-                Per Day
+            {/* Shopping List */}
+            <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: "column", md: "row" }} alignItems={{ md: "center" }} justifyContent="space-between" spacing={1.5}>
+                  <Typography variant="h6" fontWeight={800}>
+                    {prepDays}-Day Shopping List
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                    <Typography variant="body2" color="text.secondary">
+                      Prep days:
+                    </Typography>
+                    <Select
+                      size="small"
+                      value={prepDays}
+                      onChange={(e) => setPrepDays(Number(e.target.value))}
+                      sx={{ minWidth: 140 }}
+                    >
+                      {[3, 5, 6, 7, 10, 14, 21, 30].map((day) => (
+                        <MenuItem key={day} value={day}>
+                          {day === 7 ? "1 week" : day === 30 ? "1 month" : `${day} days`}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Button size="small" variant="contained" onClick={handleExportPDF}>
+                      Export PDF
+                    </Button>
+                    <Button size="small" variant="contained" color="success" onClick={handleShareToReminders}>
+                      Share List
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={handleCopyToClipboard}>
+                      Copy
+                    </Button>
+                  </Stack>
+                </Stack>
+
+                {prepDays > 7 && (
+                  <Paper
+                    variant="outlined"
+                    sx={{ p: 2, borderRadius: 2, backgroundColor: "success.light", borderColor: "success.main" }}
+                  >
+                    <Typography fontWeight={700} color="success.dark" mb={0.5}>
+                      🏗️ Extended Meal Prep Benefits:
+                    </Typography>
+                    <Typography variant="body2" color="success.dark">
+                      Planning for {prepDays} days saves time and money. Consider freezing portions and buying in bulk for better deals.
+                    </Typography>
+                  </Paper>
+                )}
+
+                <Stack spacing={1.5}>
+                  {Object.entries(categorizedShoppingList).map(([category, ingredients]) => {
+                    // Category colors - header (stronger) and background (paler)
+                    const getCategoryColors = (cat) => {
+                      if (cat.includes("Produce - Fruit")) return { header: "#86efac", bg: "#f0fdf4" };    // Green
+                      if (cat.includes("Produce - Vegetable")) return { header: "#4ade80", bg: "#f0fdf4" }; // Darker green
+                      if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "#fca5a5", bg: "#fef2f2" }; // Red
+                      if (cat.includes("Dairy")) return { header: "#93c5fd", bg: "#eff6ff" };              // Blue
+                      if (cat.includes("Grains") || cat.includes("Bread")) return { header: "#fcd34d", bg: "#fffbeb" }; // Amber
+                      if (cat.includes("Fats") || cat.includes("Oils")) return { header: "#fbbf24", bg: "#fffbeb" };    // Darker amber
+                      if (cat.includes("Beverages")) return { header: "#a5b4fc", bg: "#eef2ff" };          // Indigo
+                      return { header: "#e5e7eb", bg: "#f9fafb" };                                         // Grey
+                    };
+                    const colors = getCategoryColors(category);
+                    return (
+                    <Paper key={category} variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
+                      <Box
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          bgcolor: colors.header,
+                          color: "#1f2937",
+                        }}
+                      >
+                        <Typography fontWeight={700}>{category}</Typography>
+                        <Chip
+                          size="small"
+                          label={`${ingredients.length} items`}
+                          sx={{
+                            bgcolor: "background.paper",
+                            fontWeight: 600,
+                          }}
+                        />
+                      </Box>
+                      <Stack spacing={1} sx={{ p: 1.5, bgcolor: colors.bg }}>
+                        {ingredients.map((ingredient) => {
+                          const totalQuantity = (ingredient.quantity || 1) * prepDays;
+                          const totalGrams = ingredient.grams * prepDays;
+                          const pounds = (totalGrams / 453.592).toFixed(2);
+                          const kilos = (totalGrams / 1000).toFixed(2);
+                          const unit = ingredient.unit || "g";
+                          const quantityPerDay = ingredient.quantity || 1;
+                          const isGrams = unit === "g";
+
+                          return (
+                            <Paper
+                              key={ingredient.id}
+                              variant="outlined"
+                              sx={{ p: 1.25, borderRadius: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                            >
+                              <Typography fontWeight={600} textTransform="capitalize">
+                                {ingredient.name}
+                              </Typography>
+                              <Box textAlign="right">
+                                {isGrams ? (
+                                  <>
+                                    <Typography color="primary.main" fontWeight={800}>
+                                      {totalGrams.toFixed(0)}g
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ({pounds} lbs | {kilos} kg)
+                                      {prepDays > 7 && (
+                                        <Box component="span" display="block">
+                                          {(totalGrams / prepDays).toFixed(0)}g per day
+                                        </Box>
+                                      )}
+                                    </Typography>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Typography color="primary.main" fontWeight={800}>
+                                      {totalQuantity.toFixed(1)} {unit}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      ({totalGrams.toFixed(0)}g | {pounds} lbs | {kilos} kg)
+                                      {prepDays > 7 && (
+                                        <Box component="span" display="block">
+                                          {quantityPerDay.toFixed(1)} {unit} per day
+                                        </Box>
+                                      )}
+                                    </Typography>
+                                  </>
+                                )}
+                              </Box>
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    </Paper>
+                  );
+                  })}
+                </Stack>
+              </Stack>
+            </Paper>
+          </Stack>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Stack
+            spacing={2}
+            sx={{
+              position: { md: "sticky" },
+              top: { md: 90 }, // Below the navbar (72px + padding)
+              maxHeight: { md: "calc(100vh - 110px)" },
+              overflowY: { md: "auto" },
+            }}
+          >
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight={800} mb={1}>
+                Plan summary
               </Typography>
               <Stack spacing={1}>
                 {[
-                  { label: "Calories", value: dailyTotals.calories, color: "primary" },
-                  { label: "Protein", value: `${dailyTotals.protein}g (${Math.round(((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100)}%)` },
-                  { label: "Carbs", value: `${dailyTotals.carbs}g (${Math.round(((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100)}%)` },
-                  { label: "Fat", value: `${dailyTotals.fat}g (${Math.round(((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100)}%)` },
-                ].map((item) => (
-                  <Stack direction="row" justifyContent="space-between" key={item.label}>
-                    <Typography fontWeight={600}>{item.label}:</Typography>
-                    <Typography fontWeight={700} color={item.color ? `${item.color}.main` : "text.primary"}>
-                      {item.value}
-                    </Typography>
-                  </Stack>
-                ))}
-              </Stack>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
-              <Typography variant="h6" fontWeight={800} mb={2}>
-                Target Comparison
-              </Typography>
-              <Stack spacing={2}>
-                {[
-                  {
-                    label: "Calories",
-                    target: calorieTarget,
-                    current: dailyTotals.calories,
-                    progress: progress.calories,
-                    within: Math.abs(dailyTotals.calories - calorieTarget) <= 25,
-                  },
-                  {
-                    label: "Protein",
-                    target: `${targetMacros.protein}g (${targetPercentages.protein}%)`,
-                    current: `${dailyTotals.protein}g (${Math.round(((dailyTotals.protein * 4) / (dailyTotals.calories || 1)) * 100)}%)`,
-                    progress: progress.protein,
-                    within: Math.abs(dailyTotals.protein - targetMacros.protein) <= 5,
-                  },
-                  {
-                    label: "Carbs",
-                    target: `${targetMacros.carbs}g (${targetPercentages.carbs}%)`,
-                    current: `${dailyTotals.carbs}g (${Math.round(((dailyTotals.carbs * 4) / (dailyTotals.calories || 1)) * 100)}%)`,
-                    progress: progress.carbs,
-                    within: Math.abs(dailyTotals.carbs - targetMacros.carbs) <= 5,
-                  },
-                  {
-                    label: "Fat",
-                    target: `${targetMacros.fat}g (${targetPercentages.fat}%)`,
-                    current: `${dailyTotals.fat}g (${Math.round(((dailyTotals.fat * 9) / (dailyTotals.calories || 1)) * 100)}%)`,
-                    progress: progress.fat,
-                    within: Math.abs(dailyTotals.fat - targetMacros.fat) <= 5,
-                  },
-                ].map((item) => (
-                  <Stack key={item.label} spacing={0.5}>
-                    <Stack direction="row" justifyContent="space-between">
-                      <Typography fontWeight={600}>{item.label}:</Typography>
-                      <Typography
-                        fontWeight={700}
-                        color={item.within ? "success.main" : "error.main"}
-                      >
-                        {item.target} → {item.current}
+                  { label: "Calories", value: `${dailyTotals.calories} / ${calorieTarget}`, delta: dailyTotals.calories - calorieTarget, unit: "kcal" },
+                  { label: "Protein", value: `${dailyTotals.protein} / ${targetMacros.protein}`, delta: dailyTotals.protein - targetMacros.protein, unit: "g" },
+                  { label: "Carbs", value: `${dailyTotals.carbs} / ${targetMacros.carbs}`, delta: dailyTotals.carbs - targetMacros.carbs, unit: "g" },
+                  { label: "Fat", value: `${dailyTotals.fat} / ${targetMacros.fat}`, delta: dailyTotals.fat - targetMacros.fat, unit: "g" },
+                ].map((row) => {
+                  const over = row.delta > 0;
+                  const within = Math.abs(row.delta) <= (row.unit === "kcal" ? 50 : 5);
+                  const color = within ? "success.main" : over ? "error.main" : "warning.main";
+                  return (
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" key={row.label}>
+                      <Typography variant="body2" color="text.secondary">
+                        {row.label}
                       </Typography>
+                      <Box textAlign="right">
+                        <Typography fontWeight={700}>{row.value}</Typography>
+                        <Typography variant="caption" color={color}>
+                          {roundVal(row.delta) >= 0 ? "+" : ""}{roundVal(row.delta)} {row.unit}
+                        </Typography>
+                      </Box>
                     </Stack>
-                    <Box
-                      sx={{
-                        width: "100%",
-                        height: 8,
-                        borderRadius: 999,
-                        backgroundColor: "action.hover",
+                  );
+                })}
+              </Stack>
+            </Paper>
+
+            {savedPlans.length > 0 && (
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+                <Typography variant="subtitle1" fontWeight={800} mb={1}>
+                  Saved plans
+                </Typography>
+                <Stack spacing={1}>
+                  {savedPlans.slice(0, UI_LIMITS.RECENT_PLANS_DISPLAY).map((plan) => (
+                    <Button
+                      key={plan.id}
+                      variant={plan.id === currentPlanId ? "contained" : "outlined"}
+                      color={plan.id === currentPlanId ? "primary" : "inherit"}
+                      fullWidth
+                      onClick={() => {
+                        setSelectedPlanId(plan.id);
+                        handlePlanDropdownChange({ target: { value: plan.id } });
                       }}
+                      sx={{ justifyContent: "space-between" }}
                     >
-                      <Box
-                        sx={{
-                          width: `${item.progress}%`,
-                          height: "100%",
-                          borderRadius: 999,
-                          background: (theme) =>
-                            item.within
-                              ? `linear-gradient(90deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`
-                              : `linear-gradient(90deg, ${theme.palette.error.main}, ${theme.palette.error.dark})`,
-                          transition: "width 200ms ease",
-                        }}
-                      />
-                    </Box>
-                  </Stack>
-                ))}
-                {withinRange && (
-                  <Typography textAlign="center" color="success.main" fontWeight={700} mt={1}>
-                    You nailed today's targets! 👍
-                  </Typography>
-                )}
-              </Stack>
-            </Paper>
-          </Grid>
-        </Grid>
-
-        {/* Shopping List */}
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Stack spacing={2}>
-            <Stack direction={{ xs: "column", md: "row" }} alignItems={{ md: "center" }} justifyContent="space-between" spacing={1.5}>
-              <Typography variant="h6" fontWeight={800}>
-                {prepDays}-Day Shopping List
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
-                <Typography variant="body2" color="text.secondary">
-                  Prep days:
-                </Typography>
-                <Select
-                  size="small"
-                  value={prepDays}
-                  onChange={(e) => setPrepDays(Number(e.target.value))}
-                  sx={{ minWidth: 140 }}
-                >
-                  {[3, 5, 6, 7, 10, 14, 21, 30].map((day) => (
-                    <MenuItem key={day} value={day}>
-                      {day === 7 ? "1 week" : day === 30 ? "1 month" : `${day} days`}
-                    </MenuItem>
-                  ))}
-                </Select>
-                <Button size="small" variant="contained" onClick={handleExportPDF}>
-                  Export PDF
-                </Button>
-                <Button size="small" variant="contained" color="success" onClick={handleShareToReminders}>
-                  Share List
-                </Button>
-                <Button size="small" variant="outlined" onClick={handleCopyToClipboard}>
-                  Copy
-                </Button>
-              </Stack>
-            </Stack>
-
-            {prepDays > 7 && (
-              <Paper
-                variant="outlined"
-                sx={{ p: 2, borderRadius: 2, backgroundColor: "success.light", borderColor: "success.main" }}
-              >
-                <Typography fontWeight={700} color="success.dark" mb={0.5}>
-                  🏗️ Extended Meal Prep Benefits:
-                </Typography>
-                <Typography variant="body2" color="success.dark">
-                  Planning for {prepDays} days saves time and money. Consider freezing portions and buying in bulk for better deals.
-                </Typography>
-              </Paper>
-            )}
-
-            <Stack spacing={1.5}>
-              {Object.entries(categorizedShoppingList).map(([category, ingredients]) => (
-                <Paper key={category} variant="outlined" sx={{ borderRadius: 2 }}>
-                  <Box
-                    sx={{
-                      px: 2,
-                      py: 1.5,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Typography fontWeight={700}>{category}</Typography>
-                    <Chip size="small" label={`${ingredients.length} items`} />
-                  </Box>
-                  <Divider />
-                  <Stack spacing={1} sx={{ p: 1.5 }}>
-                    {ingredients.map((ingredient) => {
-                      const totalQuantity = (ingredient.quantity || 1) * prepDays;
-                      const totalGrams = ingredient.grams * prepDays;
-                      const pounds = (totalGrams / 453.592).toFixed(2);
-                      const kilos = (totalGrams / 1000).toFixed(2);
-                      const unit = ingredient.unit || "g";
-                      const quantityPerDay = ingredient.quantity || 1;
-                      const isGrams = unit === "g";
-
-                      return (
-                        <Paper
-                          key={ingredient.id}
-                          variant="outlined"
-                          sx={{ p: 1.25, borderRadius: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
-                        >
-                          <Typography fontWeight={600} textTransform="capitalize">
-                            {ingredient.name}
-                          </Typography>
-                          <Box textAlign="right">
-                            {isGrams ? (
-                              <>
-                                <Typography color="primary.main" fontWeight={800}>
-                                  {totalGrams.toFixed(0)}g
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  ({pounds} lbs | {kilos} kg)
-                                  {prepDays > 7 && (
-                                    <Box component="span" display="block">
-                                      {(totalGrams / prepDays).toFixed(0)}g per day
-                                    </Box>
-                                  )}
-                                </Typography>
-                              </>
-                            ) : (
-                              <>
-                                <Typography color="primary.main" fontWeight={800}>
-                                  {totalQuantity.toFixed(1)} {unit}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  ({totalGrams.toFixed(0)}g | {pounds} lbs | {kilos} kg)
-                                  {prepDays > 7 && (
-                                    <Box component="span" display="block">
-                                      {quantityPerDay.toFixed(1)} {unit} per day
-                                    </Box>
-                                  )}
-                                </Typography>
-                              </>
-                            )}
-                          </Box>
-                        </Paper>
-                      );
-                    })}
-                  </Stack>
-                </Paper>
-              ))}
-            </Stack>
-
-            <Paper
-              variant="outlined"
-              sx={{ p: 2, borderRadius: 2, backgroundColor: "info.light", borderColor: "info.main" }}
-            >
-              <Typography fontWeight={700} color="info.dark" mb={1}>
-                💡 {prepDays > 7 ? "Extended Meal Prep" : "Shopping"} Tips:
-              </Typography>
-              <Stack component="ul" spacing={0.5} sx={{ pl: 2, m: 0 }}>
-                {(prepDays > 7
-                  ? [
-                      "Storage: Invest in quality containers and freezer bags",
-                      "Freezing: Most proteins freeze well for 3+ months",
-                      "Bulk buying: Warehouse stores offer better prices for large quantities",
-                      "Prep scheduling: Cook proteins in batches and freeze portions",
-                      "Vegetables: Frozen vegetables are perfect for extended meal prep",
-                    ]
-                  : [
-                      "Buy in bulk to save money on larger quantities",
-                      "Check for sales on protein sources first",
-                      "Frozen vegetables are nutritious and last longer",
-                      "Pre-cut vegetables save prep time",
-                    ]
-                ).map((tip) => (
-                  <Typography key={tip} component="li" variant="body2" color="info.dark">
-                    {tip}
-                  </Typography>
-                ))}
-              </Stack>
-            </Paper>
-
-            {prepDays > 14 && (
-              <Paper
-                variant="outlined"
-                sx={{ p: 2, borderRadius: 2, backgroundColor: "warning.light", borderColor: "warning.main" }}
-              >
-                <Typography fontWeight={700} color="warning.dark" mb={1}>
-                  ⚠️ Long-term Storage Notes:
-                </Typography>
-                <Stack component="ul" spacing={0.5} sx={{ pl: 2, m: 0 }}>
-                  {[
-                    "Label everything with dates before freezing",
-                    "Rotate stock - use oldest items first",
-                    "Consider vacuum sealing for better preservation",
-                    "Keep a freezer inventory list to track what you have",
-                  ].map((tip) => (
-                    <Typography key={tip} component="li" variant="body2" color="warning.dark">
-                      {tip}
-                    </Typography>
+                      <span>{plan.name}</span>
+                      <Typography variant="caption" color="text.secondary">
+                        {plan.id === currentPlanId ? "Active" : "Load"}
+                      </Typography>
+                    </Button>
                   ))}
                 </Stack>
               </Paper>
             )}
-          </Stack>
-        </Paper>
 
-        {/* Sticky action bar */}
-        <Paper
-          elevation={6}
-          sx={{
-            position: { xs: "fixed", md: "static" },
-            bottom: { xs: 72, md: "auto" },
-            left: { xs: 0, md: "auto" },
-            right: { xs: 0, md: "auto" },
-            borderRadius: 3,
-            px: 2.5,
-            py: 2,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1.5,
-            alignItems: "center",
-            justifyContent: "space-between",
-            zIndex: (theme) => theme.zIndex.appBar - 1,
-            border: "1px solid",
-            borderColor: "divider",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          <Stack direction="row" spacing={1} alignItems="center" color="text.secondary">
-            <Typography variant="subtitle2" fontWeight={700}>
-              Plan actions
-            </Typography>
-            {hasUnsavedChanges && <Chip size="small" color="warning" label="Unsaved changes" />}
-            {lastPlanSavedAt && (
-              <Typography variant="caption" color="text.secondary">
-                Last saved {lastPlanSavedAt.toLocaleTimeString()}
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight={800} mb={1}>
+                Shopping list
               </Typography>
-            )}
-          </Stack>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Button variant="contained" onClick={handleSavePlan}>
-              {currentPlanId ? "Update Plan" : "Save Plan"}
-            </Button>
-            {currentPlanId && (
-              <Button variant="contained" color="secondary" onClick={handleSaveAsNew}>
-                Save as New
+              <Typography variant="body2" color="text.secondary">
+                Generated from your plan × {prepDays} days.
+              </Typography>
+              <Button
+                fullWidth
+                variant="outlined"
+                sx={{ mt: 1 }}
+                onClick={handleCopyToClipboard}
+              >
+                View / copy list
               </Button>
-            )}
-            <Button variant="outlined" onClick={handleSaveBaseline}>
-              Set Baseline
-            </Button>
-            <Button variant="contained" color="success" onClick={handleExportPDF}>
-              Export PDF
-            </Button>
-            <Button variant="outlined" onClick={handleExportJSON}>
-              Export JSON
-            </Button>
+            </Paper>
           </Stack>
-        </Paper>
+        </Grid>
+      </Grid>
 
-        <Typography textAlign="center" color="text.secondary">
-          Eat more, live mas! 🌟 Interactive meal plan calculator
-        </Typography>
-      </Stack>
+      <Typography textAlign="center" color="text.secondary" mt={3}>
+        Eat more, live mas! 🌟 Interactive meal plan calculator
+      </Typography>
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}
@@ -2106,6 +2127,40 @@ const MealPrepCalculator = ({ allIngredients }) => {
         cancelText="Cancel"
         variant="danger"
       />
+
+      {/* Pending targets from Calorie Calculator */}
+      <Snackbar
+        open={showTargetsPrompt && pendingTargets !== null}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="info"
+          variant="filled"
+          sx={{ width: "100%", alignItems: "center" }}
+          action={
+            <Stack direction="row" spacing={1}>
+              <Button
+                color="inherit"
+                size="small"
+                onClick={dismissPendingTargets}
+              >
+                Dismiss
+              </Button>
+              <Button
+                color="inherit"
+                size="small"
+                variant="outlined"
+                onClick={applyPendingTargets}
+                sx={{ fontWeight: 700 }}
+              >
+                Apply
+              </Button>
+            </Stack>
+          }
+        >
+          New targets from Calculator: {pendingTargets?.calorieTarget} kcal ({pendingTargets?.targetPercentages?.protein}P / {pendingTargets?.targetPercentages?.carbs}C / {pendingTargets?.targetPercentages?.fat}F)
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

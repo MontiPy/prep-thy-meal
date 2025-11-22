@@ -1,145 +1,134 @@
-// src/components/SkeletonLoader.jsx
+// src/shared/components/ui/SkeletonLoader.jsx
 import React from 'react';
-
-/**
- * Base skeleton component with shimmer animation
- */
-export const Skeleton = ({ className = '', width, height }) => {
-  const style = {};
-  if (width) style.width = width;
-  if (height) style.height = height;
-
-  return (
-    <div
-      className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`}
-      style={style}
-      aria-hidden="true"
-    />
-  );
-};
+import { Box, Paper, Skeleton, Stack } from '@mui/material';
 
 /**
  * Skeleton for ingredient card
  */
 export const IngredientCardSkeleton = () => (
-  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
-    <div className="flex items-start justify-between mb-3">
-      <Skeleton className="h-5 w-32" />
-      <Skeleton className="h-4 w-4 rounded-full" />
-    </div>
-    <div className="flex items-center gap-3 mb-3">
-      <Skeleton className="w-11 h-11 rounded-lg" />
-      <div className="flex-1">
-        <Skeleton className="h-8 w-full mb-1" />
-        <Skeleton className="h-3 w-20" />
-      </div>
-      <Skeleton className="w-11 h-11 rounded-lg" />
-    </div>
-    <div className="grid grid-cols-4 gap-2">
+  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+      <Skeleton variant="text" width={120} height={24} />
+      <Skeleton variant="circular" width={24} height={24} />
+    </Stack>
+    <Stack direction="row" spacing={1.5} alignItems="center" mb={1.5}>
+      <Skeleton variant="rounded" width={44} height={44} />
+      <Box sx={{ flex: 1, textAlign: 'center' }}>
+        <Skeleton variant="text" width="60%" height={32} sx={{ mx: 'auto' }} />
+        <Skeleton variant="text" width="40%" height={16} sx={{ mx: 'auto' }} />
+      </Box>
+      <Skeleton variant="rounded" width={44} height={44} />
+    </Stack>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
       {[...Array(4)].map((_, i) => (
-        <Skeleton key={i} className="h-16 rounded-lg" />
+        <Skeleton key={i} variant="rounded" height={48} />
       ))}
-    </div>
-  </div>
+    </Box>
+  </Paper>
 );
 
 /**
  * Skeleton for table row
  */
 export const TableRowSkeleton = ({ columns = 5 }) => (
-  <tr className="border-b border-gray-200 dark:border-gray-700">
+  <Box
+    component="tr"
+    sx={{ borderBottom: 1, borderColor: 'divider' }}
+  >
     {[...Array(columns)].map((_, i) => (
-      <td key={i} className="px-4 py-3">
-        <Skeleton className="h-4 w-full" />
-      </td>
+      <Box component="td" key={i} sx={{ px: 2, py: 1.5 }}>
+        <Skeleton variant="text" />
+      </Box>
     ))}
-  </tr>
+  </Box>
 );
 
 /**
  * Skeleton for stat card
  */
 export const StatCardSkeleton = () => (
-  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-    <Skeleton className="h-4 w-24 mb-2" />
-    <Skeleton className="h-8 w-16 mb-1" />
-    <Skeleton className="h-3 w-32" />
-  </div>
+  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+    <Skeleton variant="text" width={80} height={20} sx={{ mb: 1 }} />
+    <Skeleton variant="text" width={60} height={32} sx={{ mb: 0.5 }} />
+    <Skeleton variant="text" width={120} height={16} />
+  </Paper>
 );
 
 /**
  * Skeleton for meal section
  */
 export const MealSectionSkeleton = () => (
-  <div className="space-y-4">
-    <div className="flex items-center justify-between mb-4">
-      <Skeleton className="h-6 w-32" />
-      <Skeleton className="h-9 w-24 rounded-lg" />
-    </div>
-    <div className="space-y-3">
+  <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+      <Skeleton variant="text" width={120} height={28} />
+      <Skeleton variant="rounded" width={100} height={36} />
+    </Stack>
+    <Stack spacing={2}>
       {[...Array(3)].map((_, i) => (
         <IngredientCardSkeleton key={i} />
       ))}
-    </div>
-  </div>
+    </Stack>
+  </Paper>
 );
 
 /**
  * Skeleton for plan card
  */
 export const PlanCardSkeleton = () => (
-  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-    <div className="flex items-start justify-between mb-3">
-      <Skeleton className="h-5 w-40" />
-      <Skeleton className="h-8 w-8 rounded" />
-    </div>
-    <div className="space-y-2">
-      <Skeleton className="h-3 w-full" />
-      <Skeleton className="h-3 w-3/4" />
-    </div>
-    <div className="flex gap-2 mt-4">
-      <Skeleton className="h-9 flex-1 rounded-lg" />
-      <Skeleton className="h-9 w-9 rounded-lg" />
-    </div>
-  </div>
+  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+      <Skeleton variant="text" width={140} height={24} />
+      <Skeleton variant="rounded" width={32} height={32} />
+    </Stack>
+    <Stack spacing={1} mb={2}>
+      <Skeleton variant="text" width="100%" />
+      <Skeleton variant="text" width="75%" />
+    </Stack>
+    <Stack direction="row" spacing={1}>
+      <Skeleton variant="rounded" height={36} sx={{ flex: 1 }} />
+      <Skeleton variant="rounded" width={36} height={36} />
+    </Stack>
+  </Paper>
 );
 
 /**
  * Skeleton for search result
  */
 export const SearchResultSkeleton = () => (
-  <div className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
-    <Skeleton className="w-12 h-12 rounded" />
-    <div className="flex-1">
-      <Skeleton className="h-4 w-48 mb-2" />
-      <Skeleton className="h-3 w-32" />
-    </div>
-    <Skeleton className="h-9 w-20 rounded-lg" />
-  </div>
+  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+    <Stack direction="row" spacing={1.5} alignItems="center">
+      <Skeleton variant="rounded" width={48} height={48} />
+      <Box sx={{ flex: 1 }}>
+        <Skeleton variant="text" width={180} height={20} sx={{ mb: 0.5 }} />
+        <Skeleton variant="text" width={120} height={16} />
+      </Box>
+      <Skeleton variant="rounded" width={80} height={36} />
+    </Stack>
+  </Paper>
 );
 
 /**
  * Full page skeleton for initial load
  */
 export const PageSkeleton = () => (
-  <div className="calculator space-y-6">
-    <div className="card">
-      <div className="center mb-6">
-        <Skeleton className="h-10 w-64 mb-2" />
-        <Skeleton className="h-5 w-96" />
-      </div>
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
+  <Stack spacing={3}>
+    <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
+      <Box sx={{ textAlign: 'center', mb: 3 }}>
+        <Skeleton variant="text" width={240} height={40} sx={{ mx: 'auto', mb: 1 }} />
+        <Skeleton variant="text" width={360} height={24} sx={{ mx: 'auto' }} />
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
         {[...Array(3)].map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}
-      </div>
-      <div className="space-y-6">
+      </Box>
+      <Stack spacing={3}>
         {[...Array(2)].map((_, i) => (
           <MealSectionSkeleton key={i} />
         ))}
-      </div>
-    </div>
-  </div>
+      </Stack>
+    </Paper>
+  </Stack>
 );
 
 export default Skeleton;

@@ -1,12 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
-  Container,
   FormControl,
   Grid,
   IconButton,
@@ -16,212 +13,111 @@ import {
   Paper,
   Select,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
-import {
-  DataGrid,
-  GridToolbarContainer,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import CloudOffIcon from "@mui/icons-material/CloudOff";
+import AddIcon from "@mui/icons-material/AddRounded";
+import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadIcon from "@mui/icons-material/DownloadRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
-import GridViewIcon from "@mui/icons-material/GridViewRounded";
+import KitchenIcon from "@mui/icons-material/KitchenRounded";
 import SearchIcon from "@mui/icons-material/Search";
-import StarBorderIcon from "@mui/icons-material/StarBorderRounded";
-import StarIcon from "@mui/icons-material/StarRounded";
-import SwapVertIcon from "@mui/icons-material/SwapVertRounded";
-import TableRowsIcon from "@mui/icons-material/TableRowsRounded";
 import UploadIcon from "@mui/icons-material/UploadRounded";
-import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import {
   addCustomIngredient,
   removeCustomIngredient,
   upsertCustomIngredient,
   syncFromRemote,
 } from './ingredientStorage';
-import { loadFavorites, toggleFavorite, isFavorite } from './favorites';
 import { useUser } from '../auth/UserContext.jsx';
 import { getAllBaseIngredients } from './nutritionHelpers';
-import { fetchNutritionByName, searchFoods } from '../../shared/services/nutritionix';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
-import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
 
-const empty = {
+const CATEGORIES = [
+  "Produce - Vegetables",
+  "Produce - Fruit",
+  "Meat & Seafood",
+  "Dairy",
+  "Grains & Bread",
+  "Condiments & Spices",
+  "Other",
+];
+
+const emptyForm = {
   name: "",
-  grams: 100,
+  category: CATEGORIES[0],
+  unit: "g",
   gramsPerUnit: 100,
+  grams: 100,
   calories: 0,
   protein: 0,
   carbs: 0,
   fat: 0,
-  unit: "g",
+  notes: "",
 };
 
 const IngredientManager = ({ onChange }) => {
   const { user } = useUser();
-  const [showTable, setShowTable] = useState(false);
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+
+  // State
   const [ingredients, setIngredients] = useState(getAllBaseIngredients());
-  const [newIngredient, setNewIngredient] = useState({ ...empty });
   const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({ ...empty });
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [form, setForm] = useState({ ...emptyForm });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [ingredientToDelete, setIngredientToDelete] = useState(null);
-  const csvImportRef = useRef(null);
-  const searchDebounceRef = useRef(null);
+  const jsonImportRef = useRef(null);
 
-  // Search, Sort, Filter state
-  const [ingredientSearch, setIngredientSearch] = useState("");
-  const [sortBy, setSortBy] = useState("name"); // name, calories, protein, carbs, fat
-  const [sortDirection, setSortDirection] = useState("asc"); // asc, desc
-  const [filterType, setFilterType] = useState("all"); // all, custom, standard, favorites
-  const [favorites, setFavorites] = useState(loadFavorites());
+  // Search/filter state
+  const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
 
-  // Handle favorite toggle
-  const handleToggleFavorite = (ingredientId) => {
-    const newStatus = toggleFavorite(ingredientId);
-    setFavorites(loadFavorites());
-    toast.success(newStatus ? "Added to favorites" : "Removed from favorites");
-  };
+  // Editing item reference
+  const editingItem = useMemo(() => ingredients.find((i) => i.id === editingId) || null, [ingredients, editingId]);
+
+  // Sync form when editing item changes
+  useEffect(() => {
+    if (!editingItem) return;
+    setForm({
+      name: editingItem.name || "",
+      category: editingItem.category || CATEGORIES[0],
+      unit: editingItem.unit || "g",
+      gramsPerUnit: editingItem.gramsPerUnit || editingItem.grams || 100,
+      grams: editingItem.grams || editingItem.gramsPerUnit || 100,
+      calories: editingItem.calories || 0,
+      protein: editingItem.protein || 0,
+      carbs: editingItem.carbs || 0,
+      fat: editingItem.fat || 0,
+      notes: editingItem.notes || "",
+    });
+  }, [editingId, editingItem]);
 
   // Filtered and sorted ingredients
-  const filteredIngredients = React.useMemo(() => {
-    let result = [...ingredients];
-
-    // Apply search filter
-    if (ingredientSearch.trim()) {
-      const searchLower = ingredientSearch.toLowerCase();
-      result = result.filter(ing =>
-        ing.name.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Apply type filter
-    if (filterType === "custom") {
-      result = result.filter(ing => ing.id >= 1000); // Custom ingredients have ID >= 1000
-    } else if (filterType === "standard") {
-      result = result.filter(ing => ing.id < 1000);
-    } else if (filterType === "favorites") {
-      result = result.filter(ing => favorites.includes(ing.id));
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      let aVal, bVal;
-
-      switch (sortBy) {
-        case "name":
-          aVal = a.name.toLowerCase();
-          bVal = b.name.toLowerCase();
-          break;
-        case "calories":
-          aVal = a.calories;
-          bVal = b.calories;
-          break;
-        case "protein":
-          aVal = a.protein;
-          bVal = b.protein;
-          break;
-        case "carbs":
-          aVal = a.carbs;
-          bVal = b.carbs;
-          break;
-        case "fat":
-          aVal = a.fat;
-          bVal = b.fat;
-          break;
-        default:
-          aVal = a.name.toLowerCase();
-          bVal = b.name.toLowerCase();
-      }
-
-      if (typeof aVal === "string") {
-        return sortDirection === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      } else {
-        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
-      }
+  const filtered = useMemo(() => {
+    let list = ingredients.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()));
+    if (sourceFilter === "db") list = list.filter((i) => i.id < 1000);
+    if (sourceFilter === "custom") list = list.filter((i) => i.id >= 1000);
+    if (categoryFilter !== "all") list = list.filter((i) => i.category === categoryFilter);
+    list = [...list].sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "category") return (a.category || "").localeCompare(b.category || "");
+      if (sortBy === "source") return (a.id < 1000 ? "DB" : "Custom").localeCompare(b.id < 1000 ? "DB" : "Custom");
+      return 0;
     });
-
-    return result;
-  }, [ingredients, ingredientSearch, sortBy, sortDirection, filterType, favorites]);
-
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim() || isOffline) return;
-
-    setIsSearching(true);
-    try {
-      const foods = await searchFoods(searchQuery.trim());
-      setSearchResults(foods);
-      setHasSearched(true);
-    } catch (error) {
-      console.error("Search error:", error);
-      toast.error("Failed to search ingredients. Please try again.");
-    } finally {
-      setIsSearching(false);
-    }
-  }, [searchQuery, isOffline]);
-
-  // Debounce Nutritionix search to reduce API spam on quick typing
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setHasSearched(false);
-      return;
-    }
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current);
-    }
-    searchDebounceRef.current = setTimeout(() => {
-      handleSearch();
-    }, 500);
-    return () => clearTimeout(searchDebounceRef.current);
-  }, [searchQuery, handleSearch]);
-
-  const addFromApi = async (item) => {
-    const { name } = item;
-    try {
-      const details =
-        item.grams !== undefined ? item : await fetchNutritionByName(name);
-      if (!details) return;
-
-      const ingredientToAdd = { name, ...details };
-
-      // Ensure gramsPerUnit and grams are always equal
-      if (!ingredientToAdd.gramsPerUnit) {
-        ingredientToAdd.gramsPerUnit = ingredientToAdd.grams;
-      }
-      ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
-
-      await addCustomIngredient(ingredientToAdd, user?.uid);
-      setSearchResults([]);
-      setSearchQuery("");
-      refresh();
-      toast.success("Ingredient added");
-    } catch (err) {
-      console.error("Failed to add ingredient from API", err);
-      toast.error("Could not add ingredient. Please try again.");
-    }
-  };
+    return list;
+  }, [ingredients, query, sourceFilter, categoryFilter, sortBy]);
 
   const refresh = useCallback(() => {
     const base = getAllBaseIngredients();
@@ -241,54 +137,52 @@ const IngredientManager = ({ onChange }) => {
       } catch (err) {
         console.error("Failed to sync ingredients", err);
         toast.error("Could not sync your ingredients.");
-        refresh(); // fall back to local even if remote failed
+        refresh();
       }
     };
     load();
   }, [user, refresh]);
 
-  const handleAdd = async () => {
-    if (!newIngredient.name.trim()) return;
-    const ingredientToAdd = { ...newIngredient };
-
-    // Ensure gramsPerUnit and grams are always equal
-    ingredientToAdd.grams = ingredientToAdd.gramsPerUnit;
-
-    try {
-      await addCustomIngredient(ingredientToAdd, user?.uid);
-      setNewIngredient({ ...empty });
-      refresh();
-      toast.success("Ingredient added");
-    } catch (err) {
-      console.error("Failed to add ingredient", err);
-      toast.error("Could not add ingredient. Please try again.");
-    }
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({ ...emptyForm });
   };
 
-  const startEdit = (ing) => {
-    setEditingId(ing.id);
-    setEditData({ ...ing });
-  };
+  const saveIngredient = async () => {
+    if (!form.name.trim()) return;
 
-  const saveEdit = async () => {
-    const ingredientToSave = { ...editData };
-
-    // Ensure gramsPerUnit and grams are always equal
-    ingredientToSave.grams = ingredientToSave.gramsPerUnit;
+    const ingredientToSave = {
+      id: editingId || undefined,
+      name: form.name.trim(),
+      category: form.category,
+      unit: form.unit,
+      gramsPerUnit: 100,
+      grams: 100,
+      calories: Number(form.calories) || 0,
+      protein: Number(form.protein) || 0,
+      carbs: Number(form.carbs) || 0,
+      fat: Number(form.fat) || 0,
+      notes: form.notes || "",
+    };
 
     try {
-      await upsertCustomIngredient(ingredientToSave, user?.uid);
-      setEditingId(null);
+      if (editingId) {
+        await upsertCustomIngredient(ingredientToSave, user?.uid);
+        toast.success("Ingredient updated");
+      } else {
+        await addCustomIngredient(ingredientToSave, user?.uid);
+        toast.success("Ingredient added");
+      }
+      resetForm();
       refresh();
-      toast.success("Ingredient updated");
     } catch (err) {
       console.error("Failed to save ingredient", err);
-      toast.error("Could not save ingredient changes.");
+      toast.error("Could not save ingredient. Please try again.");
     }
   };
 
   const handleRemove = (id) => {
-    const ing = ingredients.find(i => i.id === id);
+    const ing = ingredients.find((i) => i.id === id);
     setIngredientToDelete({ id, name: ing?.name || 'this ingredient' });
     setShowDeleteConfirm(true);
   };
@@ -299,6 +193,7 @@ const IngredientManager = ({ onChange }) => {
       await removeCustomIngredient(ingredientToDelete.id, user?.uid);
       refresh();
       setIngredientToDelete(null);
+      if (editingId === ingredientToDelete.id) resetForm();
       toast.success("Ingredient deleted");
     } catch (err) {
       console.error("Failed to delete ingredient", err);
@@ -306,779 +201,629 @@ const IngredientManager = ({ onChange }) => {
     }
   };
 
-  const handleChange = (setter) => (e) => {
-    const { name, value } = e.target;
-    setter((prev) => {
-      const updated = { ...prev, [name]: value };
-
-      // gramsPerUnit should always equal grams
-      if (name === "gramsPerUnit") {
-        updated.grams = value;
-      } else if (name === "grams") {
-        updated.gramsPerUnit = value;
-      }
-
-      return updated;
-    });
-  };
-
-  const handleExportCSV = () => {
-    // Create CSV header
-    const headers = ['Name', 'Unit', 'Grams per Unit', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)'];
-
-    // Create CSV rows
-    const rows = ingredients.map(ing => [
-      ing.name,
-      ing.unit || 'g',
-      ing.gramsPerUnit || ing.grams || 100,
-      ing.calories,
-      ing.protein,
-      ing.carbs,
-      ing.fat,
-    ]);
-
-    // Combine headers and rows
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell =>
-        // Escape cells that contain commas
-        typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
-      ).join(','))
-    ].join('\n');
-
-    // Create download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  // Export custom ingredients as JSON
+  const handleExportJSON = () => {
+    const customIngredients = ingredients.filter((i) => i.id >= 1000);
+    const jsonContent = JSON.stringify(customIngredients, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ingredients_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `ingredients_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('Ingredients exported to CSV!');
+    toast.success(`Exported ${customIngredients.length} custom ingredients`);
   };
 
-  const handleImportCSV = (event) => {
+  // Import ingredients from JSON
+  const handleImportJSON = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const text = e.target.result;
-        const lines = text.split('\n').filter(line => line.trim());
-
-        // Skip header
-        const dataLines = lines.slice(1);
+        const data = JSON.parse(e.target.result);
+        const ingredientsToImport = Array.isArray(data) ? data : [data];
 
         let imported = 0;
         let errors = 0;
 
-        for (const line of dataLines) {
+        for (const ing of ingredientsToImport) {
           try {
-            // Parse CSV line (handle quoted fields)
-            const fields = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-            const cleanFields = fields.map(f => f.replace(/^"|"$/g, '').trim());
-
-            if (cleanFields.length < 7) continue; // Skip incomplete rows
-
-            const [name, unit, gramsPerUnit, calories, protein, carbs, fat] = cleanFields;
-
+            if (!ing.name) continue;
             const ingredient = {
-              name: name,
-              unit: unit || 'g',
-              gramsPerUnit: Math.max(0, parseFloat(gramsPerUnit) || 100),
-              grams: Math.max(0, parseFloat(gramsPerUnit) || 100),
-              calories: Math.max(0, parseFloat(calories) || 0),
-              protein: Math.max(0, parseFloat(protein) || 0),
-              carbs: Math.max(0, parseFloat(carbs) || 0),
-              fat: Math.max(0, parseFloat(fat) || 0),
+              name: ing.name,
+              category: ing.category || CATEGORIES[6],
+              unit: ing.unit || 'g',
+              gramsPerUnit: 100,
+              grams: 100,
+              calories: Math.max(0, parseFloat(ing.calories) || 0),
+              protein: Math.max(0, parseFloat(ing.protein) || 0),
+              carbs: Math.max(0, parseFloat(ing.carbs) || 0),
+              fat: Math.max(0, parseFloat(ing.fat) || 0),
+              notes: ing.notes || "",
             };
-
-            if (Number.isNaN(ingredient.calories) || Number.isNaN(ingredient.protein) || Number.isNaN(ingredient.carbs) || Number.isNaN(ingredient.fat)) {
-              errors++;
-              continue;
-            }
             await addCustomIngredient(ingredient, user?.uid);
             imported++;
           } catch (err) {
-            console.error('Error importing line:', line, err);
+            console.error('Error importing ingredient:', ing, err);
             errors++;
           }
         }
 
         refresh();
-
-        if (imported > 0) {
-          toast.success(`Successfully imported ${imported} ingredient(s)!`);
-        }
-        if (errors > 0) {
-          toast.warning(`${errors} row(s) failed to import.`);
-        }
+        if (imported > 0) toast.success(`Successfully imported ${imported} ingredient(s)`);
+        if (errors > 0) toast.error(`${errors} ingredient(s) failed to import`);
       } catch (error) {
-        console.error('Error importing CSV:', error);
-        toast.error('Failed to import CSV. Please check the file format.');
+        console.error('Error parsing JSON:', error);
+        toast.error('Failed to import. Please check the file format.');
       }
     };
-
-    reader.onerror = () => {
-      toast.error('Failed to read file. Please try again.');
-    };
-
+    reader.onerror = () => toast.error('Failed to read file.');
     reader.readAsText(file);
-    event.target.value = ''; // Reset input
+    event.target.value = '';
   };
 
-  const tableColumns = [
-    { field: "name", headerName: "Name", flex: 1.2, minWidth: 150 },
-    { field: "unit", headerName: "Unit", width: 90 },
-    {
-      field: "gramsPerUnit",
-      headerName: "g/unit",
-      width: 110,
-      valueGetter: (params) => params.row.gramsPerUnit || params.row.grams || 100,
-    },
-    { field: "calories", headerName: "Cal", width: 90, type: "number" },
-    { field: "protein", headerName: "P", width: 90, type: "number" },
-    { field: "carbs", headerName: "C", width: 90, type: "number" },
-    { field: "fat", headerName: "F", width: 90, type: "number" },
-    {
-      field: "actions",
-      headerName: "Actions",
-      width: 180,
-      sortable: false,
-      filterable: false,
-      renderCell: ({ row }) => (
-        <Stack direction="row" spacing={1}>
-          <Tooltip
-            title={isFavorite(row.id) ? "Remove from favorites" : "Add to favorites"}
-          >
-            <IconButton
-              size="small"
-              color={isFavorite(row.id) ? "warning" : "default"}
-              onClick={() => handleToggleFavorite(row.id)}
-            >
-              {isFavorite(row.id) ? (
-                <StarIcon fontSize="small" />
-              ) : (
-                <StarBorderIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Edit">
-            <IconButton size="small" onClick={() => startEdit(row)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          {row.id >= 1000 && (
-            <Tooltip title="Delete">
-              <IconButton size="small" color="error" onClick={() => handleRemove(row.id)}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Stack>
-      ),
-    },
-  ];
-
-  const gridRows = filteredIngredients.map((ing) => ({
-    ...ing,
-    gramsPerUnit: ing.gramsPerUnit || ing.grams || 100,
-  }));
-
-  const totalCustomIngredients = ingredients.filter((i) => i.id >= 1000).length;
-
-  const DataGridToolbar = () => (
-    <GridToolbarContainer
-      sx={{ justifyContent: "space-between", px: 1, py: 0.5, gap: 1, flexWrap: "wrap" }}
-    >
-      <GridToolbarQuickFilter quickFilterProps={{ debounceMs: 300 }} />
-      <Typography variant="caption" color="text.secondary">
-        {filteredIngredients.length} items
-      </Typography>
-    </GridToolbarContainer>
+  // Category pill component
+  const CategoryPill = ({ label, active, onClick }) => (
+    <Chip
+      label={label}
+      size="small"
+      onClick={onClick}
+      sx={{
+        cursor: "pointer",
+        fontWeight: 600,
+        fontSize: "0.75rem",
+        borderRadius: "9999px",
+        ...(active
+          ? { bgcolor: "#1e293b", color: "#fff", "&:hover": { bgcolor: "#334155" } }
+          : { bgcolor: "#fff", color: "#475569", border: "1px solid #e2e8f0", "&:hover": { bgcolor: "#f8fafc" } }),
+      }}
+    />
   );
 
-  const formState = editingId ? editData : newIngredient;
-  const formSetter = editingId ? setEditData : setNewIngredient;
-
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Stack spacing={3}>
-        <Paper
-          elevation={0}
-          sx={{
-            p: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 3,
-            boxShadow: "0 16px 40px rgba(15,23,42,0.08)",
-            backdropFilter: "blur(10px)",
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            justifyContent="space-between"
+    <Box sx={{ py: 2 }}>
+      <Grid container spacing={3}>
+        {/* Left Panel: Create/Edit Form */}
+        <Grid size={{ xs: 12, md: 5, lg: 4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 3,
+            }}
           >
-            <Box>
-              <Typography variant="h4" fontWeight={800} gutterBottom>
-                Ingredient Manager
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Search, import, and curate your base and custom ingredients.
-              </Typography>
-            </Box>
-            <Stack
-              direction="row"
-              spacing={1}
-              flexWrap="wrap"
-              justifyContent={{ xs: "flex-start", sm: "flex-end" }}
-            >
-              <Button
-                variant="contained"
-                startIcon={<DownloadIcon />}
-                onClick={handleExportCSV}
-              >
-                Export CSV
-              </Button>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<UploadIcon />}
-                onClick={() => csvImportRef.current?.click()}
-              >
-                Import CSV
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={showTable ? <GridViewIcon /> : <TableRowsIcon />}
-                onClick={() => setShowTable((prev) => !prev)}
-              >
-                {showTable ? "Card View" : "Table View"}
-              </Button>
-            </Stack>
-          </Stack>
-          <input
-            ref={csvImportRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={handleImportCSV}
-            style={{ display: "none" }}
-            aria-label="Import ingredients from CSV file"
-          />
-        </Paper>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={5} lg={4}>
             <Stack spacing={2.5}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 3,
-                }}
-              >
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      Search & Filter
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Narrow down ingredients by name, type, and sort order.
-                    </Typography>
-                  </Box>
-                  <TextField
-                    label="Search ingredients"
-                    value={ingredientSearch}
-                    onChange={(e) => setIngredientSearch(e.target.value)}
-                    placeholder="Search by name"
-                    fullWidth
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                  <Grid container spacing={1.5}>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel id="filter-type-label">Filter</InputLabel>
-                        <Select
-                          labelId="filter-type-label"
-                          label="Filter"
-                          value={filterType}
-                          onChange={(e) => setFilterType(e.target.value)}
-                        >
-                          <MenuItem value="all">All ({ingredients.length})</MenuItem>
-                          <MenuItem value="favorites">Favorites ({favorites.length})</MenuItem>
-                          <MenuItem value="custom">Custom Only ({totalCustomIngredients})</MenuItem>
-                          <MenuItem value="standard">
-                            Standard Only ({ingredients.filter((i) => i.id < 1000).length})
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel id="sort-by-label">Sort</InputLabel>
-                        <Select
-                          labelId="sort-by-label"
-                          label="Sort"
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value)}
-                        >
-                          <MenuItem value="name">Name</MenuItem>
-                          <MenuItem value="calories">Calories</MenuItem>
-                          <MenuItem value="protein">Protein</MenuItem>
-                          <MenuItem value="carbs">Carbs</MenuItem>
-                          <MenuItem value="fat">Fat</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </Grid>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Tooltip
-                      title={`Toggle ${sortDirection === "asc" ? "descending" : "ascending"}`}
-                    >
-                      <IconButton
-                        onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-                        color="primary"
-                        size="small"
-                        sx={{ border: "1px solid", borderColor: "divider" }}
-                      >
-                        <SwapVertIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Typography variant="body2" color="text.secondary">
-                      {sortDirection === "asc" ? "Ascending" : "Descending"}
-                    </Typography>
-                  </Stack>
-                  <Typography variant="body2" color="text.secondary">
-                    Showing {filteredIngredients.length} of {ingredients.length} ingredients
-                    {ingredientSearch && ` matching “${ingredientSearch}”`}
-                  </Typography>
-                </Stack>
-              </Paper>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 3,
-                }}
-              >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={2}
-                  mb={1}
-                >
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    Add from Nutritionix
-                  </Typography>
-                  {isOffline && (
-                    <Chip
-                      icon={<CloudOffIcon fontSize="small" />}
-                      label="Offline"
-                      size="small"
-                      color="warning"
-                      variant="outlined"
-                    />
-                  )}
-                </Stack>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                  <TextField
-                    fullWidth
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search foods..."
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon fontSize="small" />
-                        </InputAdornment>
-                      ),
-                    }}
-                    disabled={isOffline}
-                  />
-                  <Button
-                    variant="contained"
-                    startIcon={<SearchIcon />}
-                    onClick={handleSearch}
-                    disabled={isSearching || isOffline}
-                  >
-                    {isOffline ? "Offline" : isSearching ? "Searching..." : "Search"}
-                  </Button>
-                </Stack>
-                {isSearching && (
-                  <LoadingSpinner message="Searching for ingredients..." size="small" />
-                )}
-                {!isSearching && hasSearched && searchResults.length === 0 && (
-                  <Typography variant="body2" color="text.secondary" mt={1}>
-                    No ingredients found for “{searchQuery}”. Try another term.
-                  </Typography>
-                )}
-                {!isSearching && searchResults.length > 0 && (
-                  <Stack spacing={1.25} mt={1}>
-                    {searchResults.map((res) => (
-                      <Paper
-                        key={res.id}
-                        variant="outlined"
-                        sx={{ p: 1.5, borderRadius: 2, borderColor: "divider" }}
-                      >
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="flex-start"
-                          spacing={2}
-                        >
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight={700} textTransform="capitalize">
-                              {res.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {res.unit || "g"} • {res.gramsPerUnit || res.grams || "-"} g
-                            </Typography>
-                          </Box>
-                          <Button size="small" variant="contained" onClick={() => addFromApi(res)}>
-                            Add
-                          </Button>
-                        </Stack>
-                        <Grid container spacing={1} mt={1}>
-                          {[
-                            { label: "Cal", value: res.calories },
-                            { label: "P", value: res.protein },
-                            { label: "C", value: res.carbs },
-                            { label: "F", value: res.fat },
-                          ].map((item) => (
-                            <Grid item xs={3} key={item.label}>
-                              <Typography variant="caption" color="text.secondary">
-                                {item.label}
-                              </Typography>
-                              <Typography variant="body2" fontWeight={600}>
-                                {item.value ?? "-"}
-                              </Typography>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
-              </Paper>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 3,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 3,
-                }}
-              >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={2}
-                  mb={1.5}
-                >
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight={700}>
-                      {editingId ? "Edit Ingredient" : "Add Custom Ingredient"}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Custom items start at ID 1000
-                    </Typography>
-                  </Box>
-                  {editingId && (
-                    <Chip label={`Editing #${editingId}`} size="small" color="primary" variant="outlined" />
-                  )}
-                </Stack>
-                <Grid container spacing={1.5}>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      name="name"
-                      label="Name"
-                      value={formState.name}
-                      onChange={handleChange(formSetter)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
-                      <InputLabel id="unit-label">Unit</InputLabel>
-                      <Select
-                        labelId="unit-label"
-                        label="Unit"
-                        name="unit"
-                        value={formState.unit}
-                        onChange={handleChange(formSetter)}
-                      >
-                        <MenuItem value="g">g</MenuItem>
-                        <MenuItem value="unit">unit</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      name="gramsPerUnit"
-                      label="g/unit"
-                      type="number"
-                      value={formState.gramsPerUnit}
-                      onChange={handleChange(formSetter)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField
-                      fullWidth
-                      name="calories"
-                      label="Calories"
-                      type="number"
-                      value={formState.calories}
-                      onChange={handleChange(formSetter)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField
-                      fullWidth
-                      name="protein"
-                      label="Protein"
-                      type="number"
-                      value={formState.protein}
-                      onChange={handleChange(formSetter)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField
-                      fullWidth
-                      name="carbs"
-                      label="Carbs"
-                      type="number"
-                      value={formState.carbs}
-                      onChange={handleChange(formSetter)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={3}>
-                    <TextField
-                      fullWidth
-                      name="fat"
-                      label="Fat"
-                      type="number"
-                      value={formState.fat}
-                      onChange={handleChange(formSetter)}
-                    />
-                  </Grid>
-                </Grid>
-                <Stack direction="row" spacing={1} justifyContent="flex-end" mt={2}>
-                  {editingId ? (
-                    <>
-                      <Button variant="contained" onClick={saveEdit}>
-                        Save changes
-                      </Button>
-                      <Button
-                        variant="text"
-                        color="inherit"
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditData({ ...empty });
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <Button variant="contained" onClick={handleAdd}>
-                      Add ingredient
-                    </Button>
-                  )}
-                </Stack>
-              </Paper>
-            </Stack>
-          </Grid>
-
-          <Grid item xs={12} md={7} lg={8}>
-            <Stack spacing={2.5}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2.5,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 3,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 2,
-                  flexWrap: "wrap",
-                }}
-              >
+              {/* Header */}
+              <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>
-                    All Ingredients
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Favorites: {favorites.length} • Custom: {totalCustomIngredients}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <KitchenIcon sx={{ color: "#475569", fontSize: 20 }} />
+                    <Typography variant="h6" fontWeight={700} sx={{ color: "#0f172a" }}>
+                      Ingredients
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Create custom foods or browse the database to use in Planner.
                   </Typography>
                 </Box>
-                <Chip
-                  label={`${filteredIngredients.length} shown`}
+                {editingId && (
+                  <Chip
+                    label="Editing"
+                    size="small"
+                    sx={{ bgcolor: "#f1f5f9", color: "#475569", fontWeight: 600, fontSize: "0.7rem" }}
+                  />
+                )}
+              </Stack>
+
+              {/* Form Fields */}
+              <Box>
+                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                  Ingredient name
+                </Typography>
+                <TextField
+                  fullWidth
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g., Chicken breast, Jasmine rice"
                   size="small"
-                  color="primary"
-                  variant="outlined"
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
                 />
+              </Box>
+
+              <Grid container spacing={1.5}>
+                <Grid size={6}>
+                  <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                    Category
+                  </Typography>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={form.category}
+                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {CATEGORIES.map((cat) => (
+                        <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                    Default unit
+                  </Typography>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={form.unit}
+                      onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <MenuItem value="g">g</MenuItem>
+                      <MenuItem value="ml">ml</MenuItem>
+                      <MenuItem value="unit">unit</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              {/* Macros Section */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: "#f8fafc",
+                  borderColor: "#e2e8f0",
+                }}
+              >
+                <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a", mb: 1.5 }}>
+                  Macros per 100g
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid size={6}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Calories
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={form.calories}
+                      onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Protein (g)
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={form.protein}
+                      onChange={(e) => setForm((f) => ({ ...f, protein: e.target.value }))}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Carbs (g)
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={form.carbs}
+                      onChange={(e) => setForm((f) => ({ ...f, carbs: e.target.value }))}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                    />
+                  </Grid>
+                  <Grid size={6}>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Fat (g)
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      value={form.fat}
+                      onChange={(e) => setForm((f) => ({ ...f, fat: e.target.value }))}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                    />
+                  </Grid>
+                </Grid>
               </Paper>
 
-              {!showTable ? (
-                <Grid container spacing={2}>
-                  {filteredIngredients.length === 0 ? (
-                    <Grid item xs={12}>
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 3,
-                          border: "1px dashed",
-                          borderColor: "divider",
-                          borderRadius: 3,
-                          textAlign: "center",
-                        }}
+              {/* Notes */}
+              <Box>
+                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                  Notes (optional)
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="e.g., 1 unit = 57g, cooked weight differs"
+                  multiline
+                  rows={2}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                />
+              </Box>
+
+              {/* Action Buttons */}
+              <Stack direction="row" spacing={1}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={saveIngredient}
+                  sx={{
+                    bgcolor: "#1e293b",
+                    "&:hover": { bgcolor: "#334155" },
+                    textTransform: "none",
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    py: 1.25,
+                  }}
+                >
+                  {editingId ? "Save changes" : "Add ingredient"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={resetForm}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    color: "#475569",
+                    borderColor: "#e2e8f0",
+                    borderRadius: 2,
+                    px: 3,
+                    "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                  }}
+                >
+                  Clear
+                </Button>
+              </Stack>
+
+              {/* Library Actions */}
+              <Box sx={{ pt: 1, borderTop: "1px solid", borderColor: "#f1f5f9" }}>
+                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                  Library actions
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<UploadIcon sx={{ fontSize: 16 }} />}
+                    onClick={() => jsonImportRef.current?.click()}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      color: "#475569",
+                      borderColor: "#e2e8f0",
+                      borderRadius: 2,
+                      "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                    }}
+                  >
+                    Import JSON
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+                    onClick={handleExportJSON}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      color: "#475569",
+                      borderColor: "#e2e8f0",
+                      borderRadius: 2,
+                      "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                    }}
+                  >
+                    Export JSON
+                  </Button>
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                  Imports/exports your custom ingredients only.
+                </Typography>
+              </Box>
+            </Stack>
+
+            <input
+              ref={jsonImportRef}
+              type="file"
+              accept=".json,application/json"
+              onChange={handleImportJSON}
+              style={{ display: "none" }}
+            />
+          </Paper>
+        </Grid>
+
+        {/* Right Panel: Browse */}
+        <Grid size={{ xs: 12, md: 7, lg: 8 }}>
+          <Stack spacing={2.5}>
+            {/* Search & Filter Header */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 3,
+              }}
+            >
+              {/* Top row: Title + Search + Filters */}
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                alignItems={{ xs: "stretch", md: "flex-start" }}
+                justifyContent="space-between"
+                spacing={2}
+              >
+                <Box sx={{ minWidth: 180 }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#0f172a" }}>
+                    Browse ingredients
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Search the DB and your custom foods.
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap" useFlexGap>
+                  <TextField
+                    size="small"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search ingredients..."
+                    sx={{
+                      minWidth: 200,
+                      "& .MuiOutlinedInput-root": { borderRadius: 2 },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon fontSize="small" sx={{ color: "#94a3b8" }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Source
+                    </Typography>
+                    <FormControl size="small" sx={{ minWidth: 90 }}>
+                      <Select
+                        value={sourceFilter}
+                        onChange={(e) => setSourceFilter(e.target.value)}
+                        sx={{ borderRadius: 2 }}
                       >
-                        <Typography variant="body2" color="text.secondary">
-                          No ingredients yet. Add one above or import/search to get started.
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ) : (
-                    filteredIngredients.map((ing) => (
-                      <Grid item xs={12} sm={6} md={4} key={ing.id}>
-                        <Card variant="outlined" sx={{ height: "100%", borderRadius: 3 }}>
-                          <CardContent
-                            sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}
-                          >
-                            <Stack
-                              direction="row"
-                              justifyContent="space-between"
-                              alignItems="flex-start"
-                            >
-                              <Box>
-                                <Typography
-                                  variant="subtitle1"
-                                  fontWeight={700}
-                                  textTransform="capitalize"
-                                >
-                                  {ing.name}
-                                </Typography>
+                        <MenuItem value="all">All</MenuItem>
+                        <MenuItem value="db">DB</MenuItem>
+                        <MenuItem value="custom">Custom</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                      Sort
+                    </Typography>
+                    <FormControl size="small" sx={{ minWidth: 90 }}>
+                      <Select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        <MenuItem value="name">Name</MenuItem>
+                        <MenuItem value="category">Category</MenuItem>
+                        <MenuItem value="source">Source</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </Stack>
+              </Stack>
+
+              {/* Category Pills */}
+              <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap alignItems="center">
+                <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+                  Category:
+                </Typography>
+                <CategoryPill label="All" active={categoryFilter === "all"} onClick={() => setCategoryFilter("all")} />
+                {CATEGORIES.map((cat) => (
+                  <CategoryPill
+                    key={cat}
+                    label={cat}
+                    active={categoryFilter === cat}
+                    onClick={() => setCategoryFilter(cat)}
+                  />
+                ))}
+              </Stack>
+            </Paper>
+
+            {/* Ingredients Table */}
+            <Paper
+              elevation={0}
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 3,
+                overflow: "hidden",
+              }}
+            >
+              {isDesktop ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: "#f8fafc" }}>
+                        <TableCell sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>Ingredient</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>Source</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>kcal</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>P</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>C</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>F</TableCell>
+                        <TableCell sx={{ width: 80 }} />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filtered.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              No ingredients found.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filtered.map((it) => (
+                          <TableRow key={it.id} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a" }}>
+                                {it.name}
+                              </Typography>
+                              {it.notes && (
                                 <Typography variant="caption" color="text.secondary">
-                                  {ing.unit || "g"} • {ing.gramsPerUnit || ing.grams || 100} g/unit
+                                  {it.notes}
                                 </Typography>
-                              </Box>
-                              <Stack direction="row" spacing={0.5}>
-                                <IconButton
-                                  size="small"
-                                  color={isFavorite(ing.id) ? "warning" : "default"}
-                                  onClick={() => handleToggleFavorite(ing.id)}
-                                  aria-label="Toggle favorite"
-                                >
-                                  {isFavorite(ing.id) ? (
-                                    <StarIcon fontSize="small" />
-                                  ) : (
-                                    <StarBorderIcon fontSize="small" />
-                                  )}
-                                </IconButton>
-                                {ing.id >= 1000 && (
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                      setShowTable(true);
-                                      startEdit(ing);
-                                    }}
-                                  >
-                                    <EditIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                              </Stack>
-                            </Stack>
-                            <Grid container spacing={1}>
-                              {[
-                                { label: "Cal", value: ing.calories },
-                                { label: "P", value: ing.protein },
-                                { label: "C", value: ing.carbs },
-                                { label: "F", value: ing.fat },
-                              ].map((item) => (
-                                <Grid item xs={3} key={item.label}>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {item.label}
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {item.value}
-                                  </Typography>
-                                </Grid>
-                              ))}
-                            </Grid>
-                            {ing.id >= 1000 && (
-                              <Stack direction="row" spacing={1} mt={1}>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onClick={() => {
-                                    setShowTable(true);
-                                    startEdit(ing);
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  size="small"
-                                  color="error"
-                                  variant="outlined"
-                                  onClick={() => handleRemove(ing.id)}
-                                >
-                                  Delete
-                                </Button>
-                              </Stack>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Grid>
+                              )}
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Typography variant="body2" color="text.secondary">
+                                {it.category || "—"}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              <Chip
+                                label={it.id < 1000 ? "DB" : "Custom"}
+                                size="small"
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.7rem",
+                                  height: 24,
+                                  borderRadius: 1,
+                                  ...(it.id < 1000
+                                    ? { bgcolor: "#d1fae5", color: "#065f46", border: "1px solid #a7f3d0" }
+                                    : { bgcolor: "#dbeafe", color: "#1e40af", border: "1px solid #bfdbfe" }),
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.5 }}>
+                              <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                {it.calories}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.5 }}>
+                              <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                {it.protein}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.5 }}>
+                              <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                {it.carbs}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right" sx={{ py: 1.5 }}>
+                              <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                {it.fat}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              {it.id >= 1000 && (
+                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                  <Tooltip title="Edit">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => setEditingId(it.id)}
+                                      sx={{ color: "#94a3b8", "&:hover": { color: "#64748b" } }}
+                                    >
+                                      <EditIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleRemove(it.id)}
+                                      sx={{ color: "#94a3b8", "&:hover": { color: "#64748b" } }}
+                                    >
+                                      <DeleteIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Stack>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                /* Mobile List */
+                <Stack divider={<Box sx={{ borderBottom: "1px solid", borderColor: "divider" }} />}>
+                  {filtered.length === 0 ? (
+                    <Box sx={{ p: 3, textAlign: "center" }}>
+                      <Typography variant="body2" color="text.secondary">
+                        No ingredients found.
+                      </Typography>
+                    </Box>
+                  ) : (
+                    filtered.map((it) => (
+                      <Box key={it.id} sx={{ p: 2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                          <Box>
+                            <Typography variant="body2" fontWeight={600}>
+                              {it.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {it.category || "—"} · {it.id < 1000 ? "DB" : "Custom"}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                        <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
+                          <Chip label={`${it.calories} kcal`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
+                          <Chip label={`${it.protein}g P`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
+                          <Chip label={`${it.carbs}g C`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
+                          <Chip label={`${it.fat}g F`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
+                        </Stack>
+                        {it.id >= 1000 && (
+                          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<EditIcon />}
+                              onClick={() => setEditingId(it.id)}
+                              sx={{ textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#e2e8f0" }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<DeleteIcon />}
+                              onClick={() => handleRemove(it.id)}
+                              sx={{ textTransform: "none", fontWeight: 600 }}
+                            >
+                              Delete
+                            </Button>
+                          </Stack>
+                        )}
+                      </Box>
                     ))
                   )}
-                </Grid>
-              ) : (
-                <Paper
-                  elevation={0}
-                  sx={{ p: 1, border: "1px solid", borderColor: "divider", borderRadius: 3 }}
-                >
-                  <DataGrid
-                    autoHeight
-                    rows={gridRows}
-                    columns={tableColumns}
-                    density="comfortable"
-                    disableRowSelectionOnClick
-                    pageSizeOptions={[10, 25, 50]}
-                    initialState={{
-                      pagination: { paginationModel: { pageSize: 10, page: 0 } },
-                    }}
-                    getRowId={(row) => row.id}
-                    slots={{ toolbar: DataGridToolbar }}
-                  />
-                </Paper>
+                </Stack>
               )}
-            </Stack>
-          </Grid>
+            </Paper>
+          </Stack>
         </Grid>
-      </Stack>
+      </Grid>
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}
@@ -1088,12 +833,12 @@ const IngredientManager = ({ onChange }) => {
         }}
         onConfirm={confirmDeleteIngredient}
         title="Delete Ingredient?"
-        message={`Are you sure you want to delete "${ingredientToDelete?.name}"?\n\nThis will remove it from your custom ingredients list. Any meal plans using this ingredient will show it as unavailable.`}
+        message={`Are you sure you want to delete "${ingredientToDelete?.name}"?\n\nThis will remove it from your custom ingredients list.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
       />
-    </Container>
+    </Box>
   );
 };
 

@@ -115,15 +115,19 @@ const MealPrep = () => {
         elevation={trigger ? 4 : 0}
         sx={{
           px: { xs: 1.5, md: 2 },
-          py: trigger ? 0.5 : 1,
+          py: 1,
+          minHeight: 72,
+          display: "flex",
+          justifyContent: "center",
           backdropFilter: "blur(12px)",
-          backgroundColor: trigger
-            ? theme.palette.mode === "dark"
-              ? "rgba(15,23,42,0.9)"
-              : "rgba(255,255,255,0.96)"
-            : "transparent",
-          borderBottom: trigger ? `1px solid ${theme.palette.divider}` : "none",
-          transition: "all 200ms ease",
+          backgroundColor:
+            theme.palette.mode === "dark"
+              ? "rgba(15,23,42,0.92)"
+              : "rgba(255,255,255,0.96)",
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          transition: theme.transitions.create(["box-shadow"], {
+            duration: theme.transitions.duration.shorter,
+          }),
         }}
       >
         <Toolbar disableGutters sx={{ gap: { xs: 1, md: 2 }, alignItems: "center" }}>
@@ -284,33 +288,34 @@ const MealPrep = () => {
           pb: isDesktop ? 0 : 10,
         }}
       >
-        <Stack spacing={3} key={activeTab}>
-          {activeTab === TABS.CALCULATOR && (
-            <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
-              <MealPrepCalculator allIngredients={allIngredients} />
-            </ErrorBoundary>
-          )}
-          {activeTab === TABS.CALORIE_CALC && (
-            <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
-              <CalorieCalculator />
-            </ErrorBoundary>
-          )}
-          {activeTab === TABS.INSTRUCTIONS && (
-            <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
-              <MealPrepInstructions />
-            </ErrorBoundary>
-          )}
-          {activeTab === TABS.INGREDIENTS && (
-            <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
-              <IngredientManager onChange={handleIngredientChange} />
-            </ErrorBoundary>
-          )}
-          {activeTab === TABS.ACCOUNT && (
-            <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
-              <AccountPage />
-            </ErrorBoundary>
-          )}
-        </Stack>
+        {/* Keep MealPrepCalculator mounted to preserve state */}
+        <Box sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}>
+          <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
+            <MealPrepCalculator allIngredients={allIngredients} isActive={activeTab === TABS.CALCULATOR} />
+          </ErrorBoundary>
+        </Box>
+
+        {/* Other tabs can mount/unmount as they don't have complex state */}
+        {activeTab === TABS.CALORIE_CALC && (
+          <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
+            <CalorieCalculator />
+          </ErrorBoundary>
+        )}
+        {activeTab === TABS.INSTRUCTIONS && (
+          <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
+            <MealPrepInstructions />
+          </ErrorBoundary>
+        )}
+        {activeTab === TABS.INGREDIENTS && (
+          <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
+            <IngredientManager onChange={handleIngredientChange} />
+          </ErrorBoundary>
+        )}
+        {activeTab === TABS.ACCOUNT && (
+          <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
+            <AccountPage />
+          </ErrorBoundary>
+        )}
       </Container>
     </Box>
   );

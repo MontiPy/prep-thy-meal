@@ -1,7 +1,12 @@
+// src/shared/components/layout/OfflineBanner.jsx
 import React, { useEffect, useState } from 'react';
+import { Alert, Snackbar } from '@mui/material';
+import { WifiOff } from 'lucide-react';
 
 const OfflineBanner = () => {
-  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -14,12 +19,19 @@ const OfflineBanner = () => {
     };
   }, []);
 
-  if (!isOffline) return null;
-
   return (
-    <div className="fixed top-0 inset-x-0 z-50 bg-amber-500 text-white text-sm py-2 px-4 shadow">
-      You are offline. Edits will be kept locally and cloud sync/search is disabled until you reconnect.
-    </div>
+    <Snackbar
+      open={isOffline}
+      anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+    >
+      <Alert
+        severity="warning"
+        icon={<WifiOff size={20} />}
+        sx={{ width: '100%' }}
+      >
+        You are offline. Edits will be kept locally and cloud sync/search is disabled until you reconnect.
+      </Alert>
+    </Snackbar>
   );
 };
 
