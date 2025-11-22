@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   FormControl,
   Grid,
   IconButton,
@@ -32,6 +33,7 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import KitchenIcon from "@mui/icons-material/KitchenRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadRounded";
+import CloudSearchIcon from "@mui/icons-material/TravelExplore";
 import {
   addCustomIngredient,
   removeCustomIngredient,
@@ -41,6 +43,7 @@ import {
 import { useUser } from '../auth/UserContext.jsx';
 import { getAllBaseIngredients } from './nutritionHelpers';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+import { searchFoods } from '../../shared/services/fatsecret';
 
 const CATEGORIES = [
   "Produce - Vegetables",
@@ -84,6 +87,11 @@ const IngredientManager = ({ onChange }) => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
 
+  // Nutritionix API search state
+  const [apiResults, setApiResults] = useState([]);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiSearched, setApiSearched] = useState(false);
+
   // Editing item reference
   const editingItem = useMemo(() => ingredients.find((i) => i.id === editingId) || null, [ingredients, editingId]);
 
@@ -124,6 +132,75 @@ const IngredientManager = ({ onChange }) => {
     setIngredients(base);
     onChange && onChange(base);
   }, [onChange]);
+
+  // Nutritionix API search function
+  const searchNutritionixAPI = useCallback(async (searchQuery) => {
+    if (!searchQuery || searchQuery.length < 2) {
+      setApiResults([]);
+      setApiSearched(false);
+      return;
+    }
+
+    if (!navigator.onLine) {
+      toast.error("You're offline. Nutritionix search unavailable.");
+      return;
+    }
+
+    setApiLoading(true);
+    setApiSearched(true);
+    try {
+      const results = await searchFoods(searchQuery);
+      setApiResults(results);
+      if (results.length === 0) {
+        // No results is okay, just show empty state
+      }
+    } catch (err) {
+      console.error("Nutritionix search failed:", err);
+      toast.error("Failed to search Nutritionix API");
+      setApiResults([]);
+    } finally {
+      setApiLoading(false);
+    }
+  }, []);
+
+  // Add API result as custom ingredient
+  const addFromApi = async (apiItem) => {
+    // Check if ingredient with same name already exists
+    const existing = ingredients.find(
+      (i) => i.name.toLowerCase() === apiItem.name.toLowerCase()
+    );
+    if (existing) {
+      toast.error(`"${apiItem.name}" already exists in your ingredients`);
+      return;
+    }
+
+    // FatSecret provides per-100g values directly
+    const ingredientToAdd = {
+      name: apiItem.name,
+      category: "Other", // User can edit later
+      unit: "g",
+      gramsPerUnit: 100,
+      grams: 100,
+      calories: apiItem.caloriesPer100g || apiItem.calories || 0,
+      protein: apiItem.proteinPer100g || apiItem.protein || 0,
+      carbs: apiItem.carbsPer100g || apiItem.carbs || 0,
+      fat: apiItem.fatPer100g || apiItem.fat || 0,
+      notes: apiItem.brandName
+        ? `${apiItem.brandName} (via FatSecret)`
+        : `Added from FatSecret`,
+    };
+
+    try {
+      await addCustomIngredient(ingredientToAdd, user?.uid);
+      toast.success(`Added "${apiItem.name}" to your ingredients`);
+      refresh();
+      // Remove from API results
+      setApiResults((prev) => prev.filter((r) => r.id !== apiItem.id));
+    } catch (err) {
+      console.error("Failed to add ingredient:", err);
+      toast.error("Failed to add ingredient");
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -582,6 +659,11 @@ const IngredientManager = ({ onChange }) => {
                     size="small"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && query.length >= 2) {
+                        searchNutritionixAPI(query);
+                      }
+                    }}
                     placeholder="Search ingredients..."
                     sx={{
                       minWidth: 200,
@@ -595,6 +677,26 @@ const IngredientManager = ({ onChange }) => {
                       ),
                     }}
                   />
+                  <Tooltip title="Search Nutritionix food database">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={apiLoading ? <CircularProgress size={16} /> : <CloudSearchIcon />}
+                      onClick={() => searchNutritionixAPI(query)}
+                      disabled={query.length < 2 || apiLoading}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 600,
+                        color: "#475569",
+                        borderColor: "#e2e8f0",
+                        borderRadius: 2,
+                        height: 40,
+                        "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                      }}
+                    >
+                      {apiLoading ? "Searching..." : "Lookup"}
+                    </Button>
+                  </Tooltip>
                   <Box>
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Source
@@ -646,6 +748,121 @@ const IngredientManager = ({ onChange }) => {
                 ))}
               </Stack>
             </Paper>
+
+            {/* FatSecret API Results */}
+            {(apiSearched || apiLoading) && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  border: "1px solid",
+                  borderColor: "#a5b4fc",
+                  borderRadius: 3,
+                  bgcolor: "#eef2ff",
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                  <CloudSearchIcon sx={{ color: "#4f46e5", fontSize: 20 }} />
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#1e1b4b" }}>
+                    FatSecret Results
+                  </Typography>
+                  {apiLoading && <CircularProgress size={18} sx={{ ml: 1 }} />}
+                  {!apiLoading && apiResults.length > 0 && (
+                    <Chip
+                      label={`${apiResults.length} found`}
+                      size="small"
+                      sx={{ bgcolor: "#c7d2fe", color: "#3730a3", fontWeight: 600, fontSize: "0.7rem" }}
+                    />
+                  )}
+                </Stack>
+
+                {apiLoading ? (
+                  <Box sx={{ textAlign: "center", py: 3 }}>
+                    <CircularProgress size={32} />
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Searching FatSecret database...
+                    </Typography>
+                  </Box>
+                ) : apiResults.length === 0 ? (
+                  <Box sx={{ textAlign: "center", py: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No results found for "{query}". Try a different search term.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Stack spacing={1}>
+                    {apiResults.map((item) => (
+                      <Paper
+                        key={item.id}
+                        variant="outlined"
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          bgcolor: "#fff",
+                          borderColor: "#c7d2fe",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 2,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <Box sx={{ minWidth: 150, flex: 1 }}>
+                          <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a", textTransform: "capitalize" }}>
+                            {item.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {item.brandName ? `${item.brandName} · ` : ""}{item.servingDescription || `${item.grams}g`}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          <Chip
+                            label={`${item.calories} kcal`}
+                            size="small"
+                            sx={{ bgcolor: "#fef3c7", color: "#92400e", fontWeight: 600, fontSize: "0.7rem" }}
+                          />
+                          <Chip
+                            label={`${item.protein}g P`}
+                            size="small"
+                            sx={{ bgcolor: "#dbeafe", color: "#1e40af", fontWeight: 600, fontSize: "0.7rem" }}
+                          />
+                          <Chip
+                            label={`${item.carbs}g C`}
+                            size="small"
+                            sx={{ bgcolor: "#dcfce7", color: "#166534", fontWeight: 600, fontSize: "0.7rem" }}
+                          />
+                          <Chip
+                            label={`${item.fat}g F`}
+                            size="small"
+                            sx={{ bgcolor: "#ffe4e6", color: "#9f1239", fontWeight: 600, fontSize: "0.7rem" }}
+                          />
+                        </Stack>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() => addFromApi(item)}
+                          sx={{
+                            bgcolor: "#4f46e5",
+                            "&:hover": { bgcolor: "#4338ca" },
+                            textTransform: "none",
+                            fontWeight: 600,
+                            borderRadius: 2,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Add to library
+                        </Button>
+                      </Paper>
+                    ))}
+                  </Stack>
+                )}
+
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2, textAlign: "center" }}>
+                  Data provided by FatSecret. Values normalized to per 100g when added to your library.
+                </Typography>
+              </Paper>
+            )}
 
             {/* Ingredients Table */}
             <Paper
