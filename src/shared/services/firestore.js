@@ -68,7 +68,23 @@ export const loadCustomIngredients = async (uid) => {
   return snap.exists() ? snap.data().customIngredients || [] : [];
 };
 
+// Helper to remove undefined values from objects (Firestore doesn't allow undefined)
+const removeUndefined = (obj) => {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, removeUndefined(v)])
+    );
+  }
+  return obj;
+};
+
 export const saveCustomIngredients = async (uid, items) => {
-  await setDoc(doc(settingsRef, uid), { customIngredients: items }, { merge: true });
+  const cleanedItems = removeUndefined(items);
+  await setDoc(doc(settingsRef, uid), { customIngredients: cleanedItems }, { merge: true });
   return loadCustomIngredients(uid);
 };

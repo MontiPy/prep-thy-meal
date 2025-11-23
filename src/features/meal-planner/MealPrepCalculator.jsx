@@ -331,7 +331,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
           .map((ing) => {
             const updated = allIngredients.find((i) => i.id === ing.id);
             return updated
-              ? normalizeIngredient({ ...updated, grams: ing.grams })
+              ? normalizeIngredient({ ...updated, grams: ing.grams, quantity: ing.quantity })
               : normalizeIngredient(ing);
           })
           .filter(Boolean);
@@ -1154,19 +1154,19 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
     MEALS.forEach((meal) => {
       const list = mealIngredients[meal];
       list.forEach((ing) => {
-        const quantity =
-          ing.quantity || ing.grams / (ing.gramsPerUnit || ing.grams || 100);
-        const grams = quantity * (ing.gramsPerUnit || ing.grams || 100);
+        // Use the quantity and grams already calculated on the ingredient
+        const quantity = Number(ing.quantity) || 1;
+        const grams = Number(ing.grams) || 0;
 
         if (!totals[ing.id]) {
           totals[ing.id] = {
             ...ing,
-            quantity: Number(quantity) || 0,
-            grams: Number(grams) || 0,
+            quantity: quantity,
+            grams: grams,
           };
         } else {
-          totals[ing.id].quantity += Number(quantity) || 0;
-          totals[ing.id].grams += Number(grams) || 0;
+          totals[ing.id].quantity += quantity;
+          totals[ing.id].grams += grams;
         }
       });
     });
