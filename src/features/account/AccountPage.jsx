@@ -33,6 +33,15 @@ const AccountPage = () => {
   const { user, logout } = useUser();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Failed to logout:', error);
+      toast.error('Failed to sign out. Please try again.');
+    }
+  };
+
   const handleDeleteAccount = async () => {
     try {
       localStorage.clear();
@@ -186,7 +195,7 @@ const AccountPage = () => {
               <CardHeader title={<Typography variant="h6" fontWeight={800}>Account Actions</Typography>} />
               <CardContent>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                  <Button variant="contained" color="error" onClick={logout}>
+                  <Button variant="contained" color="error" onClick={handleLogout}>
                     🚪 Sign Out
                   </Button>
                   <Button variant="outlined" color="inherit" onClick={() => setShowDeleteConfirm(true)}>

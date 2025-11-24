@@ -2,10 +2,10 @@ import React from 'react';
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import { IconButton, Tooltip } from '@mui/material';
-import { useTheme } from '../../context/ThemeContext';
+import { useAppTheme } from '../../context/ThemeContext';
 
 const ThemeToggle = () => {
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useAppTheme();
 
   return (
     <Tooltip title={isDark ? 'Light mode' : 'Dark mode'} arrow>

@@ -231,7 +231,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
   const [currentPlanId, setCurrentPlanId] = useState(null);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
+  const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
 

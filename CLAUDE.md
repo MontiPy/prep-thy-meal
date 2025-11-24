@@ -21,12 +21,12 @@ This is a React + Vite meal preparation application with Firebase authentication
 ### Core Structure
 - **React 19** frontend with modern JSX and ES modules
 - **Vite** for development and build tooling
-- **Tailwind CSS v4** for styling with class-based dark mode support
+- **Material-UI (MUI) v7** for UI components and styling with built-in dark mode support
 - **Vitest** with @testing-library/react for unit and component testing
 - **Firebase** for user authentication (Google provider) and Firestore database
 - **USDA FoodData Central API** for ingredient nutrition data lookup (free API key required)
 - **react-hot-toast** for user notifications and feedback
-- **Mobile-responsive** design with Tailwind's responsive utilities
+- **Mobile-responsive** design with MUI's responsive utilities and breakpoints
 
 ### Folder Structure
 
@@ -288,9 +288,9 @@ Setup requirements:
 - ESLint configured with React hooks and refresh plugins
 - Import paths use relative references (`./` and `../`)
 - Firebase services imported from `src/shared/services/firebase.js`
-- **Tailwind CSS** for styling with utility classes and dark mode variants (`dark:` prefix)
+- **Material-UI (MUI)** for styling with `sx` prop and theme-based dark mode
 - No TypeScript and no PropTypes/runtime validation in components
-- Icon library: `lucide-react` for UI icons
+- Icon library: `@mui/icons-material` and `lucide-react` for UI icons
 - Toast notifications: `react-hot-toast` for user feedback
 - PDF generation: `jspdf` and `jspdf-autotable` for meal plan exports
 
@@ -302,22 +302,23 @@ Setup requirements:
 5. User profile photo and display name shown in header
 
 ### Dark Mode Implementation
-- **Class-based dark mode** using Tailwind's `dark:` variant
-- **ThemeContext** manages theme state across the application
+- **MUI theme-based dark mode** using `createTheme` with `palette.mode`
+- **ThemeContext** manages theme state across the application (use `useAppTheme` hook)
 - **ThemeToggle** component provides UI for switching themes
 - **Persistence**: Theme preference saved to localStorage
 - **System preference detection**: Defaults to `prefers-color-scheme` media query
-- **Dark variants**: All components support dark mode styling with `dark:` utility classes
+- **Dark variants**: All components use MUI's theme-aware `sx` prop for dark mode styling
 
 ### Mobile Considerations
 - Mobile bottom navigation bar (MealPrep) is fixed at the footer; ensure views leave bottom padding
 - Ingredient Manager renders card layouts on mobile; desktop uses tables with horizontal scroll
 - Tables use horizontal scroll when content exceeds viewport
 - Touch-friendly button sizing (minimum 44×44px tap targets)
-- Responsive breakpoints handled via Tailwind CSS utilities
+- Responsive breakpoints handled via MUI's `useMediaQuery` and `theme.breakpoints`
 - Share functionality uses Web Share API for mobile integration (shopping list → Reminders)
 - Dark mode automatically adapts to system preference on first load
 - Offline banner appears when `navigator.onLine` is false; food search is disabled offline
+- Touch optimizations in CSS for smoother mobile interactions
 
 ## User Experience Improvement Roadmap
 

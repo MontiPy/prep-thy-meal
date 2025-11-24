@@ -1,5 +1,6 @@
 // src/shared/components/layout/MealPrep.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 import AccountCircleIcon from "@mui/icons-material/AccountCircleRounded";
 import ArticleIcon from "@mui/icons-material/ArticleRounded";
 import CalculateIcon from "@mui/icons-material/CalculateRounded";
@@ -67,6 +68,15 @@ const MealPrep = () => {
     setAllIngredients(list);
   };
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Failed to logout:", error);
+      toast.error("Failed to sign out. Please try again.");
+    }
+  }, [logout]);
+
   // Refresh ingredients when switching to Planner tab to pick up any changes
   useEffect(() => {
     if (activeTab === TABS.CALCULATOR) {
@@ -76,10 +86,17 @@ const MealPrep = () => {
 
   useEffect(() => {
     if (user) {
-      syncFromRemote(user.uid).then(() => {
-        setAllIngredients(getAllBaseIngredients());
-        setLastSync(new Date());
-      });
+      syncFromRemote(user.uid)
+        .then(() => {
+          setAllIngredients(getAllBaseIngredients());
+          setLastSync(new Date());
+        })
+        .catch((error) => {
+          console.error("Failed to sync from remote:", error);
+          toast.error("Failed to sync data. Using local data.");
+          setAllIngredients(getAllBaseIngredients());
+          setLastSync(new Date());
+        });
     } else {
       setAllIngredients(getAllBaseIngredients());
       setLastSync(new Date());
@@ -190,6 +207,8 @@ const MealPrep = () => {
                 <Tab
                   key={key}
                   value={key}
+                  id={`tab-${key}`}
+                  aria-controls={`tabpanel-${key}`}
                   label={
                     <Stack direction="row" spacing={1} alignItems="center">
                       {icon}
@@ -252,7 +271,7 @@ const MealPrep = () => {
               </Avatar>
               <Button
                 type="button"
-                onClick={logout}
+                onClick={handleLogout}
                 variant="outlined"
                 color="error"
                 size="small"
@@ -280,9 +299,17 @@ const MealPrep = () => {
             showLabels
             value={activeTab}
             onChange={(_, value) => setActiveTab(value)}
+            component="nav"
+            aria-label="Main navigation"
           >
             {TAB_CONFIG.map(({ key, label, icon }) => (
-              <BottomNavigationAction key={key} value={key} label={label} icon={icon} />
+              <BottomNavigationAction
+                key={key}
+                value={key}
+                label={label}
+                icon={icon}
+                aria-controls={`tabpanel-${key}`}
+              />
             ))}
           </BottomNavigation>
         </Paper>
@@ -290,13 +317,20 @@ const MealPrep = () => {
 
       <Container
         maxWidth="xl"
+        component="main"
         sx={{
           pt: 3,
           pb: isDesktop ? 0 : 10,
         }}
       >
         {/* Keep MealPrepCalculator mounted to preserve state */}
-        <Box sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}>
+        <Box
+          role="tabpanel"
+          id="tabpanel-calculator"
+          aria-labelledby="tab-calculator"
+          hidden={activeTab !== TABS.CALCULATOR}
+          sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}
+        >
           <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
             <MealPrepCalculator allIngredients={allIngredients} isActive={activeTab === TABS.CALCULATOR} />
           </ErrorBoundary>
@@ -304,24 +338,32 @@ const MealPrep = () => {
 
         {/* Other tabs can mount/unmount as they don't have complex state */}
         {activeTab === TABS.CALORIE_CALC && (
-          <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
-            <CalorieCalculator />
-          </ErrorBoundary>
+          <Box role="tabpanel" id="tabpanel-calorie-calc" aria-labelledby="tab-calorie-calc">
+            <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
+              <CalorieCalculator />
+            </ErrorBoundary>
+          </Box>
         )}
         {activeTab === TABS.INSTRUCTIONS && (
-          <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
-            <MealPrepInstructions />
-          </ErrorBoundary>
+          <Box role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions">
+            <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
+              <MealPrepInstructions />
+            </ErrorBoundary>
+          </Box>
         )}
         {activeTab === TABS.INGREDIENTS && (
-          <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
-            <IngredientManager onChange={handleIngredientChange} />
-          </ErrorBoundary>
+          <Box role="tabpanel" id="tabpanel-ingredients" aria-labelledby="tab-ingredients">
+            <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
+              <IngredientManager onChange={handleIngredientChange} />
+            </ErrorBoundary>
+          </Box>
         )}
         {activeTab === TABS.ACCOUNT && (
-          <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
-            <AccountPage />
-          </ErrorBoundary>
+          <Box role="tabpanel" id="tabpanel-account" aria-labelledby="tab-account">
+            <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
+              <AccountPage />
+            </ErrorBoundary>
+          </Box>
         )}
       </Container>
     </Box>

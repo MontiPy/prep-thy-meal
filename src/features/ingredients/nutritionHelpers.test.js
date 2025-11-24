@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { normalizeIngredient, calculateNutrition } from './nutritionHelpers';
+import { normalizeIngredient, calculateNutrition, invalidateIngredientCache } from './nutritionHelpers';
 import * as ingredientStorage from './ingredientStorage';
 
 // Mock the ingredient storage
@@ -71,8 +71,9 @@ describe('normalizeIngredient', () => {
 
 describe('calculateNutrition', () => {
   beforeEach(() => {
-    // Reset mock before each test
+    // Reset mock and cache before each test
     vi.clearAllMocks();
+    invalidateIngredientCache();
   });
 
   it('should scale nutrition values based on quantity', () => {
