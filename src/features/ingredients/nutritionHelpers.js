@@ -1,6 +1,51 @@
 // src/features/ingredients/nutritionHelpers.js
 import { loadCustomIngredients } from "./ingredientStorage";
 
+// ============================================================================
+// INGREDIENT CACHE - Dramatically improves performance by avoiding repeated
+// localStorage parsing and normalization on every calculateNutrition call
+// ============================================================================
+let cachedIngredients = null;
+let cachedIngredientsMap = null;
+let cacheVersion = 0;
+
+/**
+ * Invalidate the ingredient cache. Call this when ingredients are added/updated/removed.
+ */
+export const invalidateIngredientCache = () => {
+  cachedIngredients = null;
+  cachedIngredientsMap = null;
+  cacheVersion++;
+};
+
+/**
+ * Get the current cache version (useful for React dependency tracking)
+ */
+export const getCacheVersion = () => cacheVersion;
+
+/**
+ * Get cached ingredients list, rebuilding cache if needed
+ */
+const getCachedIngredients = () => {
+  if (cachedIngredients === null) {
+    cachedIngredients = loadCustomIngredients().map(normalizeIngredient);
+    // Build lookup map for O(1) access
+    cachedIngredientsMap = new Map();
+    cachedIngredients.forEach(ing => cachedIngredientsMap.set(ing.id, ing));
+  }
+  return cachedIngredients;
+};
+
+/**
+ * Get ingredient by ID using O(1) map lookup
+ */
+const getCachedIngredient = (id) => {
+  if (cachedIngredientsMap === null) {
+    getCachedIngredients(); // This will build the map
+  }
+  return cachedIngredientsMap.get(id) || null;
+};
+
 /**
  * Migrate old ingredient format to new serving model
  * Old: nutritionPer ("100g" | "serving"), gramsPerUnit, weightPerUnit
@@ -113,11 +158,11 @@ export const normalizeIngredient = (item) => {
 };
 
 export const getAllBaseIngredients = () => {
-  return loadCustomIngredients().map(normalizeIngredient);
+  return getCachedIngredients();
 };
 
 const getOriginal = (id) => {
-  return getAllBaseIngredients().find((item) => item.id === id);
+  return getCachedIngredient(id);
 };
 
 export const getOriginalGrams = (id) => getOriginal(id)?.grams || 0;

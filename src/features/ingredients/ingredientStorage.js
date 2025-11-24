@@ -1,5 +1,6 @@
 const LOCAL_KEY = 'customIngredients';
 import { loadCustomIngredients as apiLoad, saveCustomIngredients as apiSave } from '../../shared/services/firestore';
+import { invalidateIngredientCache } from './nutritionHelpers';
 
 export const loadCustomIngredients = () => {
   try {
@@ -35,6 +36,7 @@ export const syncFromRemote = async (uid) => {
 
   const merged = Array.from(mergedMap.values());
   saveLocal(merged);
+  invalidateIngredientCache();
   return merged;
 };
 
@@ -43,6 +45,7 @@ export const addCustomIngredient = async (ingredient, uid) => {
   const newIngredient = { id: Date.now(), ...ingredient };
   items.push(newIngredient);
   saveLocal(items);
+  invalidateIngredientCache();
   await saveRemote(uid, items);
   return newIngredient;
 };
@@ -52,6 +55,7 @@ export const updateCustomIngredient = async (id, updates, uid) => {
     i.id === id ? { ...i, ...updates } : i
   );
   saveLocal(items);
+  invalidateIngredientCache();
   await saveRemote(uid, items);
 };
 
@@ -64,12 +68,14 @@ export const upsertCustomIngredient = async (ingredient, uid) => {
     items.push({ ...ingredient });
   }
   saveLocal(items);
+  invalidateIngredientCache();
   await saveRemote(uid, items);
 };
 
 export const removeCustomIngredient = async (id, uid) => {
   const items = loadCustomIngredients().filter((i) => i.id !== id);
   saveLocal(items);
+  invalidateIngredientCache();
   await saveRemote(uid, items);
 };
 export const getAllIngredients = (defaults) => [...defaults, ...loadCustomIngredients()];

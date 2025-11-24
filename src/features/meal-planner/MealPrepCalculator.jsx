@@ -37,8 +37,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useTheme } from "@mui/material/styles";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// jsPDF is dynamically imported in handleExportPDF to reduce initial bundle size
 import {
   calculateNutrition,
   normalizeIngredient,
@@ -68,6 +67,121 @@ import MacroTargetPopover from "./MacroTargetPopover";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 const roundVal = (n) => Math.round(Number(n) || 0);
+
+// Moved outside component to avoid recreation on every render
+const calcTotals = (list) =>
+  list.reduce(
+    (totals, ingredient) => {
+      const nutrition = calculateNutrition(ingredient);
+      return {
+        calories: totals.calories + nutrition.calories,
+        protein: totals.protein + nutrition.protein,
+        carbs: totals.carbs + nutrition.carbs,
+        fat: totals.fat + nutrition.fat,
+      };
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+const calcTotalsRounded = (list) => {
+  const totals = calcTotals(list);
+  return {
+    calories: roundVal(totals.calories),
+    protein: roundVal(totals.protein),
+    carbs: roundVal(totals.carbs),
+    fat: roundVal(totals.fat),
+  };
+};
+
+// Categorize ingredients by store section (moved outside component)
+const categorizeIngredient = (name) => {
+  const nameL = name.toLowerCase();
+  if (
+    nameL.includes("chicken") ||
+    nameL.includes("beef") ||
+    nameL.includes("pork") ||
+    nameL.includes("turkey") ||
+    nameL.includes("fish") ||
+    nameL.includes("salmon") ||
+    nameL.includes("tuna") ||
+    nameL.includes("meat")
+  ) {
+    return "Meat & Seafood";
+  }
+  if (
+    nameL.includes("milk") ||
+    nameL.includes("cheese") ||
+    nameL.includes("yogurt") ||
+    nameL.includes("butter") ||
+    nameL.includes("cream")
+  ) {
+    return "Dairy";
+  }
+  if (
+    nameL.includes("apple") ||
+    nameL.includes("banana") ||
+    nameL.includes("berry") ||
+    nameL.includes("orange") ||
+    nameL.includes("grape") ||
+    nameL.includes("fruit")
+  ) {
+    return "Produce - Fruits";
+  }
+  if (
+    nameL.includes("broccoli") ||
+    nameL.includes("spinach") ||
+    nameL.includes("carrot") ||
+    nameL.includes("lettuce") ||
+    nameL.includes("tomato") ||
+    nameL.includes("vegetable") ||
+    nameL.includes("kale") ||
+    nameL.includes("pepper")
+  ) {
+    return "Produce - Vegetables";
+  }
+  if (
+    nameL.includes("rice") ||
+    nameL.includes("pasta") ||
+    nameL.includes("bread") ||
+    nameL.includes("oats") ||
+    nameL.includes("quinoa") ||
+    nameL.includes("cereal")
+  ) {
+    return "Grains & Bread";
+  }
+  if (
+    nameL.includes("beans") ||
+    nameL.includes("nuts") ||
+    nameL.includes("peanut") ||
+    nameL.includes("almond") ||
+    nameL.includes("seed")
+  ) {
+    return "Nuts & Legumes";
+  }
+  if (
+    nameL.includes("oil") ||
+    nameL.includes("sauce") ||
+    nameL.includes("spice") ||
+    nameL.includes("salt") ||
+    nameL.includes("pepper") ||
+    nameL.includes("vinegar")
+  ) {
+    return "Condiments & Spices";
+  }
+  return "Other";
+};
+
+// Category colors for shopping list (moved outside component)
+const getCategoryColors = (cat) => {
+  if (cat.includes("Produce - Fruit")) return { header: "#86efac", bg: "#f0fdf4" };
+  if (cat.includes("Produce - Vegetable")) return { header: "#4ade80", bg: "#f0fdf4" };
+  if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "#fca5a5", bg: "#fef2f2" };
+  if (cat.includes("Dairy")) return { header: "#93c5fd", bg: "#eff6ff" };
+  if (cat.includes("Grains") || cat.includes("Bread")) return { header: "#fcd34d", bg: "#fffbeb" };
+  if (cat.includes("Fats") || cat.includes("Oils")) return { header: "#fbbf24", bg: "#fffbeb" };
+  if (cat.includes("Beverages")) return { header: "#a5b4fc", bg: "#eef2ff" };
+  return { header: "#e5e7eb", bg: "#f9fafb" };
+};
 
 const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
   const { user } = useUser();
@@ -362,7 +476,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
     setHasUnsavedChanges(false);
   }, [currentPlanId]);
 
-  const updateIngredientAmount = (meal, id, newValue) => {
+  const updateIngredientAmount = useCallback((meal, id, newValue) => {
     setMealIngredients((prev) => {
       const list = prev[meal].map((ingredient) => {
         if (ingredient.id !== id) return ingredient;
@@ -401,10 +515,10 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
       }
       return updated;
     });
-  };
+  }, [allIngredients, matchDinner, refreshIngredientData, setMealIngredients]);
 
   // Update the selected serving size for an ingredient
-  const updateIngredientServing = (meal, id, servingName) => {
+  const updateIngredientServing = useCallback((meal, id, servingName) => {
     setMealIngredients((prev) => {
       const list = prev[meal].map((ingredient) => {
         if (ingredient.id !== id) return ingredient;
@@ -431,9 +545,9 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
       }
       return updated;
     });
-  };
+  }, [matchDinner, refreshIngredientData, setMealIngredients]);
 
-  const removeIngredient = (meal, id) => {
+  const removeIngredient = useCallback((meal, id) => {
     setMealIngredients((prev) => {
       const list = prev[meal].filter((ing) => ing.id !== id);
       const updated = { ...prev, [meal]: list };
@@ -442,9 +556,9 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
       }
       return updated;
     });
-  };
+  }, [matchDinner, refreshIngredientData, setMealIngredients]);
 
-  const handleAddIngredient = (meal) => {
+  const handleAddIngredient = useCallback((meal) => {
     const id = parseInt(selectedId);
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
@@ -469,7 +583,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
       return updated;
     });
     setSelectedId("");
-  };
+  }, [selectedId, allIngredients, matchDinner, refreshIngredientData, setMealIngredients]);
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
@@ -822,7 +936,13 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
     toast.success('Meal plan exported as JSON!');
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    // Dynamic import to reduce initial bundle size (~200KB savings)
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+
     const doc = new jsPDF();
     const title = planName || "Meal Plan";
 
@@ -1028,126 +1148,28 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
     }
   };
 
-  const calcTotals = (list) =>
-    list.reduce(
-      (totals, ingredient) => {
-        const nutrition = calculateNutrition(ingredient);
-        return {
-          calories: totals.calories + nutrition.calories,
-          protein: totals.protein + nutrition.protein,
-          carbs: totals.carbs + nutrition.carbs,
-          fat: totals.fat + nutrition.fat,
-        };
-      },
+  // Memoized meal totals - calculated once per meal change
+  const mealTotals = useMemo(() => {
+    const totals = {};
+    MEALS.forEach((meal) => {
+      totals[meal] = calcTotalsRounded(mealIngredients[meal]);
+    });
+    return totals;
+  }, [mealIngredients]);
+
+  // Daily totals across all meals (memoized)
+  const dailyTotals = useMemo(() => {
+    const totals = MEALS.reduce(
+      (acc, meal) => ({
+        calories: acc.calories + mealTotals[meal].calories,
+        protein: acc.protein + mealTotals[meal].protein,
+        carbs: acc.carbs + mealTotals[meal].carbs,
+        fat: acc.fat + mealTotals[meal].fat,
+      }),
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
-
-  const calcTotalsRounded = (list) => {
-    const totals = calcTotals(list);
-    return {
-      calories: roundVal(totals.calories),
-      protein: roundVal(totals.protein),
-      carbs: roundVal(totals.carbs),
-      fat: roundVal(totals.fat),
-    };
-  };
-
-  // Daily totals across all meals
-  const dailyTotals = MEALS.reduce(
-    (totals, meal) => {
-      const list = mealIngredients[meal];
-      const t = calcTotals(list);
-      return {
-        calories: totals.calories + t.calories,
-        protein: totals.protein + t.protein,
-        carbs: totals.carbs + t.carbs,
-        fat: totals.fat + t.fat,
-      };
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-  dailyTotals.calories = roundVal(dailyTotals.calories);
-  dailyTotals.protein = roundVal(dailyTotals.protein);
-  dailyTotals.carbs = roundVal(dailyTotals.carbs);
-  dailyTotals.fat = roundVal(dailyTotals.fat);
-
-  // Categorize ingredients by store section
-  const categorizeIngredient = (name) => {
-    const nameL = name.toLowerCase();
-    if (
-      nameL.includes("chicken") ||
-      nameL.includes("beef") ||
-      nameL.includes("pork") ||
-      nameL.includes("turkey") ||
-      nameL.includes("fish") ||
-      nameL.includes("salmon") ||
-      nameL.includes("tuna") ||
-      nameL.includes("meat")
-    ) {
-      return "Meat & Seafood";
-    }
-    if (
-      nameL.includes("milk") ||
-      nameL.includes("cheese") ||
-      nameL.includes("yogurt") ||
-      nameL.includes("butter") ||
-      nameL.includes("cream")
-    ) {
-      return "Dairy";
-    }
-    if (
-      nameL.includes("apple") ||
-      nameL.includes("banana") ||
-      nameL.includes("berry") ||
-      nameL.includes("orange") ||
-      nameL.includes("grape") ||
-      nameL.includes("fruit")
-    ) {
-      return "Produce - Fruits";
-    }
-    if (
-      nameL.includes("broccoli") ||
-      nameL.includes("spinach") ||
-      nameL.includes("carrot") ||
-      nameL.includes("lettuce") ||
-      nameL.includes("tomato") ||
-      nameL.includes("vegetable") ||
-      nameL.includes("kale") ||
-      nameL.includes("pepper")
-    ) {
-      return "Produce - Vegetables";
-    }
-    if (
-      nameL.includes("rice") ||
-      nameL.includes("pasta") ||
-      nameL.includes("bread") ||
-      nameL.includes("oats") ||
-      nameL.includes("quinoa") ||
-      nameL.includes("cereal")
-    ) {
-      return "Grains & Bread";
-    }
-    if (
-      nameL.includes("beans") ||
-      nameL.includes("nuts") ||
-      nameL.includes("peanut") ||
-      nameL.includes("almond") ||
-      nameL.includes("seed")
-    ) {
-      return "Nuts & Legumes";
-    }
-    if (
-      nameL.includes("oil") ||
-      nameL.includes("sauce") ||
-      nameL.includes("spice") ||
-      nameL.includes("salt") ||
-      nameL.includes("pepper") ||
-      nameL.includes("vinegar")
-    ) {
-      return "Condiments & Spices";
-    }
-    return "Other";
-  };
+    return totals;
+  }, [mealTotals]);
 
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
@@ -1570,7 +1592,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
               {MEALS.map((meal, idx) => {
                 const list = mealIngredients[meal];
                 const disabled = matchDinner && meal === "dinner";
-                const mealTotals = calcTotals(list);
+                const currentMealTotals = mealTotals[meal]; // Use memoized totals
                 return (
                   <Accordion key={meal} defaultExpanded={idx === 1} disableGutters>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -1607,7 +1629,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                           )}
                         </Stack>
                         <Typography variant="caption" color="text.secondary">
-                          {roundVal(mealTotals.calories)} kcal · {roundVal(mealTotals.protein)}g P · {roundVal(mealTotals.carbs)}g C · {roundVal(mealTotals.fat)}g F
+                          {currentMealTotals.calories} kcal · {currentMealTotals.protein}g P · {currentMealTotals.carbs}g C · {currentMealTotals.fat}g F
                         </Typography>
                       </Stack>
                     </AccordionSummary>
@@ -1804,16 +1826,16 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                                 <TableCell align="center">—</TableCell>
                                 <TableCell align="center">—</TableCell>
                                 <TableCell align="center">
-                                  {calcTotalsRounded(list).calories}
+                                  {currentMealTotals.calories}
                                 </TableCell>
                                 <TableCell align="center">
-                                  {calcTotalsRounded(list).protein}
+                                  {currentMealTotals.protein}
                                 </TableCell>
                                 <TableCell align="center">
-                                  {calcTotalsRounded(list).carbs}
+                                  {currentMealTotals.carbs}
                                 </TableCell>
                                 <TableCell align="center">
-                                  {calcTotalsRounded(list).fat}
+                                  {currentMealTotals.fat}
                                 </TableCell>
                                 <TableCell align="center">-</TableCell>
                               </TableRow>
@@ -2012,17 +2034,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
 
                 <Stack spacing={1.5}>
                   {Object.entries(categorizedShoppingList).map(([category, ingredients]) => {
-                    // Category colors - header (stronger) and background (paler)
-                    const getCategoryColors = (cat) => {
-                      if (cat.includes("Produce - Fruit")) return { header: "#86efac", bg: "#f0fdf4" };    // Green
-                      if (cat.includes("Produce - Vegetable")) return { header: "#4ade80", bg: "#f0fdf4" }; // Darker green
-                      if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "#fca5a5", bg: "#fef2f2" }; // Red
-                      if (cat.includes("Dairy")) return { header: "#93c5fd", bg: "#eff6ff" };              // Blue
-                      if (cat.includes("Grains") || cat.includes("Bread")) return { header: "#fcd34d", bg: "#fffbeb" }; // Amber
-                      if (cat.includes("Fats") || cat.includes("Oils")) return { header: "#fbbf24", bg: "#fffbeb" };    // Darker amber
-                      if (cat.includes("Beverages")) return { header: "#a5b4fc", bg: "#eef2ff" };          // Indigo
-                      return { header: "#e5e7eb", bg: "#f9fafb" };                                         // Grey
-                    };
                     const colors = getCategoryColors(category);
                     return (
                     <Paper key={category} variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
