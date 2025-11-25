@@ -1,0 +1,983 @@
+
+ ▐▛███▜▌   Claude Code v2.0.37
+▝▜█████▛▘  Sonnet 4.5 · Claude API
+  ▘▘ ▝▝    C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal
+══════════════════════════════════════════════════════ Conversation compacted · ctrl+o for history ══════════════════════════════════════════════════════
+  ⎿  Read fix_imports.py (99 lines)
+  ⎿  Read src\features\auth\UserContext.jsx (35 lines)
+  ⎿  Read fix-imports.sh (49 lines)
+  ⎿  Read src\shared\components\layout\MealPrep.jsx (182 lines)
+  ⎿  Read src\app\App.jsx (71 lines)
+  ⎿  Todo list read (7 items)
+
+● I'll continue with running the fixed Python script to batch-update all import paths across the project.
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && python fix_imports.py)
+  ⎿  [OK] Updated: features\auth\Login.jsx                          
+     [OK] Updated: features\calorie-calculator\CalorieCalculator.jsx
+     [OK] Updated: features\ingredients\IngredientManager.jsx
+     … +6 lines (ctrl+o to expand)
+
+● Excellent! The script successfully updated 7 files. Let me verify the changes by checking one of the key files:
+
+● Read(src\features\meal-planner\MealPrepCalculator.jsx)
+  ⎿  Read 50 lines
+
+● I can see there are still some incorrect import paths. Lines 19-20 show imports from the current directory that should be pointing to shared
+  components. Let me check which files still have incorrect imports:
+
+● Search(pattern: "from ['"]\.\/ConfirmDialog", path: "src\features")
+  ⎿  Found 3 files (ctrl+o to expand)
+
+● Search(pattern: "from ['"]\.\/LoadingSpinner", path: "src\features")
+  ⎿  Found 2 files (ctrl+o to expand)
+
+● Search(pattern: "from ['"]\.\/ErrorBoundary", path: "src\features")
+  ⎿  Found 0 files 
+
+● I found files with incorrect imports. Let me fix them manually:
+
+● Read(src\features\meal-planner\MealPrepCalculator.jsx)
+  ⎿  Read 25 lines
+
+● Update(src\features\meal-planner\MealPrepCalculator.jsx)
+  ⎿  Updated src\features\meal-planner\MealPrepCalculator.jsx with 2 additions and 2 removals
+       16      saveBaseline,
+       17    } from '../../shared/services/storage';
+       18    import { useUser } from '../auth/UserContext.jsx";
+       19 -  import ConfirmDialog from "./ConfirmDialog";
+       20 -  import LoadingSpinner from "./LoadingSpinner";
+       19 +  import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+       20 +  import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+       21    
+       22    const MealPrepCalculator = ({ allIngredients }) => {
+       23      const { user } = useUser();
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 30 lines
+
+● Update(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Updated src\features\ingredients\IngredientManager.jsx with 2 additions and 2 removals        
+       11    import { useUser } from '../auth/UserContext.jsx";
+       12    import { getAllBaseIngredients } from './nutritionHelpers";
+       13    import { fetchNutritionByName, searchFoods } from '../../shared/services/nutritionix";
+       14 -  import ConfirmDialog from "./ConfirmDialog";
+       15 -  import LoadingSpinner from "./LoadingSpinner";
+       14 +  import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+       15 +  import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+       16    
+       17    const empty = {
+       18      name: "",
+
+● Read(src\features\account\AccountPage.jsx)
+  ⎿  Read 25 lines
+
+● Update(src\features\account\AccountPage.jsx)
+  ⎿  Updated src\features\account\AccountPage.jsx with 1 addition and 1 removal  
+       1    import React, { useState } from 'react';
+       2    import toast from 'react-hot-toast';
+       3    import { useUser } from '../auth/UserContext.jsx';
+       4 -  import ConfirmDialog from './ConfirmDialog';
+       4 +  import ConfirmDialog from '../../shared/components/ui/ConfirmDialog';
+       5    
+       6    const AccountPage = () => {
+       7      const { user, logout } = useUser();
+
+● Now let me verify all imports are correct by searching for any remaining incorrect patterns:
+
+● Search(pattern: "from ['"]\.\.\/components\/", path: "src")
+  ⎿  Found 0 files 
+
+● Search(pattern: "from ['"]\.\.\/utils\/", path: "src")
+  ⎿  Found 0 files 
+
+● Search(pattern: "from ['"]\.\.\/context\/", path: "src")
+  ⎿  Found 0 files 
+
+● Perfect! All old import paths have been updated. Now let me run the tests to verify everything still works:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run test:run) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+
+     ⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+      FAIL  src/utils/ingredientConversions.test.js [ src/utils/ingredientConversions.test.js ]
+     Error: Failed to resolve import "./ingredientStorage" from "src/utils/nutritionHelpers.js". Does the file exist?
+       Plugin: vite:import-analysis
+       File: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/utils/nutritionHelpers.js:2:39
+       1  |  // src/utils/nutritionHelpers.js
+       2  |  import { loadCustomIngredients } from "./ingredientStorage";
+     … +66 lines (ctrl+o to see all)
+
+● The tests are failing because the test files are still in src/utils/ but the files they're testing have moved to src/features/ingredients/. Let me
+  move the test files and update their imports:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && dir src\utils\*.test.js /b)
+  ⎿  Error: Exit code 2
+     dir: cannot access 'srcutils*.test.js': No such file or directory
+     dir: cannot access '/b': No such file or directory
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && ls src/utils/*.test.js)
+  ⎿  src/utils/ingredientConversions.test.js
+     src/utils/matchDinner.test.js
+     src/utils/nutritionHelpers.test.js
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && mv src/utils/ingredientConversions.test.js src/features/ingredients/ && mv
+      src/utils/matchDinn…)
+  ⎿  (No content)
+
+● Good! The test files are now in the same directory as the code they're testing. Let me run the tests again:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run test:run) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+
+     ⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+      FAIL  src/features/ingredients/ingredientConversions.test.js [ src/features/ingredients/ingredientConversions.test.js ]
+     Error: Failed to resolve import "./nutritionHelpers" from "src/features/ingredients/ingredientConversions.test.js". Does the file exist?
+       Plugin: vite:import-analysis
+       File: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/ingredients/ingredientConversions.test.js:2:37
+       1  |  import { describe, it, expect } from 'vitest';
+       2  |  import { normalizeIngredient } from './nutritionHelpers';
+     … +66 lines (ctrl+o to see all)
+
+● Let me check if the files actually exist in the expected location:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && ls src/features/ingredients/ | grep -E "nutrition|ingredient")
+  ⎿  ingredientConversions.test.js
+     ingredientStorage.js
+     nutritionHelpers.test.js
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && find src -name "nutritionHelpers.js" 2>/dev/null)
+  ⎿  src/utils/nutritionHelpers.js
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && ls src/utils/)
+  ⎿  favoritesStorage.js
+     nutritionHelpers.js
+
+● I see the problem - some files weren't moved during restructuring. Let me move them now:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && mv src/utils/nutritionHelpers.js src/features/ingredients/ && mv
+      src/utils/favoritesStorage.js…)
+  ⎿  (No content)
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run test:run) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+
+     ⎯⎯⎯⎯⎯⎯ Failed Suites 3 ⎯⎯⎯⎯⎯⎯⎯
+
+      FAIL  src/features/ingredients/ingredientConversions.test.js [ src/features/ingredients/ingredientConversions.test.js ]
+     Error: Failed to resolve import "./api.js" from "src/features/ingredients/ingredientStorage.js". Does the file exist?
+       Plugin: vite:import-analysis
+       File: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/ingredients/ingredientStorage.js:2:84
+       1  |  const LOCAL_KEY = 'customIngredients';
+       2  |  import { loadCustomIngredients as apiLoad, saveCustomIngredients as apiSave } from './api.js';
+     … +47 lines (ctrl+o to see all)
+
+● Now I need to fix the import in ingredientStorage.js. Let me check and update it:
+
+● Read(src\features\ingredients\ingredientStorage.js)
+  ⎿  Read 10 lines
+
+● Update(src\features\ingredients\ingredientStorage.js)
+  ⎿  Updated src\features\ingredients\ingredientStorage.js with 1 addition and 1 removal                                         
+       1    const LOCAL_KEY = 'customIngredients';
+       2 -  import { loadCustomIngredients as apiLoad, saveCustomIngredients as apiSave } from './api.js';
+       2 +  import { loadCustomIngredients as apiLoad, saveCustomIngredients as apiSave } from '../../shared/services/firestore';
+       3    
+       4    export const loadCustomIngredients = () => {
+       5      try {
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run test:run) timeout: 1m 0s
+  ⎿  > prep-thy-meal@0.0.0 test:run
+     > vitest run
+     … +11 lines (ctrl+o to expand)
+
+● Perfect! All 37 tests are passing. Let me update the todo list and then update CLAUDE.md with the new structure:
+
+● Now let me update CLAUDE.md to reflect the new folder structure:
+
+● Read(CLAUDE.md)
+  ⎿  Read 100 lines
+
+● Search(pattern: "###.*Structure|##.*Structure|Folder|Directory", path: "CLAUDE.md", output_mode: "content")
+  ⎿  Found 1 line (ctrl+o to expand)
+
+● Search(pattern: "src/(components|utils|context|hooks)/", path: "CLAUDE.md", output_mode: "content")
+  ⎿  Found 17 lines (ctrl+o to expand)
+
+● Let me add a new section about the folder structure and update all the old file paths:
+
+● Read(CLAUDE.md)
+  ⎿  Read 35 lines
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 69 additions                                                                         
+        28    - **react-hot-toast** for user notifications and feedback
+        29    - **Mobile-responsive** design with Tailwind's responsive utilities
+        30    
+        31 +  ### Folder Structure
+        32 +  
+        33 +  The project follows a **feature-based architecture** for better organization and scalability:
+        34 +  
+        35 +  ```
+        36 +  src/
+        37 +  ├── app/                          # Application entry point
+        38 +  │   ├── App.jsx                   # Root component with providers
+        39 +  │   └── main.jsx                  # Vite entry point
+        40 +  ├── features/                     # Feature modules (domain-driven)
+        41 +  │   ├── auth/                     # Authentication feature
+        42 +  │   │   ├── Login.jsx
+        43 +  │   │   └── UserContext.jsx
+        44 +  │   ├── meal-planner/             # Meal planning feature
+        45 +  │   │   ├── MealPrepCalculator.jsx
+        46 +  │   │   ├── IngredientCard.jsx
+        47 +  │   │   └── MealTemplateSelector.jsx
+        48 +  │   ├── ingredients/              # Ingredient management feature
+        49 +  │   │   ├── IngredientManager.jsx
+        50 +  │   │   ├── ingredientStorage.js
+        51 +  │   │   ├── nutritionHelpers.js
+        52 +  │   │   ├── favorites.js
+        53 +  │   │   └── *.test.js             # Co-located tests
+        54 +  │   ├── calorie-calculator/       # Calorie calculator feature
+        55 +  │   │   └── CalorieCalculator.jsx
+        56 +  │   ├── account/                  # Account management feature
+        57 +  │   │   └── AccountPage.jsx
+        58 +  │   └── instructions/             # Instructions feature
+        59 +  │       └── MealPrepInstructions.jsx
+        60 +  ├── shared/                       # Shared/reusable code
+        61 +  │   ├── components/
+        62 +  │   │   ├── ui/                   # Reusable UI components
+        63 +  │   │   │   ├── ConfirmDialog.jsx
+        64 +  │   │   │   ├── Tooltip.jsx
+        65 +  │   │   │   ├── LoadingSpinner.jsx
+        66 +  │   │   │   ├── ErrorBoundary.jsx
+        67 +  │   │   │   └── SkeletonLoader.jsx
+        68 +  │   │   ├── layout/               # Layout components
+        69 +  │   │   │   ├── MealPrep.jsx      # Main app layout
+        70 +  │   │   │   ├── ThemeToggle.jsx
+        71 +  │   │   │   └── OfflineBanner.jsx
+        72 +  │   │   └── onboarding/           # Onboarding components
+        73 +  │   │       ├── OnboardingModal.jsx
+        74 +  │   │       └── KeyboardShortcutsHelp.jsx
+        75 +  │   ├── hooks/                    # Shared React hooks
+        76 +  │   │   ├── useKeyboardShortcuts.js
+        77 +  │   │   └── useUndoRedo.js
+        78 +  │   ├── context/                  # Global context providers
+        79 +  │   │   └── ThemeContext.jsx
+        80 +  │   ├── services/                 # External services
+        81 +  │   │   ├── firebase.js           # Firebase config
+        82 +  │   │   ├── firestore.js          # Firestore operations
+        83 +  │   │   ├── nutritionix.js        # Nutritionix API
+        84 +  │   │   ├── storage.js            # Storage facade
+        85 +  │   │   └── onboarding.js         # Onboarding storage
+        86 +  │   └── utils/                    # Shared utilities
+        87 +  │       ├── mealTemplates.js
+        88 +  │       └── recentIngredients.js
+        89 +  ├── index.css                     # Global styles
+        90 +  └── App.css                       # Component styles
+        91 +  ```
+        92 +  
+        93 +  **Architecture Principles:**
+        94 +  - **Feature folders** contain all related code for a specific domain (components, utilities, tests)
+        95 +  - **Shared folder** contains code used across multiple features
+        96 +  - **Co-located tests** live next to the code they test
+        97 +  - **Clear boundaries** between features prevent tight coupling
+        98 +  - **Import paths** reflect the architecture (e.g., `../../shared/components/ui/LoadingSpinner`)
+        99 +  
+       100    ### Key Components
+       101    
+       102    **Main Application Components:**
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Now let me update all the old file path references:
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 3 additions and 3 removals                                    
+       126    
+       127    **Three-Layer Storage System:**
+       128    
+       129 -  1. **Local Storage Layer** (`src/utils/ingredientStorage.js`)
+       129 +  1. **Local Storage Layer** (`src/features/ingredients/ingredientStorage.js`)
+       130       - Primary data cache using localStorage
+       131       - Custom ingredients stored with unique timestamp-based IDs (>= 1000)
+       132       - Provides immediate data access without network calls
+       133    
+       134 -  2. **Firebase Sync Layer** (`src/utils/api.js`)
+       134 +  2. **Firebase Sync Layer** (`src/shared/services/firestore.js`)
+       135       - Syncs custom ingredients to Firestore `settings/{uid}` document
+       136       - Saves meal plans to Firestore `plans` collection with uid filtering
+       137       - Stores baseline configuration in `settings/{uid}` document
+       138       - All writes trigger local → remote sync
+       139    
+       140 -  3. **External API Layer** (`src/utils/nutritionixApi.js`)
+       140 +  3. **External API Layer** (`src/shared/services/nutritionix.js`)
+       141       - Searches Nutritionix API for ingredient nutrition data
+       142       - Two endpoints: instant search and natural language nutrients
+       143       - Results are added to local/remote storage for future use
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 3 additions and 3 removals                                                                                        
+       148    - New ingredients via Nutritionix → added as custom ingredients (local + Firestore)
+       149    
+       150    **Additional Storage Systems:**
+       151 -  - **Favorites** (`src/utils/favoritesStorage.js`): localStorage-based favorites system for frequently used ingredients
+       152 -  - **Storage Facade** (`src/utils/storage.js`): Convenience wrapper that re-exports api.js functions for plan/baseline operations
+       153 -  - **Theme Preference** (`ThemeContext`): Dark/light mode preference stored in localStorage with system preference fallback
+       151 +  - **Favorites** (`src/features/ingredients/favorites.js`): localStorage-based favorites system for frequently used ingredients
+       152 +  - **Storage Facade** (`src/shared/services/storage.js`): Convenience wrapper that re-exports firestore
+           +  .js functions for plan/baseline operations
+       153 +  - **Theme Preference** (`src/shared/context/ThemeContext.jsx
+           +  `): Dark/light mode preference stored in localStorage with system preference fallback
+       154      - Auth loading states use the shared `LoadingSpinner` component
+       155    
+       156    ### Meal Planning Data Model
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                                                                        
+       228    - Authentication required: All operations require valid Firebase authentication
+       229    
+       230    **Code-Level Security:**
+       231 -  - `assertPlanOwnership()` function in `src/utils/api.js` validates ownership before operations
+       231 +  - `assertPlanOwnership()` function in `src/shared/services/firestore.js` validates ownership before operations
+       232    - Race condition protection: UID checks prevent stale data updates
+       233    - Firebase Auth integration: User context provides authenticated user state
+       234    
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Error editing file
+
+● Search(pattern: "ingredientConversions.test.js|matchDinner.test.js|nutritionHelpers.test.js", path: "CLAUDE.md", output_mode: "content")
+  ⎿  Found 13 lines (ctrl+o to expand)
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 3 additions and 3 removals                                                
+       280    - **Error Handling**: Test error boundaries and error states
+       281    
+       282    **Example Test Files:**
+       283 -  - `src/utils/ingredientConversions.test.js` - Unit conversion logic tests
+       284 -  - `src/utils/matchDinner.test.js` - Meal matching algorithm tests
+       285 -  - `src/utils/nutritionHelpers.test.js` - Nutrition calculation tests
+       283 +  - `src/features/ingredients/ingredientConversions.test.js` - Unit conversion logic tests
+       284 +  - `src/features/ingredients/matchDinner.test.js` - Meal matching algorithm tests
+       285 +  - `src/features/ingredients/nutritionHelpers.test.js` - Nutrition calculation tests
+       286    
+       287    ### Code Patterns
+       288    - Uses modern React patterns (hooks, context, functional components)
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Error editing file
+
+● Search(pattern: "Firebase services imported from", path: "CLAUDE.md", output_mode: "content")
+  ⎿  Found 7 lines (ctrl+o to expand)
+
+● Update(CLAUDE.md)
+  ⎿  Error editing file
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                                                     
+       288    - Uses modern React patterns (hooks, context, functional components)
+       289    - ESLint configured with React hooks and refresh plugins
+       290    - Import paths use relative references (`./` and `../`)
+       291 -  - Firebase services imported from `src/utils/firebase.js`
+       291 +  - Firebase services imported from `src/shared/services/firebase.js`
+       292    - **Tailwind CSS** for styling with utility classes and dark mode variants (`dark:` prefix)
+       293    - No TypeScript and no PropTypes/runtime validation in components
+       294    - Icon library: `lucide-react` for UI icons
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Search(pattern: "^\*\*Location\*\*:|^Location:", path: "CLAUDE.md", output_mode: "content")
+  ⎿  Found 7 lines (ctrl+o to expand)
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                  
+       478    
+       479    ### 1. Keyboard Shortcuts (`useKeyboardShortcuts` hook)
+       480    
+       481 -  **Location**: `src/hooks/useKeyboardShortcuts.js`
+       481 +  **Location**: `src/shared/hooks/useKeyboardShortcuts.js`
+       482    
+       483    **Usage Example**:
+       484    ```javascript
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal            
+       506    
+       507    ### 2. Undo/Redo System (`useUndoRedo` hook)
+       508    
+       509 -  **Location**: `src/hooks/useUndoRedo.js`
+       509 +  **Location**: `src/shared/hooks/useUndoRedo.js`
+       510    
+       511    **Usage Example**:
+       512    ```javascript
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                                  
+       543    
+       544    ### 3. Recent Ingredients Tracking
+       545    
+       546 -  **Location**: `src/utils/recentIngredientsStorage.js`
+       546 +  **Location**: `src/shared/utils/recentIngredients.js`
+       547    
+       548    **API**:
+       549    - `addToRecentIngredients(ingredientId)` - Add ingredient to recent list
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                                                                 
+       557    
+       558    ### 4. Meal Templates System
+       559    
+       560 -  **Location**: `src/utils/mealTemplates.js`, `src/components/MealTemplateSelector.jsx`
+       560 +  **Location**: `src/shared/utils/mealTemplates.js`, `src/features/meal-planner/MealTemplateSelector.jsx`
+       561    
+       562    **Predefined Templates**:
+       563    - Breakfast: Oatmeal, Eggs & Toast, Protein Smoothie, Greek Yogurt Bowl
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                                                                   
+       589    
+       590    ### 5. First-Time User Onboarding
+       591    
+       592 -  **Location**: `src/components/OnboardingModal.jsx`, `src/utils/onboardingStorage.js`
+       592 +  **Location**: `src/shared/components/onboarding/OnboardingModal.jsx`, `src/shared/services/onboarding.js`
+       593    
+       594    **Integration**:
+       595    ```javascript
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal              
+       625    
+       626    ### 6. Tooltip Component
+       627    
+       628 -  **Location**: `src/components/Tooltip.jsx`
+       628 +  **Location**: `src/shared/components/ui/Tooltip.jsx`
+       629    
+       630    **Usage**:
+       631    ```javascript
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Update(CLAUDE.md)
+  ⎿  Updated CLAUDE.md with 1 addition and 1 removal                     
+       643    
+       644    ### 7. Loading Skeletons
+       645    
+       646 -  **Location**: `src/components/SkeletonLoader.jsx`
+       646 +  **Location**: `src/shared/components/ui/SkeletonLoader.jsx`
+       647    
+       648    **Available Components**:
+       649    - `Skeleton` - Base component
+
+     Tip: Use # to memorize shortcut to quickly add to CLAUDE.md
+
+● Perfect! All file path references have been updated in CLAUDE.md. Let me mark this task as complete:
+
+● Excellent! The project restructuring is complete. Let me verify the app still runs correctly:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 129ms
+     error during build:
+     [vite:build-html] Failed to resolve /src/main.jsx from C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/index.html
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/index.html
+         at file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/vite/dist/node/chunks/dep-Bg4HVnP5.js:26899:64
+         at async Promise.all (index 0)
+         at async Object.handler 
+     (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/vite/dist/node/chunks/dep-Bg4HVnP5.js:27000:5)
+         at async transform (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21020:16)
+         at async ModuleLoader.addModuleSource 
+     (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21233:36)
+     … +7 lines (ctrl+o to see all)
+
+● I need to update index.html to point to the new location of main.jsx:
+
+● Read(index.html)
+  ⎿  Read 24 lines
+
+● Update(index.html)
+  ⎿  Updated index.html with 1 addition and 1 removal                   
+       18      </head>
+       19      <body>
+       20        <div id="root"></div>
+       21 -      <script type="module" src="/src/main.jsx"></script>
+       21 +      <script type="module" src="/src/app/main.jsx"></script>
+       22      </body>
+       23    </html>
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 859ms
+     error during build:
+     Could not resolve "./index.css" from "src/app/main.jsx"
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/app/main.jsx
+         at getRollupError (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+         at error (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+         at ModuleLoader.handleInvalidResolvedId 
+     (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21442:24)
+         at file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21402:26
+
+     … +7 lines (ctrl+o to see all)
+
+● Read(src\app\main.jsx)
+  ⎿  Read 12 lines
+
+● Update(src\app\main.jsx)
+  ⎿  Updated src\app\main.jsx with 2 additions and 2 removals           
+       1 -  // src/main.jsx
+       1 +  // src/app/main.jsx
+       2    import React from "react";
+       3    import ReactDOM from "react-dom/client";
+       4    import App from "./App";
+       5 -  import "./index.css";
+       5 +  import "../index.css";
+       6    
+       7    ReactDOM.createRoot(document.getElementById("root")).render(
+       8      <React.StrictMode>
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 1.64s
+     error during build:
+     Could not resolve "../../shared/context/ThemeContext" from "src/shared/components/layout/ThemeToggle.jsx"
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/shared/components/layout/ThemeToggle.jsx
+         at getRollupError (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+         at error (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+         at ModuleLoader.handleInvalidResolvedId 
+     (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21442:24)
+         at file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21402:26
+
+     … +7 lines (ctrl+o to see all)
+
+● Read(src\shared\components\layout\ThemeToggle.jsx)
+  ⎿  Read 15 lines
+
+● Update(src\shared\components\layout\ThemeToggle.jsx)
+  ⎿  Updated src\shared\components\layout\ThemeToggle.jsx with 1 addition and 1 removal
+       1    import React from 'react';
+       2    import { Moon, Sun } from 'lucide-react';
+       3 -  import { useTheme } from '../../shared/context/ThemeContext';
+       3 +  import { useTheme } from '../../context/ThemeContext';
+       4    
+       5    const ThemeToggle = () => {
+       6      const { isDark, toggleTheme } = useTheme();
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 2.67s
+     error during build:
+     [vite:esbuild] Transform failed with 1 error:
+     C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/meal-planner/MealPrepCalculator.jsx:9:28: ERROR: Unterminated string literal
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/meal-planner/MealPrepCalculator.jsx:9:28
+
+     Unterminated string literal
+     7  |    calculateNutrition,
+     8  |    normalizeIngredient,
+     … +23 lines (ctrl+o to see all)
+
+● Read(src\features\meal-planner\MealPrepCalculator.jsx)
+  ⎿  Read 20 lines
+
+● Update(src\features\meal-planner\MealPrepCalculator.jsx)
+  ⎿  Updated src\features\meal-planner\MealPrepCalculator.jsx with 2 additions and 2 removals
+        6    import {
+        7      calculateNutrition,
+        8      normalizeIngredient,
+        9 -  } from './nutritionHelpers";
+        9 +  } from './nutritionHelpers';
+       10    import {
+       11      loadPlans,
+       12      addPlan,
+     ...
+       15      loadBaseline,
+       16      saveBaseline,
+       17    } from '../../shared/services/storage';
+       18 -  import { useUser } from '../auth/UserContext.jsx";
+       18 +  import { useUser } from '../auth/UserContext.jsx';
+       19    import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+       20    import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+       21    
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && grep -r "from '.*\"" src/ --include="*.jsx" --include="*.js" | head -20)
+  ⎿  src/features/ingredients/IngredientManager.jsx:} from './ingredientStorage";                                           
+     src/features/ingredients/IngredientManager.jsx:import { loadFavorites, toggleFavorite, isFavorite } from './favorites";
+     src/features/ingredients/IngredientManager.jsx:import { useUser } from '../auth/UserContext.jsx";
+     … +2 lines (ctrl+o to expand)
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 15 lines
+
+● Update(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Updated src\features\ingredients\IngredientManager.jsx with 5 additions and 5 removals        
+        6      removeCustomIngredient,
+        7      upsertCustomIngredient,
+        8      syncFromRemote,
+        9 -  } from './ingredientStorage";
+       10 -  import { loadFavorites, toggleFavorite, isFavorite } from './favorites";
+       11 -  import { useUser } from '../auth/UserContext.jsx";
+       12 -  import { getAllBaseIngredients } from './nutritionHelpers";
+       13 -  import { fetchNutritionByName, searchFoods } from '../../shared/services/nutritionix";
+        9 +  } from './ingredientStorage';
+       10 +  import { loadFavorites, toggleFavorite, isFavorite } from './favorites';
+       11 +  import { useUser } from '../auth/UserContext.jsx';
+       12 +  import { getAllBaseIngredients } from './nutritionHelpers';
+       13 +  import { fetchNutritionByName, searchFoods } from '../../shared/services/nutritionix';
+       14    import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
+       15    import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+       16    
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && grep -r "from '.*\"" src/ --include="*.jsx" --include="*.js" 2>/dev/null)
+  ⎿  No matches found
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 1.65s
+     error during build:
+     [vite:esbuild] Transform failed with 1 error:
+     C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/ingredients/IngredientManager.jsx:554:15: ERROR: Expected ")" but found 
+     "className"
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/ingredients/IngredientManager.jsx:554:15
+
+     Expected ")" but found "className"
+     552|              </table>
+     553|            </div>
+     … +23 lines (ctrl+o to see all)
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 15 lines
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 25 lines
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run lint 2>&1 | head -50)
+  ⎿  > prep-thy-meal@0.0.0 lint    
+     > eslint .
+     … +45 lines (ctrl+o to expand)
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 40 lines
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 50 lines
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 25 lines
+
+● Read(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Read 10 lines
+
+● Update(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Updated src\features\ingredients\IngredientManager.jsx with 35 additions and 34 removals                                                  
+       517              <p className="text-sm text-gray-600 dark:text-gray-400">No ingredients found for “{searchQuery}”. Try another term.</p>
+       518            )}
+       519            {!isSearching && searchResults.length > 0 && (
+       520 -            <div className="overflow-x-auto hidden md:block">
+       521 -              <table className="min-w-max w-full border-collapse border dark:border-gray-700">
+       522 -                <thead>
+       523 -                  <tr className="bg-gray-100 dark:bg-gray-800">
+       524 -                    <th className="border p-1">Name</th>
+       525 -                    <th className="border p-1">Unit</th>
+       526 -                    <th className="border p-1">g/unit</th>
+       527 -                    <th className="border p-1">Cal</th>
+       528 -                    <th className="border p-1">P</th>
+       529 -                    <th className="border p-1">C</th>
+       530 -                    <th className="border p-1">F</th>
+       531 -                    <th className="border p-1">Actions</th>
+       532 -                  </tr>
+       533 -                </thead>
+       534 -                <tbody>
+       535 -                  {searchResults.map((res) => (
+       536 -                    <tr key={res.id} className="border-t">
+       537 -                      <td className="border p-1 capitalize">{res.name}</td>
+       538 -                      <td className="border p-1 text-center">{res.unit || "g"}</td>
+       539 -                      <td className="border p-1 text-center">{res.gramsPerUnit || res.grams || "-"}</td>
+       540 -                      <td className="border p-1 text-center">{res.calories !== undefined ? res.calories : "-"}</td>
+       541 -                      <td className="border p-1 text-center">{res.protein !== undefined ? res.protein : "-"}</td>
+       542 -                      <td className="border p-1 text-center">{res.carbs !== undefined ? res.carbs : "-"}</td>
+       543 -                      <td className="border p-1 text-center">{res.fat !== undefined ? res.fat : "-"}</td>
+       544 -                      <td className="border p-1 text-center">
+       545 -                        <button className="btn-green" type="button" onClick={() => addFromApi(res)}>
+       546 -                          Add
+       547 -                        </button>
+       548 -                      </td>
+       520 +            <>
+       521 +              <div className="overflow-x-auto hidden md:block">
+       522 +                <table className="min-w-max w-full border-collapse border dark:border-gray-700">
+       523 +                  <thead>
+       524 +                    <tr className="bg-gray-100 dark:bg-gray-800">
+       525 +                      <th className="border p-1">Name</th>
+       526 +                      <th className="border p-1">Unit</th>
+       527 +                      <th className="border p-1">g/unit</th>
+       528 +                      <th className="border p-1">Cal</th>
+       529 +                      <th className="border p-1">P</th>
+       530 +                      <th className="border p-1">C</th>
+       531 +                      <th className="border p-1">F</th>
+       532 +                      <th className="border p-1">Actions</th>
+       533                      </tr>
+       534 -                  ))}
+       535 -                </tbody>
+       536 -              </table>
+       537 -            </div>
+       538 -            <div className="md:hidden space-y-2">
+       534 +                  </thead>
+       535 +                  <tbody>
+       536 +                    {searchResults.map((res) => (
+       537 +                      <tr key={res.id} className="border-t">
+       538 +                        <td className="border p-1 capitalize">{res.name}</td>
+       539 +                        <td className="border p-1 text-center">{res.unit || "g"}</td>
+       540 +                        <td className="border p-1 text-center">{res.gramsPerUnit || res.grams || "-"}</td>
+       541 +                        <td className="border p-1 text-center">{res.calories !== undefined ? res.calories : "-"}</td>
+       542 +                        <td className="border p-1 text-center">{res.protein !== undefined ? res.protein : "-"}</td>
+       543 +                        <td className="border p-1 text-center">{res.carbs !== undefined ? res.carbs : "-"}</td>
+       544 +                        <td className="border p-1 text-center">{res.fat !== undefined ? res.fat : "-"}</td>
+       545 +                        <td className="border p-1 text-center">
+       546 +                          <button className="btn-green" type="button" onClick={() => addFromApi(res)}>
+       547 +                            Add
+       548 +                          </button>
+       549 +                        </td>
+       550 +                      </tr>
+       551 +                    ))}
+       552 +                  </tbody>
+       553 +                </table>
+       554 +              </div>
+       555 +              <div className="md:hidden space-y-2">
+       556                {searchResults.map((res) => (
+       557                  <div key={res.id} className="border rounded-lg p-3 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
+       558                    <div className="flex justify-between items-start">
+
+● Update(src\features\ingredients\IngredientManager.jsx)
+  ⎿  Updated src\features\ingredients\IngredientManager.jsx with 2 additions and 1 removal
+       584                    </div>
+       585                  </div>
+       586                ))}
+       587 -            </div>
+       587 +              </div>
+       588 +            </>
+       589            )}
+       590          </div>
+       591    
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 6.71s
+     error during build:
+     Could not resolve "./nutritionHelpers" from "src/features/meal-planner/MealPrepCalculator.jsx"
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/features/meal-planner/MealPrepCalculator.jsx
+         at getRollupError (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+         at error (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+         at ModuleLoader.handleInvalidResolvedId 
+     (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21442:24)
+         at file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21402:26
+
+     … +7 lines (ctrl+o to see all)
+
+● Update(src\features\meal-planner\MealPrepCalculator.jsx)
+  ⎿  Updated src\features\meal-planner\MealPrepCalculator.jsx with 1 addition and 1 removal
+        6    import {
+        7      calculateNutrition,
+        8      normalizeIngredient,
+        9 -  } from './nutritionHelpers';
+        9 +  } from '../ingredients/nutritionHelpers';
+       10    import {
+       11      loadPlans,
+       12      addPlan,
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  Error: Exit code 1
+     ✗ Build failed in 6.87s
+     error during build:
+     Could not resolve "./api.js" from "src/shared/services/storage.js"
+     file: C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/src/shared/services/storage.js
+         at getRollupError (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+         at error (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+         at ModuleLoader.handleInvalidResolvedId 
+     (file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21442:24)
+         at file:///C:/Users/Michael/OneDrive/Documents/FITNESS/prep-thy-meal/node_modules/rollup/dist/es/shared/node-entry.js:21402:26
+
+     … +7 lines (ctrl+o to see all)
+
+● Read(src\shared\services\storage.js)
+  ⎿  Read 33 lines
+
+● Update(src\shared\services\storage.js)
+  ⎿  Updated src\shared\services\storage.js with 1 addition and 1 removal
+        5      updatePlan as apiUpdate,
+        6      loadBaseline as apiLoadBaseline,
+        7      saveBaseline as apiSaveBaseline,
+        8 -  } from './api.js';
+        8 +  } from './firestore.js';
+        9    
+       10    export const loadPlans = async (uid) => {
+       11      return apiLoad(uid);
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run build) timeout: 1m 0s
+  ⎿  > prep-thy-meal@0.0.0 build   
+     > vite build
+     … +24 lines (ctrl+o to expand)
+
+● Perfect! The build succeeded! Let me run the tests one final time to confirm everything is working:
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && npm run test:run) timeout: 1m 0s
+  ⎿  > prep-thy-meal@0.0.0 test:run
+     > vitest run
+     … +11 lines (ctrl+o to expand)
+
+● Excellent! The project restructuring is complete and successful!
+
+  Summary
+
+  Project successfully restructured to feature-based architecture!
+
+  Completed Tasks:
+
+  1. ✅ Analyzed current project structure
+  2. ✅ Designed ideal feature-based folder structure
+  3. ✅ Created new folder structure (app/, features/, shared/)
+  4. ✅ Moved all files to new locations
+  5. ✅ Updated all import paths
+  6. ✅ Fixed import issues (mismatched quotes, missing extensions, wrong paths)
+  7. ✅ Verified all 37 tests still pass
+  8. ✅ Updated CLAUDE.md with new architecture documentation
+  9. ✅ Built production bundle successfully
+
+  New Folder Structure:
+
+  src/
+  ├── app/                      # Application entry
+  ├── features/                 # Feature modules
+  │   ├── auth/
+  │   ├── meal-planner/
+  │   ├── ingredients/
+  │   ├── calorie-calculator/
+  │   ├── account/
+  │   └── instructions/
+  └── shared/                   # Shared resources
+      ├── components/
+      │   ├── ui/
+      │   ├── layout/
+      │   └── onboarding/
+      ├── hooks/
+      ├── context/
+      ├── services/
+      └── utils/
+
+  Key Benefits:
+
+  - Better organization: Related code grouped by domain/feature
+  - Clear boundaries: Features are isolated and self-contained
+  - Scalability: Easy to add new features or modify existing ones
+  - Co-located tests: Tests live next to the code they test
+  - Easier navigation: Intuitive file locations based on functionality
+
+  Files Modified:
+
+  - Moved 30+ files to new locations
+  - Updated 15+ import paths across the codebase
+  - Fixed 7 import/build issues
+  - Updated index.html to point to new entry point
+  - Updated CLAUDE.md documentation
+
+  All tests passing (37/37) and production build successful!
+
+> /usage 
+  ⎿  Set verbose to true
+
+> what are next steps? and delete worker.md 
+
+● I'll delete worker.md and outline the next steps for you.
+
+● Bash(cd "C:\Users\Michael\OneDrive\Documents\FITNESS\prep-thy-meal" && rm worker.md)
+  ⎿  (No content)
+
+● Done! worker.md has been deleted.
+
+  Next Steps
+
+  Now that the restructuring is complete, here are the recommended next steps:
+
+  1. Integrate New Features into Application (High Priority)
+
+  We have 7 new features that were implemented earlier but not yet integrated:
+
+  a. Add Keyboard Shortcuts System
+  - Integrate useKeyboardShortcuts hook into MealPrepCalculator
+  - Add KeyboardShortcutsHelp modal to App.jsx
+  - Shortcuts to add: Ctrl+S (save), Ctrl+Z (undo), Ctrl+Y (redo), ? (help)
+
+  b. Implement Undo/Redo
+  - Replace useState with useUndoRedo in MealPrepCalculator for:
+    - Meal ingredients state
+    - Calorie target
+    - Target percentages
+  - Add Undo/Redo buttons to the UI
+
+  c. Add Recent Ingredients Tracking
+  - Integrate recentIngredients.js into IngredientManager
+  - Display "Recently Used" section at the top of ingredient list
+  - Call addToRecentIngredients() when ingredients are added
+
+  d. Add Meal Templates
+  - Add MealTemplateSelector component to each meal section in MealPrepCalculator
+  - Allow users to apply templates and save custom ones
+
+  e. Add First-Time User Onboarding
+  - Add OnboardingModal to MealPrep.jsx
+  - Show automatically on first app load
+
+  f. Add Tooltips Throughout App
+  - Add tooltips to buttons and icons for better UX
+  - Focus on complex features (plan switching, match dinner, etc.)
+
+  g. Add Loading Skeletons
+  - Replace basic "Loading..." text with skeleton components
+  - Use in IngredientManager, MealPrepCalculator, and plan loading
+
+  2. Clean Up Code (Medium Priority)
+
+  - Remove empty old folders (if any remain)
+  - Fix linter warnings:
+    - Unused variables (err in Login.jsx, error in ErrorBoundary.jsx)
+    - React Hook dependency warnings
+    - Fast refresh warnings in context files
+
+  3. Performance Optimizations (Lower Priority)
+
+  - Address bundle size warning (main chunk is 1.1MB)
+  - Implement code splitting for large features
+  - Use dynamic imports for Firebase and other heavy libraries
+
+  4. Testing (Ongoing)
+
+  - Add tests for new features
+  - Test the app manually to ensure all features work after restructuring
+
+  Would you like me to start with any of these next steps? I'd recommend starting with integrating the new features since they're already built and
+  will provide immediate value to users.
+
+> /output-style 
+  ⎿  Set output style to default
+
+> /usage 
+  ⎿  Status dialog dismissed
+
+
+
