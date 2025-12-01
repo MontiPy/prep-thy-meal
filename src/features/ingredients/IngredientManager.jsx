@@ -42,9 +42,11 @@ import {
 } from './ingredientStorage';
 import { useUser } from '../auth/UserContext.jsx';
 import { getAllBaseIngredients } from './nutritionHelpers';
+import { cleanupDuplicateIngredients } from './cleanupDuplicates';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import { searchFoods, getFoodDetails } from '../../shared/services/usda';
 import ServingSizePreviewModal from './ServingSizePreviewModal';
+import { SearchResultSkeleton } from "../../shared/components/ui/SkeletonLoader";
 
 const CATEGORIES = [
   "Produce - Vegetables",
@@ -299,6 +301,43 @@ const IngredientManager = ({ onChange }) => {
       }
     };
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]); // Only run when user changes, not when refresh changes
+
+  // Make cleanup function available globally for emergency use
+  useEffect(() => {
+    if (user) {
+      window.cleanupDuplicates = async () => {
+        try {
+          await cleanupDuplicateIngredients(user.uid);
+          refresh();
+          toast.success("Duplicates removed! Refresh the page.");
+        } catch (err) {
+          console.error("Cleanup failed:", err);
+          toast.error("Cleanup failed. Check console for details.");
+        }
+      };
+
+      // Debug function to show ingredient IDs
+      window.debugIngredients = () => {
+        const all = getAllBaseIngredients();
+        console.log(`Total ingredients: ${all.length}`);
+        console.table(all.map(i => ({
+          id: i.id,
+          name: i.name,
+          hasValidId: i.id && i.id !== undefined && i.id !== null,
+          idType: typeof i.id
+        })));
+
+        const invalid = all.filter(i => !i.id || i.id === undefined || i.id === null);
+        console.log(`Found ${invalid.length} ingredients with invalid IDs:`, invalid);
+        return all;
+      };
+    }
+    return () => {
+      delete window.cleanupDuplicates;
+      delete window.debugIngredients;
+    };
   }, [user, refresh]);
 
   const resetForm = () => {
@@ -351,7 +390,7 @@ const IngredientManager = ({ onChange }) => {
       : servingSize;
 
     const ingredientToSave = {
-      id: editingId || undefined,
+      ...(editingId && { id: editingId }), // Only include id if editing
       name: form.name.trim(),
       category: form.category,
       // New serving model fields
@@ -992,12 +1031,11 @@ const IngredientManager = ({ onChange }) => {
                 </Stack>
 
                 {apiLoading ? (
-                  <Box sx={{ textAlign: "center", py: 3 }}>
-                    <CircularProgress size={32} />
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      Searching USDA database...
-                    </Typography>
-                  </Box>
+                  <Stack spacing={1}>
+                    {[...Array(3)].map((_, i) => (
+                      <SearchResultSkeleton key={i} />
+                    ))}
+                  </Stack>
                 ) : apiResults.length === 0 ? (
                   <Box sx={{ textAlign: "center", py: 2 }}>
                     <Typography variant="body2" color="text.secondary">

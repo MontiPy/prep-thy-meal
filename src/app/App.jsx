@@ -1,17 +1,29 @@
 // src/app/App.jsx
-import React from 'react';
-import { Box, Container } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box } from '@mui/material';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import MealPrep from '../shared/components/layout/MealPrep';
-import Login from '../features/auth/Login';
 import { UserProvider, useUser } from '../features/auth/UserContext';
 import { ThemeProvider } from '../shared/context/ThemeContext';
-import ThemeToggle from '../shared/components/layout/ThemeToggle';
 import ErrorBoundary from '../shared/components/ui/ErrorBoundary';
 import OfflineBanner from '../shared/components/layout/OfflineBanner';
+import OnboardingModal from '../shared/components/onboarding/OnboardingModal';
+import { hasCompletedOnboarding, completeOnboarding } from '../shared/services/onboarding';
 
 const AppContent = () => {
   const { user } = useUser();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Show onboarding for authenticated users who haven't completed it
+  useEffect(() => {
+    if (user && !hasCompletedOnboarding()) {
+      // Small delay to let the UI load first
+      const timer = setTimeout(() => setShowOnboarding(true), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
   return (
     <Box
       component="main"
@@ -25,20 +37,17 @@ const AppContent = () => {
       })}
     >
       <OfflineBanner />
-      {user ? (
-        <ErrorBoundary message="An error occurred in the meal planning app. Please try refreshing the page.">
-          <MealPrep />
-        </ErrorBoundary>
-      ) : (
-        <Container maxWidth="sm" sx={{ py: 4 }}>
-          <Box display="flex" justifyContent="flex-end" mb={3}>
-            <ThemeToggle />
-          </Box>
-          <ErrorBoundary message="An error occurred during login. Please try refreshing the page.">
-            <Login />
-          </ErrorBoundary>
-        </Container>
-      )}
+      <ErrorBoundary message="An error occurred in the meal planning app. Please try refreshing the page.">
+        <MealPrep />
+      </ErrorBoundary>
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onComplete={() => {
+          completeOnboarding();
+          setShowOnboarding(false);
+          toast.success("Welcome! Let's start planning your meals.");
+        }}
+      />
     </Box>
   );
 };

@@ -1,6 +1,7 @@
 // src/shared/components/layout/MealPrep.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import toast from "react-hot-toast";
+import { loadUserPreferences } from "../../../shared/services/userPreferences";
 import AccountCircleIcon from "@mui/icons-material/AccountCircleRounded";
 import ArticleIcon from "@mui/icons-material/ArticleRounded";
 import CalculateIcon from "@mui/icons-material/CalculateRounded";
@@ -30,6 +31,7 @@ import MealPrepInstructions from "../../../features/instructions/MealPrepInstruc
 import IngredientManager from "../../../features/ingredients/IngredientManager";
 import CalorieCalculator from "../../../features/calorie-calculator/CalorieCalculator";
 import AccountPage from "../../../features/account/AccountPage";
+import Login from "../../../features/auth/Login";
 import ErrorBoundary from "../ui/ErrorBoundary";
 import { getAllBaseIngredients } from "../../../features/ingredients/nutritionHelpers";
 import { syncFromRemote } from "../../../features/ingredients/ingredientStorage";
@@ -53,13 +55,15 @@ const TAB_CONFIG = [
 ];
 
 const MealPrep = () => {
-  const { user, logout } = useUser();
+  const { user, isGuest, logout } = useUser();
   const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
   const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
   const [lastSync, setLastSync] = useState(null);
   const [isOffline, setIsOffline] = useState(
     typeof navigator !== "undefined" ? !navigator.onLine : false
   );
+  const [userPreferences, setUserPreferences] = useState({ showRecentIngredients: true });
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const trigger = useScrollTrigger({ threshold: 8 });
@@ -77,18 +81,23 @@ const MealPrep = () => {
     }
   }, [logout]);
 
-  // Refresh ingredients when switching to Planner tab to pick up any changes
+  // Refresh ingredients when switching tabs to pick up any changes
   useEffect(() => {
-    if (activeTab === TABS.CALCULATOR) {
+    if (activeTab === TABS.CALCULATOR || activeTab === TABS.INGREDIENTS) {
       setAllIngredients(getAllBaseIngredients());
     }
   }, [activeTab]);
 
   useEffect(() => {
     if (user) {
-      syncFromRemote(user.uid)
-        .then(() => {
+      // Sync ingredients and preferences
+      Promise.all([
+        syncFromRemote(user.uid),
+        loadUserPreferences(user.uid)
+      ])
+        .then(([_, prefs]) => {
           setAllIngredients(getAllBaseIngredients());
+          setUserPreferences(prefs);
           setLastSync(new Date());
         })
         .catch((error) => {
@@ -262,22 +271,44 @@ const MealPrep = () => {
             )}
             <ThemeToggle />
             <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 1 }}>
-              <Avatar
-                src={user?.photoURL || ""}
-                alt={user?.displayName || "Profile"}
-                sx={{ width: 38, height: 38, bgcolor: "primary.main", fontWeight: 700 }}
-              >
-                {(user?.displayName || "User").charAt(0).toUpperCase()}
-              </Avatar>
-              <Button
-                type="button"
-                onClick={handleLogout}
-                variant="outlined"
-                color="error"
-                size="small"
-              >
-                Logout
-              </Button>
+              {user ? (
+                <>
+                  <Avatar
+                    src={user?.photoURL || ""}
+                    alt={user?.displayName || "Profile"}
+                    sx={{ width: 38, height: 38, bgcolor: "primary.main", fontWeight: 700 }}
+                  >
+                    {(user?.displayName || "User").charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Button
+                    type="button"
+                    onClick={handleLogout}
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                  >
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Chip
+                    label="Guest Mode"
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ fontWeight: 600 }}
+                  />
+                  <Button
+                    onClick={() => setShowLoginModal(true)}
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                  >
+                    Login / Sign Up
+                  </Button>
+                </>
+              )}
             </Stack>
           </Stack>
         </Toolbar>
@@ -332,7 +363,11 @@ const MealPrep = () => {
           sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}
         >
           <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
-            <MealPrepCalculator allIngredients={allIngredients} isActive={activeTab === TABS.CALCULATOR} />
+            <MealPrepCalculator
+              allIngredients={allIngredients}
+              isActive={activeTab === TABS.CALCULATOR}
+              userPreferences={userPreferences}
+            />
           </ErrorBoundary>
         </Box>
 
@@ -366,6 +401,17 @@ const MealPrep = () => {
           </Box>
         )}
       </Container>
+
+      {/* Login Modal for Guest Users */}
+      <Login
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={(user) => {
+          setShowLoginModal(false);
+          // Sync will happen automatically via useEffect on user change
+          toast.success(`Welcome, ${user.displayName}!`);
+        }}
+      />
     </Box>
   );
 };

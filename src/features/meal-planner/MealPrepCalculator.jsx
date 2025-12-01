@@ -51,9 +51,12 @@ import {
 } from '../../shared/services/storage';
 import { useUser } from '../auth/UserContext.jsx';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
-import LoadingSpinner from "../../shared/components/ui/LoadingSpinner";
+import { PageSkeleton } from "../../shared/components/ui/SkeletonLoader";
 import { useUndoRedo } from "../../shared/hooks/useUndoRedo";
-import { addToRecentIngredients } from '../ingredients/recentIngredients';
+import { addToRecentIngredients, getRecentIngredientsWithData } from '../ingredients/recentIngredients';
+import MealTemplateSelector from './MealTemplateSelector';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
 import {
   CALORIE_LIMITS,
   MACRO_TOLERANCE,
@@ -183,20 +186,21 @@ const getCategoryColors = (cat) => {
   return { header: "#e5e7eb", bg: "#f9fafb" };
 };
 
-const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
+const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences = {} }) => {
   const { user } = useUser();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [calorieTarget, setCalorieTarget] = useState(1400);
+  const showRecentIngredients = userPreferences?.showRecentIngredients !== false; // Default to true
+  const [calorieTarget, setCalorieTarget] = useState(2575);
   const [editingTarget, setEditingTarget] = useState(false);
-  const [tempTarget, setTempTarget] = useState(2000);
+  const [tempTarget, setTempTarget] = useState(2575);
   const [targetWarning, setTargetWarning] = useState("");
 
   const [targetPercentages, setTargetPercentages] = useState({
-    protein: 40,
-    fat: 25,
-    carbs: 35,
+    protein: 30,
+    fat: 30,
+    carbs: 40,
   });
   const [macroAnchor, setMacroAnchor] = useState(null);
 
@@ -213,7 +217,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
     canRedo,
   } = useUndoRedo({
     breakfast: [],
-    lunch: allIngredients.map((ingredient) => normalizeIngredient(ingredient)),
+    lunch: [],
     dinner: [],
     snack: [],
   }, UI_LIMITS.UNDO_HISTORY_MAX);
@@ -247,6 +251,13 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
   // Pending targets from Calorie Calculator
   const [pendingTargets, setPendingTargets] = useState(null);
   const [showTargetsPrompt, setShowTargetsPrompt] = useState(false);
+
+  // Meal template selector state
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateMealType, setTemplateMealType] = useState(null);
+
+  // Recent ingredients state
+  const [recentIngredients, setRecentIngredients] = useState([]);
 
   // Check for pending targets from Calorie Calculator
   useEffect(() => {
@@ -476,6 +487,12 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
     setHasUnsavedChanges(false);
   }, [currentPlanId]);
 
+  // Update recent ingredients when allIngredients or mealIngredients change
+  useEffect(() => {
+    const recent = getRecentIngredientsWithData(allIngredients);
+    setRecentIngredients(recent);
+  }, [allIngredients, mealIngredients]);
+
   const updateIngredientAmount = useCallback((meal, id, newValue) => {
     setMealIngredients((prev) => {
       const list = prev[meal].map((ingredient) => {
@@ -559,7 +576,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
   }, [matchDinner, refreshIngredientData, setMealIngredients]);
 
   const handleAddIngredient = useCallback((meal) => {
-    const id = parseInt(selectedId);
+    const id = Number(selectedId);  // Use Number() instead of parseInt() to preserve decimals
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
 
@@ -1283,7 +1300,11 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
   };
 
   if (isLoadingData) {
-    return <LoadingSpinner message="Loading your meal plan..." size="large" />;
+    return (
+      <Box sx={{ maxWidth: 1440, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}>
+        <PageSkeleton />
+      </Box>
+    );
   }
 
   const handleOpenActionsMenu = (event) => setActionsAnchor(event.currentTarget);
@@ -1605,6 +1626,24 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                             {meal === "dinner" && matchDinner && (
                               <Chip size="small" icon={<Link2 size={14} />} label="Mirroring Lunch" />
                             )}
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<BookmarkBorderIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTemplateMealType(meal);
+                                setTemplateModalOpen(true);
+                              }}
+                              disabled={disabled}
+                              sx={{
+                                textTransform: "none",
+                                fontWeight: 600,
+                                borderRadius: 2,
+                              }}
+                            >
+                              Templates
+                            </Button>
                           </Stack>
                           {meal === "dinner" && (
                             <FormControlLabel
@@ -1647,6 +1686,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                             >
                               <MenuItem value="">Select ingredient</MenuItem>
                               {allIngredients
+                                .filter((i) => i.id && i.id !== undefined && i.id !== null && i.name)
                                 .filter((i) => !list.some((p) => p.id === i.id))
                                 .map((i) => (
                                   <MenuItem key={i.id} value={i.id}>
@@ -1664,6 +1704,66 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
                             Add ingredient
                           </Button>
                         </Stack>
+
+                        {/* Recent Ingredients Quick Add */}
+                        {showRecentIngredients && recentIngredients.length > 0 && (
+                          <Paper
+                            variant="outlined"
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2,
+                              bgcolor: (theme) => theme.palette.mode === 'dark'
+                                ? 'rgba(99,102,241,0.08)'
+                                : 'rgba(226,235,255,0.4)',
+                              borderColor: 'primary.light'
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                              <Typography variant="caption" fontWeight={600} color="primary.main">
+                                Recently Used:
+                              </Typography>
+                              <Tooltip title="Quickly add ingredients you've used recently">
+                                <InfoIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              </Tooltip>
+                            </Stack>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                              {recentIngredients
+                                .filter(ing => !list.some(p => p.id === ing.id))
+                                .slice(0, 5)
+                                .map(ing => (
+                                  <Chip
+                                    key={ing.id}
+                                    label={ing.name}
+                                    onClick={() => {
+                                      addToRecentIngredients(ing.id);
+                                      const ingredientToAdd = normalizeIngredient({
+                                        ...ing,
+                                        gramsPerUnit: ing.gramsPerUnit || ing.grams || 100,
+                                        grams: ing.gramsPerUnit || ing.grams || 100,
+                                        quantity: 1,
+                                      });
+                                      setMealIngredients((prev) => {
+                                        const updated = { ...prev, [meal]: [...prev[meal], ingredientToAdd] };
+                                        if (meal === "lunch" && matchDinner) {
+                                          updated.dinner = updated.lunch.map((i) => refreshIngredientData(i));
+                                        }
+                                        return updated;
+                                      });
+                                    }}
+                                    disabled={disabled}
+                                    size="small"
+                                    clickable
+                                    sx={{
+                                      cursor: 'pointer',
+                                      fontWeight: 600,
+                                      '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                                    }}
+                                  />
+                                ))
+                              }
+                            </Stack>
+                          </Paper>
+                        )}
 
                         {isDesktop ? (
                           <Table size="small">
@@ -2261,6 +2361,33 @@ const MealPrepCalculator = ({ allIngredients, isActive = true }) => {
           New targets from Calculator: {pendingTargets?.calorieTarget} kcal ({pendingTargets?.targetPercentages?.protein}P / {pendingTargets?.targetPercentages?.carbs}C / {pendingTargets?.targetPercentages?.fat}F)
         </Alert>
       </Snackbar>
+
+      {/* Meal Template Selector Modal */}
+      <MealTemplateSelector
+        isOpen={templateModalOpen}
+        onClose={() => {
+          setTemplateModalOpen(false);
+          setTemplateMealType(null);
+        }}
+        mealType={templateMealType}
+        allIngredients={allIngredients}
+        currentMealIngredients={templateMealType ? mealIngredients[templateMealType] : []}
+        onApplyTemplate={(ingredients) => {
+          if (!templateMealType) return;
+
+          setMealIngredients((prev) => {
+            const updated = { ...prev, [templateMealType]: ingredients };
+            if (templateMealType === "lunch" && matchDinner) {
+              updated.dinner = ingredients.map((i) => refreshIngredientData(i));
+            }
+            return updated;
+          });
+
+          setTemplateModalOpen(false);
+          setTemplateMealType(null);
+          toast.success(`Template applied to ${templateMealType}!`);
+        }}
+      />
     </Box>
   );
 };
