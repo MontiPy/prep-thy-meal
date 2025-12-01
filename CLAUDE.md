@@ -70,10 +70,8 @@ src/
 │   │   │   ├── ThemeToggle.jsx
 │   │   │   └── OfflineBanner.jsx
 │   │   └── onboarding/           # Onboarding components
-│   │       ├── OnboardingModal.jsx
-│   │       └── KeyboardShortcutsHelp.jsx
+│   │       └── OnboardingModal.jsx
 │   ├── hooks/                    # Shared React hooks
-│   │   ├── useKeyboardShortcuts.js
 │   │   └── useUndoRedo.js
 │   ├── context/                  # Global context providers
 │   │   └── ThemeContext.jsx
@@ -217,6 +215,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null &&
                          request.auth.uid == uid;
     }
+
+    // User preferences
+    match /userPreferences/{uid} {
+      allow read, write: if request.auth != null &&
+                         request.auth.uid == uid;
+    }
   }
 }
 ```
@@ -333,7 +337,6 @@ This section documents planned and potential UX improvements based on comprehens
 - Multi-plan management
 - USDA FoodData Central API integration
 - Toast notifications for feedback
-- **NEW: Keyboard shortcuts system** with help modal (press `?`)
 - **NEW: Undo/Redo functionality** via `useUndoRedo` hook
 - **NEW: Recent ingredients tracking** (last 10 used ingredients)
 - **NEW: Meal templates library** (16 predefined + custom templates)
@@ -351,7 +354,6 @@ This section documents planned and potential UX improvements based on comprehens
 
 **2. Undo/Redo System**
 - Action history for meal planning
-- Keyboard shortcuts (Ctrl+Z/Ctrl+Y)
 - Toast-based undo prompts
 - Last 20 actions tracked
 
@@ -361,14 +363,7 @@ This section documents planned and potential UX improvements based on comprehens
 - Combined with favorites system
 - Speeds up common workflows
 
-**4. Keyboard Shortcuts**
-- Tab navigation (1-5 for tabs)
-- Save/Export shortcuts (Ctrl+S, Ctrl+E)
-- Search focus (Ctrl+F)
-- Quantity adjustments (+/-)
-- Modal closing (Escape)
-
-**5. Meal Templates Library**
+**4. Meal Templates Library**
 - Pre-configured common meals
 - User-saved custom templates
 - One-click meal population
@@ -476,35 +471,7 @@ This section documents planned and potential UX improvements based on comprehens
 
 ## Implementation Guide for New Features
 
-### 1. Keyboard Shortcuts (`useKeyboardShortcuts` hook)
-
-**Location**: `src/shared/hooks/useKeyboardShortcuts.js`
-
-**Usage Example**:
-```javascript
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-
-function MyComponent() {
-  const handleSave = () => { /* save logic */ };
-  const handleUndo = () => { /* undo logic */ };
-
-  useKeyboardShortcuts({
-    'ctrl+s': handleSave,
-    'ctrl+z': handleUndo,
-    'escape': () => setModalOpen(false)
-  }, [handleSave, handleUndo]);
-
-  return <div>...</div>;
-}
-```
-
-**Features**:
-- Platform-aware (Cmd on Mac, Ctrl on Windows/Linux)
-- Ignores shortcuts when typing in inputs (except Escape)
-- Help modal component: `KeyboardShortcutsHelp.jsx`
-- Press `?` to show keyboard shortcuts help
-
-### 2. Undo/Redo System (`useUndoRedo` hook)
+### 1. Undo/Redo System (`useUndoRedo` hook)
 
 **Location**: `src/shared/hooks/useUndoRedo.js`
 
@@ -541,7 +508,7 @@ function MealPlanner() {
 - Doesn't add to history during undo/redo actions
 - Returns `canUndo` and `canRedo` for button states
 
-### 3. Recent Ingredients Tracking
+### 2. Recent Ingredients Tracking
 
 **Location**: `src/shared/utils/recentIngredients.js`
 
@@ -555,7 +522,7 @@ function MealPlanner() {
 Call `addToRecentIngredients(id)` whenever user adds an ingredient to a meal.
 Display recent ingredients in a "Quick Add" section for faster workflow.
 
-### 4. Meal Templates System
+### 3. Meal Templates System
 
 **Location**: `src/shared/utils/mealTemplates.js`, `src/features/meal-planner/MealTemplateSelector.jsx`
 
@@ -587,7 +554,7 @@ import MealTemplateSelector from './MealTemplateSelector';
 />
 ```
 
-### 5. First-Time User Onboarding
+### 4. First-Time User Onboarding
 
 **Location**: `src/shared/components/onboarding/OnboardingModal.jsx`, `src/shared/services/onboarding.js`
 
@@ -623,7 +590,7 @@ function App() {
 - Stored in localStorage (won't show again)
 - Use `resetOnboarding()` to force show again (for testing)
 
-### 6. Tooltip Component
+### 5. Tooltip Component
 
 **Location**: `src/shared/components/ui/Tooltip.jsx`
 
@@ -641,7 +608,7 @@ import Tooltip from './Tooltip';
 - `position`: 'top' | 'bottom' | 'left' | 'right' (default: 'top')
 - `delay`: Milliseconds before showing (default: 300)
 
-### 7. Loading Skeletons
+### 6. Loading Skeletons
 
 **Location**: `src/shared/components/ui/SkeletonLoader.jsx`
 
@@ -676,7 +643,6 @@ To integrate these features into existing components:
 
 **MealPrepCalculator.jsx**:
 - [ ] Replace `useState` for `mealIngredients` with `useUndoRedo`
-- [ ] Add keyboard shortcuts (Ctrl+S, Ctrl+Z, Ctrl+Y, Ctrl+E)
 - [ ] Add "Templates" button for each meal section
 - [ ] Call `addToRecentIngredients()` when adding ingredients
 - [ ] Show recent ingredients in a quick-add section
@@ -684,20 +650,16 @@ To integrate these features into existing components:
 - [ ] Add tooltips to action buttons
 
 **IngredientManager.jsx**:
-- [ ] Add keyboard shortcut for search focus (Ctrl+F)
 - [ ] Show recent ingredients section at top
 - [ ] Add loading skeletons for search results
 - [ ] Add tooltips to action buttons
 
 **MealPrep.jsx** (Root):
 - [ ] Add `OnboardingModal` that shows on first visit
-- [ ] Add keyboard shortcuts for tab switching (1-5)
-- [ ] Add keyboard shortcut to show shortcuts help (?)
 - [ ] Wrap initial data load with skeleton loaders
 
 **App.jsx**:
-- [ ] Add global keyboard shortcut listener
-- [ ] Add `KeyboardShortcutsHelp` modal component
+- [ ] Integrate `OnboardingModal` component
 
 ## Testing New Features
 
@@ -714,8 +676,7 @@ npm test -- recentIngredients
 ```
 
 **Manual Testing Checklist**:
-- [ ] Press `?` to open keyboard shortcuts help
-- [ ] Test Ctrl+Z/Ctrl+Y undo/redo in meal planning
+- [ ] Test undo/redo in meal planning
 - [ ] Verify recent ingredients appear after adding to meals
 - [ ] Test meal template selector for all 4 meal types
 - [ ] Complete onboarding flow on first visit

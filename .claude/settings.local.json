@@ -18,7 +18,12 @@
       "Bash(npm run build:*)",
       "Bash(npm run lint)",
       "WebSearch",
-      "WebFetch(domain:platform.fatsecret.com)"
+      "WebFetch(domain:platform.fatsecret.com)",
+      "Bash(find:*)",
+      "Bash(if [ -d \"C:\\Users\\Michael\\OneDrive\\Documents\\FITNESS\\prep-thy-meal\\src\\shared\\components\\onboarding\" ])",
+      "Bash(then ls \"C:\\Users\\Michael\\OneDrive\\Documents\\FITNESS\\prep-thy-meal\\src\\shared\\components\\onboarding\")",
+      "Bash(else echo \"onboarding directory not found\")",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": []

@@ -42,7 +42,9 @@ export const syncFromRemote = async (uid) => {
 
 export const addCustomIngredient = async (ingredient, uid) => {
   const items = loadCustomIngredients();
-  const newIngredient = { id: Date.now(), ...ingredient };
+  // Remove id from ingredient if it exists, then add our generated id
+  const { id, ...ingredientWithoutId } = ingredient;
+  const newIngredient = { ...ingredientWithoutId, id: id || Date.now() };
   items.push(newIngredient);
   saveLocal(items);
   invalidateIngredientCache();

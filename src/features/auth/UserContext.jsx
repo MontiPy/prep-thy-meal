@@ -20,13 +20,16 @@ export const UserProvider = ({ children }) => {
 
   const logout = () => signOut(auth);
 
+  // Determine if user is in guest mode (unauthenticated)
+  const isGuest = !user;
+
   // Show loading state while checking authentication
   if (loading) {
     return <LoadingSpinner message="Signing you in..." size="large" />;
   }
 
   return (
-    <UserContext.Provider value={{ user, logout, loading }}>
+    <UserContext.Provider value={{ user, isGuest, logout, loading }}>
       {children}
     </UserContext.Provider>
   );

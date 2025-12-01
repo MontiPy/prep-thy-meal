@@ -67,8 +67,8 @@ const CalorieCalculator = () => {
   const [activity, setActivity] = useState("light");
 
   // Goal settings
-  const [goalPreset, setGoalPreset] = useState("cut");
-  const [weeklyChange, setWeeklyChange] = useState(-1);
+  const [goalPreset, setGoalPreset] = useState("maintain");
+  const [weeklyChange, setWeeklyChange] = useState(0);
 
   // Macro settings
   const [macroPreset, setMacroPreset] = useState("balanced");
