@@ -67,6 +67,8 @@ import {
   isWithinMacroTargets,
 } from "../../shared/constants/validation";
 import MacroTargetPopover from "./MacroTargetPopover";
+import { validateAllMacros } from "../../shared/utils/macroValidation.js";
+import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 const roundVal = (n) => Math.round(Number(n) || 0);
@@ -203,6 +205,53 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
     carbs: 40,
   });
   const [macroAnchor, setMacroAnchor] = useState(null);
+
+  // Bodyweight for macro validation (optional, can be synced from CalorieCalculator profile)
+  const [bodyweightLbs, setBodyweightLbs] = useState(null);
+
+  // Load bodyweight from CalorieCalculator profile if available
+  useEffect(() => {
+    const loadBodyweight = async () => {
+      try {
+        let profile = null;
+
+        // Try to load from Firebase first if user is logged in
+        if (user) {
+          try {
+            const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+            const db = getFirestore();
+            const docRef = doc(db, "userProfiles", user.uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists() && docSnap.data().calorieProfile) {
+              profile = docSnap.data().calorieProfile;
+            }
+          } catch (error) {
+            console.error("Error loading profile from cloud:", error);
+          }
+        }
+
+        // Fallback to localStorage
+        if (!profile) {
+          const saved = localStorage.getItem("calorieCalculatorProfile");
+          if (saved) {
+            profile = JSON.parse(saved);
+          }
+        }
+
+        if (profile && profile.weight) {
+          // Convert to lbs if needed
+          const weightLbs = profile.units === "imperial"
+            ? profile.weight
+            : profile.weight * 2.20462;
+          setBodyweightLbs(Math.round(weightLbs));
+        }
+      } catch (error) {
+        console.error("Error loading bodyweight:", error);
+      }
+    };
+
+    loadBodyweight();
+  }, [user]);
 
   const [prepDays, setPrepDays] = useState(6);
   const [matchDinner, setMatchDinner] = useState(false);
@@ -1258,6 +1307,23 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
     [calorieTarget, targetPercentages]
   );
 
+  // Validate macros against bodyweight and research-based ranges
+  const macroValidation = useMemo(() => {
+    // Only validate if bodyweight is available
+    if (!bodyweightLbs || bodyweightLbs <= 0) {
+      return null;
+    }
+
+    return validateAllMacros({
+      proteinGrams: targetMacros.protein,
+      fatGrams: targetMacros.fat,
+      carbGrams: targetMacros.carbs,
+      totalCalories: calorieTarget,
+      bodyweightLbs,
+      activityLevel: 'moderate', // Could be made configurable
+    });
+  }, [targetMacros, calorieTarget, bodyweightLbs]);
+
   const withinRange = isWithinMacroTargets(
     { calories: dailyTotals.calories, protein: dailyTotals.protein, carbs: dailyTotals.carbs, fat: dailyTotals.fat },
     { calories: calorieTarget, protein: targetMacros.protein, carbs: targetMacros.carbs, fat: targetMacros.fat }
@@ -1604,6 +1670,22 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
         targetPercentages={targetPercentages}
         onPercentagesChange={setTargetPercentages}
       />
+
+      {/* Macro Validation Warnings */}
+      {macroValidation && (macroValidation.hasWarnings || macroValidation.hasCritical) && (
+        <Box sx={{ mt: 2 }}>
+          <MacroWarnings validation={macroValidation} />
+        </Box>
+      )}
+
+      {/* Show info if bodyweight is not set */}
+      {!bodyweightLbs && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          <Typography variant="body2">
+            <strong>Tip:</strong> Set your bodyweight in the Calorie Calculator to see personalized macro recommendations based on research.
+          </Typography>
+        </Alert>
+      )}
 
       <Grid container spacing={2.5}>
         <Grid size={{ xs: 12, md: 8 }}>
