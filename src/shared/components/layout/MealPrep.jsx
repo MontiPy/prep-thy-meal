@@ -24,6 +24,7 @@ import {
   Typography,
   useMediaQuery,
   useScrollTrigger,
+  Fade,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import MealPrepCalculator from "../../../features/meal-planner/MealPrepCalculator";
@@ -362,42 +363,62 @@ const MealPrep = () => {
           hidden={activeTab !== TABS.CALCULATOR}
           sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}
         >
-          <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
-            <MealPrepCalculator
-              allIngredients={allIngredients}
-              isActive={activeTab === TABS.CALCULATOR}
-              userPreferences={userPreferences}
-            />
-          </ErrorBoundary>
+          <Fade in={activeTab === TABS.CALCULATOR} timeout={300}>
+            <div>
+              <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
+                <MealPrepCalculator
+                  allIngredients={allIngredients}
+                  isActive={activeTab === TABS.CALCULATOR}
+                  userPreferences={userPreferences}
+                />
+              </ErrorBoundary>
+            </div>
+          </Fade>
         </Box>
 
         {/* Other tabs can mount/unmount as they don't have complex state */}
         {activeTab === TABS.CALORIE_CALC && (
           <Box role="tabpanel" id="tabpanel-calorie-calc" aria-labelledby="tab-calorie-calc">
-            <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
-              <CalorieCalculator />
-            </ErrorBoundary>
+            <Fade in={activeTab === TABS.CALORIE_CALC} timeout={300}>
+              <div>
+                <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
+                  <CalorieCalculator />
+                </ErrorBoundary>
+              </div>
+            </Fade>
           </Box>
         )}
         {activeTab === TABS.INSTRUCTIONS && (
           <Box role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions">
-            <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
-              <MealPrepInstructions />
-            </ErrorBoundary>
+            <Fade in={activeTab === TABS.INSTRUCTIONS} timeout={300}>
+              <div>
+                <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
+                  <MealPrepInstructions />
+                </ErrorBoundary>
+              </div>
+            </Fade>
           </Box>
         )}
         {activeTab === TABS.INGREDIENTS && (
           <Box role="tabpanel" id="tabpanel-ingredients" aria-labelledby="tab-ingredients">
-            <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
-              <IngredientManager onChange={handleIngredientChange} />
-            </ErrorBoundary>
+            <Fade in={activeTab === TABS.INGREDIENTS} timeout={300}>
+              <div>
+                <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
+                  <IngredientManager onChange={handleIngredientChange} />
+                </ErrorBoundary>
+              </div>
+            </Fade>
           </Box>
         )}
         {activeTab === TABS.ACCOUNT && (
           <Box role="tabpanel" id="tabpanel-account" aria-labelledby="tab-account">
-            <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
-              <AccountPage />
-            </ErrorBoundary>
+            <Fade in={activeTab === TABS.ACCOUNT} timeout={300}>
+              <div>
+                <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
+                  <AccountPage />
+                </ErrorBoundary>
+              </div>
+            </Fade>
           </Box>
         )}
       </Container>

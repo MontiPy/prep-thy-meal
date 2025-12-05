@@ -6,11 +6,13 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
   Chip,
   Divider,
+  Fab,
   FormControl,
   FormControlLabel,
   Grid,
@@ -34,9 +36,21 @@ import {
   Tooltip,
   Typography,
   useMediaQuery,
+  Zoom,
+  LinearProgress,
+  Dialog,
+  DialogContent,
+  Collapse,
 } from "@mui/material";
+import { TransitionGroup } from 'react-transition-group';
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { useTheme } from "@mui/material/styles";
+import SaveIcon from "@mui/icons-material/Save";
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import { useTheme, alpha } from "@mui/material/styles";
 // jsPDF is dynamically imported in handleExportPDF to reduce initial bundle size
 import {
   calculateNutrition,
@@ -69,6 +83,9 @@ import {
 import MacroTargetPopover from "./MacroTargetPopover";
 import { validateAllMacros } from "../../shared/utils/macroValidation.js";
 import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
+import SmartTextField from "../../shared/components/ui/SmartTextField";
+import { useSmartNumberInput } from "../../shared/hooks/useSmartNumberInput";
+import NutritionFactsLabel from "../../shared/components/ui/NutritionFactsLabel";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 const roundVal = (n) => Math.round(Number(n) || 0);
@@ -186,6 +203,26 @@ const getCategoryColors = (cat) => {
   if (cat.includes("Fats") || cat.includes("Oils")) return { header: "#fbbf24", bg: "#fffbeb" };
   if (cat.includes("Beverages")) return { header: "#a5b4fc", bg: "#eef2ff" };
   return { header: "#e5e7eb", bg: "#f9fafb" };
+};
+
+const SmartInputBase = ({ value, onChange, ...props }) => {
+  const inputProps = useSmartNumberInput({ value, onChange });
+  return (
+    <InputBase
+      {...props}
+      value={inputProps.value}
+      onChange={inputProps.onChange}
+      onBlur={(e) => {
+        inputProps.onBlur();
+        if (props.onBlur) props.onBlur(e);
+      }}
+      onFocus={(e) => {
+        inputProps.onFocus();
+        if (props.onFocus) props.onFocus(e);
+      }}
+      type="number"
+    />
+  );
 };
 
 const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences = {} }) => {
@@ -307,6 +344,50 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
   // Recent ingredients state
   const [recentIngredients, setRecentIngredients] = useState([]);
+
+  // Nutrition Label Modal
+  const [showNutritionLabel, setShowNutritionLabel] = useState(false);
+
+  // Meal Actions Menu
+  const [mealMenuAnchor, setMealMenuAnchor] = useState(null);
+  const [activeMealMenu, setActiveMealMenu] = useState(null);
+
+  const handleOpenMealMenu = (event, meal) => {
+    event.stopPropagation();
+    setMealMenuAnchor(event.currentTarget);
+    setActiveMealMenu(meal);
+  };
+
+  const handleCloseMealMenu = () => {
+    setMealMenuAnchor(null);
+    setActiveMealMenu(null);
+  };
+
+  const handleClearMeal = () => {
+    if (activeMealMenu) {
+      setMealIngredients((prev) => {
+        const updated = { ...prev, [activeMealMenu]: [] };
+        if (activeMealMenu === "lunch" && matchDinner) {
+          updated.dinner = [];
+        }
+        return updated;
+      });
+      toast.success(`Cleared ${activeMealMenu}`);
+    }
+    handleCloseMealMenu();
+  };
+
+  const handleCopyMealTo = (targetMeal) => {
+    if (activeMealMenu && targetMeal) {
+      setMealIngredients((prev) => {
+        // Deep copy ingredients to avoid reference issues
+        const ingredientsToCopy = prev[activeMealMenu].map(ing => ({ ...ing }));
+        return { ...prev, [targetMeal]: ingredientsToCopy };
+      });
+      toast.success(`Copied ${activeMealMenu} to ${targetMeal}`);
+    }
+    handleCloseMealMenu();
+  };
 
   // Check for pending targets from Calorie Calculator
   useEffect(() => {
@@ -624,8 +705,8 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
     });
   }, [matchDinner, refreshIngredientData, setMealIngredients]);
 
-  const handleAddIngredient = useCallback((meal) => {
-    const id = Number(selectedId);  // Use Number() instead of parseInt() to preserve decimals
+  const handleAddIngredient = useCallback((meal, idOverride = null) => {
+    const id = idOverride ? Number(idOverride) : Number(selectedId);
     const item = allIngredients.find((i) => i.id === id);
     if (!item) return;
 
@@ -1344,9 +1425,8 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   };
 
   const handleTargetChange = (value) => {
-    const numValue = parseInt(value, 10) || 0;
-    setTempTarget(numValue);
-    validateCalorieTarget(numValue);
+    setTempTarget(value);
+    validateCalorieTarget(value);
   };
 
   const handleTargetEdit = () => {
@@ -1549,8 +1629,11 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
               sx={{
                 p: 2,
                 borderRadius: 2,
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(37,99,235,0.08)" : "rgba(226,235,255,0.6)",
+                backgroundColor: (theme) => alpha(theme.palette.background.paper, 0.8),
+                backdropFilter: "blur(8px)",
+                border: "1px solid",
+                borderColor: (theme) =>
+                  theme.palette.mode === "dark" ? "rgba(37,99,235,0.2)" : "rgba(226,235,255,0.8)",
               }}
             >
               <Stack spacing={1}>
@@ -1566,11 +1649,11 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                 </Stack>
                 {editingTarget ? (
                   <Stack spacing={1}>
-                    <TextField
-                      type="number"
+                    <SmartTextField
+                      autoFocus
                       size="small"
                       value={tempTarget}
-                      onChange={(e) => handleTargetChange(e.target.value)}
+                      onChange={handleTargetChange}
                       inputProps={{ min: 500, max: 10000 }}
                       label="kcal/day target"
                     />
@@ -1727,27 +1810,36 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                               Templates
                             </Button>
                           </Stack>
-                          {meal === "dinner" && (
-                            <FormControlLabel
-                              sx={{ ml: "auto" }}
-                              control={
-                                <Checkbox
-                                  checked={matchDinner}
-                                  onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    setMatchDinner(checked);
-                                    if (checked) {
-                                      setMealIngredients((prev) => ({
-                                        ...prev,
-                                        dinner: prev.lunch.map((i) => refreshIngredientData(i)),
-                                      }));
-                                    }
-                                  }}
-                                />
-                              }
-                              label="Mirror lunch"
-                            />
-                          )}
+                          <Stack direction="row" alignItems="center" spacing={1} sx={{ ml: "auto" }}>
+                            {meal === "dinner" && (
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={matchDinner}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setMatchDinner(checked);
+                                      if (checked) {
+                                        setMealIngredients((prev) => ({
+                                          ...prev,
+                                          dinner: prev.lunch.map((i) => refreshIngredientData(i)),
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                }
+                                label="Mirror lunch"
+                              />
+                            )}
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleOpenMealMenu(e, meal)}
+                              disabled={disabled}
+                            >
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
+                          </Stack>
                         </Stack>
                         <Typography variant="caption" color="text.secondary">
                           {currentMealTotals.calories} kcal · {currentMealTotals.protein}g P · {currentMealTotals.carbs}g C · {currentMealTotals.fat}g F
@@ -1757,34 +1849,70 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                     <AccordionDetails>
                       <Stack spacing={1.5}>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 220 } }}>
-                            <InputLabel id={`${meal}-ingredient-label`}>Select ingredient</InputLabel>
-                            <Select
-                              labelId={`${meal}-ingredient-label`}
-                              label="Select ingredient"
-                              value={selectedId}
-                              onChange={(e) => setSelectedId(e.target.value)}
-                              disabled={disabled}
-                            >
-                              <MenuItem value="">Select ingredient</MenuItem>
-                              {allIngredients
-                                .filter((i) => i.id && i.id !== undefined && i.id !== null && i.name)
-                                .filter((i) => !list.some((p) => p.id === i.id))
-                                .map((i) => (
-                                  <MenuItem key={i.id} value={i.id}>
-                                    {i.name}
-                                  </MenuItem>
-                                ))}
-                            </Select>
-                          </FormControl>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            onClick={() => handleAddIngredient(meal)}
-                            disabled={!selectedId || disabled}
-                          >
-                            Add ingredient
-                          </Button>
+                          <Autocomplete
+                            size="small"
+                            sx={{ minWidth: { xs: "100%", sm: 280 }, flexGrow: 1 }}
+                            options={allIngredients
+                              .filter((i) => i.id && i.id !== undefined && i.id !== null && i.name)
+                              .filter((i) => !list.some((p) => p.id === i.id))}
+                            getOptionLabel={(option) => option.name}
+                            value={null}
+                            onChange={(_, newValue) => {
+                              if (newValue) {
+                                handleAddIngredient(meal, newValue.id);
+                              }
+                            }}
+                            disabled={disabled}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label="Search to add ingredient..."
+                                variant="outlined"
+                                placeholder="Type to search..."
+                              />
+                            )}
+                            renderOption={(props, option) => {
+                              const { key, ...otherProps } = props;
+                              return (
+                                <li key={key} {...otherProps}>
+                                  <Stack>
+                                    <Typography variant="body2" fontWeight={600}>{option.name}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {roundVal(calculateNutrition(option).calories)} kcal / {option.grams || 100}g
+                                    </Typography>
+                                  </Stack>
+                                </li>
+                              );
+                            }}
+                            noOptionsText={
+                              <Button
+                                fullWidth
+                                size="small"
+                                onMouseDown={() => {
+                                  // Using onMouseDown to prevent blur before click
+                                  // Redirect to Ingredients tab would be ideal, but for now we'll just show a toast
+                                  toast((t) => (
+                                    <span>
+                                      Ingredient not found.
+                                      <Button 
+                                        size="small" 
+                                        onClick={() => {
+                                          toast.dismiss(t.id);
+                                          // Find the tab button and click it to switch tabs (hacky but works without context)
+                                          document.getElementById('tab-ingredients')?.click();
+                                        }}
+                                        sx={{ ml: 1 }}
+                                      >
+                                        Go to Manager
+                                      </Button>
+                                    </span>
+                                  ), { icon: '🥑' });
+                                }}
+                              >
+                                Create New Ingredient
+                              </Button>
+                            }
+                          />
                         </Stack>
 
                         {/* Recent Ingredients Quick Add */}
@@ -1847,7 +1975,17 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                           </Paper>
                         )}
 
-                        {isDesktop ? (
+                        {list.length === 0 ? (
+                          <Box sx={{ py: 4, textAlign: 'center', opacity: 0.6 }}>
+                             <AutoAwesomeIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1.5 }} />
+                             <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                               No ingredients yet.
+                             </Typography>
+                             <Typography variant="caption" color="text.secondary">
+                               Search above or pick from recents to start building your {meal}.
+                             </Typography>
+                          </Box>
+                        ) : isDesktop ? (
                           <Table size="small">
                             <TableHead>
                               <TableRow>
@@ -1862,7 +2000,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                 <TableCell align="center">-</TableCell>
                               </TableRow>
                             </TableHead>
-                            <TableBody>
+                            <TableBody component={TransitionGroup}>
                               {list.map((ingredient) => {
                                 const nutrition = calculateNutrition(ingredient);
                                 const disabledRow = matchDinner && meal === "dinner";
@@ -1889,7 +2027,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                 const currentServing = ingredient.selectedServing || servingSizes[0]?.name || '100g';
 
                                 return (
-                                  <TableRow key={ingredient.id} hover>
+                                  <TableRow key={ingredient.id} hover component={Collapse}>
                                     <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
                                       {ingredient.name}
                                     </TableCell>
@@ -1942,14 +2080,13 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                     >
                                       <Minus size={18} />
                                     </IconButton>
-                                    <InputBase
+                                    <SmartInputBase
                                       value={displayQuantity}
-                                      type="number"
-                                      onChange={(e) =>
+                                      onChange={(val) =>
                                         updateIngredientAmount(
                                           meal,
                                           ingredient.id,
-                                          parseFloat(e.target.value) || 0
+                                          val
                                         )
                                       }
                                       inputProps={{
@@ -2003,6 +2140,8 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                   </TableRow>
                                 );
                               })}
+                            </TableBody>
+                            <TableBody>
                               <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
                                 <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
                                 <TableCell align="center">—</TableCell>
@@ -2024,7 +2163,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                             </TableBody>
                           </Table>
                         ) : (
-                          <Stack spacing={1}>
+                          <Stack spacing={1} component={TransitionGroup}>
                             {list.map((ingredient) => {
                               const nutrition = calculateNutrition(ingredient);
                               const disabledRow = matchDinner && meal === "dinner";
@@ -2045,7 +2184,8 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                               const mobileCurrentServing = ingredient.selectedServing || mobileServingSizes[0]?.name || '100g';
 
                               return (
-                                <Paper key={ingredient.id} variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
+                                <Collapse key={ingredient.id}>
+                                <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
                                   <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                                     <Box>
                                       <Typography fontWeight={700} textTransform="capitalize">
@@ -2111,14 +2251,13 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                     >
                                       <Minus size={16} />
                                     </IconButton>
-                                    <InputBase
+                                    <SmartInputBase
                                       value={displayQuantity}
-                                      type="number"
-                                      onChange={(e) =>
+                                      onChange={(val) =>
                                         updateIngredientAmount(
                                           meal,
                                           ingredient.id,
-                                          parseFloat(e.target.value) || 0
+                                          val
                                         )
                                       }
                                       inputProps={{
@@ -2154,6 +2293,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                     </IconButton>
                                   </Stack>
                                 </Paper>
+                                </Collapse>
                               );
                             })}
                           </Stack>
@@ -2314,31 +2454,58 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
             }}
           >
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-              <Typography variant="subtitle1" fontWeight={800} mb={1}>
-                Plan summary
-              </Typography>
-              <Stack spacing={1}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                <Typography variant="subtitle1" fontWeight={800}>
+                  Plan summary
+                </Typography>
+                <Button 
+                  size="small" 
+                  startIcon={<ReceiptIcon size={16} />}
+                  onClick={() => setShowNutritionLabel(true)}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                >
+                  Label
+                </Button>
+              </Stack>
+              <Stack spacing={2}>
                 {[
-                  { label: "Calories", value: `${dailyTotals.calories} / ${calorieTarget}`, delta: dailyTotals.calories - calorieTarget, unit: "kcal" },
-                  { label: "Protein", value: `${dailyTotals.protein} / ${targetMacros.protein}`, delta: dailyTotals.protein - targetMacros.protein, unit: "g" },
-                  { label: "Carbs", value: `${dailyTotals.carbs} / ${targetMacros.carbs}`, delta: dailyTotals.carbs - targetMacros.carbs, unit: "g" },
-                  { label: "Fat", value: `${dailyTotals.fat} / ${targetMacros.fat}`, delta: dailyTotals.fat - targetMacros.fat, unit: "g" },
+                  { label: "Calories", current: dailyTotals.calories, target: calorieTarget, unit: "kcal" },
+                  { label: "Protein", current: dailyTotals.protein, target: targetMacros.protein, unit: "g" },
+                  { label: "Carbs", current: dailyTotals.carbs, target: targetMacros.carbs, unit: "g" },
+                  { label: "Fat", current: dailyTotals.fat, target: targetMacros.fat, unit: "g" },
                 ].map((row) => {
-                  const over = row.delta > 0;
-                  const within = Math.abs(row.delta) <= (row.unit === "kcal" ? 50 : 5);
-                  const color = within ? "success.main" : over ? "error.main" : "warning.main";
+                  const pct = Math.min(100, Math.max(0, (row.current / row.target) * 100));
+                  const delta = row.current - row.target;
+                  const over = delta > 0;
+                  // Tolerance: 50kcal or 5g
+                  const tolerance = row.unit === "kcal" ? 50 : 5;
+                  const within = Math.abs(delta) <= tolerance;
+                  
+                  let color = "primary";
+                  if (within) color = "success";
+                  else if (over) color = "error";
+                  else if (pct > 80) color = "warning"; // Getting close
+
                   return (
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" key={row.label}>
-                      <Typography variant="body2" color="text.secondary">
-                        {row.label}
-                      </Typography>
-                      <Box textAlign="right">
-                        <Typography fontWeight={700}>{row.value}</Typography>
-                        <Typography variant="caption" color={color}>
-                          {roundVal(row.delta) >= 0 ? "+" : ""}{roundVal(row.delta)} {row.unit}
+                    <Box key={row.label}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {row.label}
                         </Typography>
-                      </Box>
-                    </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          {row.current} / {row.target} {row.unit}
+                          <Typography component="span" color={over ? "error.main" : "text.secondary"} sx={{ ml: 0.5, fontWeight: 600 }}>
+                            ({delta > 0 ? "+" : ""}{roundVal(delta)})
+                          </Typography>
+                        </Typography>
+                      </Stack>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={pct} 
+                        color={color}
+                        sx={{ height: 8, borderRadius: 4, bgcolor: (theme) => theme.palette.action.hover }} 
+                      />
+                    </Box>
                   );
                 })}
               </Stack>
@@ -2470,6 +2637,50 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
           toast.success(`Template applied to ${templateMealType}!`);
         }}
       />
+      
+      <Zoom in={!isDesktop}>
+        <Fab
+          color="primary"
+          aria-label="save"
+          onClick={handleSavePlan}
+          sx={{
+            position: 'fixed',
+            bottom: 80,
+            right: 16,
+            zIndex: 100,
+          }}
+        >
+          <SaveIcon />
+        </Fab>
+      </Zoom>
+
+      {/* Nutrition Facts Label Modal */}
+      <Dialog 
+        open={showNutritionLabel} 
+        onClose={() => setShowNutritionLabel(false)}
+        maxWidth="xs"
+      >
+        <DialogContent sx={{ p: 0 }}>
+          <NutritionFactsLabel totals={dailyTotals} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Meal Actions Menu */}
+      <Menu
+        anchorEl={mealMenuAnchor}
+        open={Boolean(mealMenuAnchor)}
+        onClose={handleCloseMealMenu}
+      >
+        <MenuItem onClick={handleClearMeal} sx={{ color: 'error.main' }}>
+          <DeleteSweepIcon fontSize="small" sx={{ mr: 1 }} /> Clear {activeMealMenu}
+        </MenuItem>
+        <Divider />
+        {MEALS.filter(m => m !== activeMealMenu).map(targetMeal => (
+          <MenuItem key={targetMeal} onClick={() => handleCopyMealTo(targetMeal)}>
+            <ContentCopyIcon fontSize="small" sx={{ mr: 1 }} /> Copy to {targetMeal}
+          </MenuItem>
+        ))}
+      </Menu>
     </Box>
   );
 };

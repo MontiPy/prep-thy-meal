@@ -95,6 +95,9 @@ export const ThemeProvider = ({ children }) => {
             h1: { fontWeight: 700, letterSpacing: -0.5 },
             h2: { fontWeight: 700, letterSpacing: -0.25 },
             h3: { fontWeight: 700 },
+            h4: { fontFamily: '"Fredoka", sans-serif', fontWeight: 600 },
+            h5: { fontFamily: '"Fredoka", sans-serif', fontWeight: 600 },
+            h6: { fontFamily: '"Fredoka", sans-serif', fontWeight: 600 },
             subtitle1: { fontWeight: 600 },
             button: { textTransform: 'none', fontWeight: 600, letterSpacing: 0 },
             body2: { color: isDark ? '#cbd5e1' : '#475569' },
@@ -125,12 +128,6 @@ export const ThemeProvider = ({ children }) => {
                 boxShadow: isDark
                   ? '0 12px 30px rgba(15,23,42,0.35)'
                   : '0 12px 30px rgba(15,23,42,0.08)',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: isDark
-                    ? '0 14px 34px rgba(15,23,42,0.5)'
-                    : '0 14px 34px rgba(15,23,42,0.12)',
-                },
               },
             },
           },

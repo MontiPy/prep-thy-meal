@@ -1,6 +1,7 @@
 // src/app/App.jsx
 import React, { useState, useEffect } from 'react';
 import { Box } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import MealPrep from '../shared/components/layout/MealPrep';
@@ -52,35 +53,43 @@ const AppContent = () => {
   );
 };
 
+const ThemedToaster = () => {
+  const theme = useTheme();
+  return (
+    <Toaster
+      position="top-center"
+      toastOptions={{
+        duration: 4000,
+        style: {
+          background: theme.palette.background.paper,
+          color: theme.palette.text.primary,
+          border: `1px solid ${theme.palette.divider}`,
+        },
+        success: {
+          duration: 3000,
+          iconTheme: {
+            primary: theme.palette.success.main,
+            secondary: theme.palette.background.paper,
+          },
+        },
+        error: {
+          duration: 5000,
+          iconTheme: {
+            primary: theme.palette.error.main,
+            secondary: theme.palette.background.paper,
+          },
+        },
+      }}
+    />
+  );
+};
+
 const App = () => (
   <ErrorBoundary message="A critical error occurred. Please refresh the page to continue.">
     <ThemeProvider>
       <UserProvider>
         <AppContent />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              duration: 5000,
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
+        <ThemedToaster />
       </UserProvider>
     </ThemeProvider>
   </ErrorBoundary>

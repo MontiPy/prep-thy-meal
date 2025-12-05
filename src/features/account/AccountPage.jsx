@@ -12,27 +12,20 @@ import {
   Grid,
   Stack,
   Switch,
-  Typography
+  Typography,
+  IconButton,
+  Tooltip,
+  Divider
 } from '@mui/material';
+import { Delete as DeleteIcon, RestaurantMenu as MealIcon } from '@mui/icons-material';
 import { useUser } from '../auth/UserContext.jsx';
 import Login from '../auth/Login';
 import ConfirmDialog from '../../shared/components/ui/ConfirmDialog';
 import { loadUserPreferences, updateUserPreference } from '../../shared/services/userPreferences';
 import { getGuestDataSummary } from '../../shared/services/guestMigration';
+import { loadCustomTemplates, deleteCustomTemplate } from '../meal-planner/mealTemplates';
 
-const FeatureCard = ({ title, description, status }) => (
-  <Card variant="outlined" sx={{ borderRadius: 2 }}>
-    <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Box>
-        <Typography fontWeight={700}>{title}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {description}
-        </Typography>
-      </Box>
-      <Chip label={status} color="success" size="small" />
-    </CardContent>
-  </Card>
-);
+
 
 const AccountPage = () => {
   const { user, isGuest, logout } = useUser();
@@ -41,6 +34,29 @@ const AccountPage = () => {
   const [preferences, setPreferences] = useState({ showRecentIngredients: true });
   const [loadingPrefs, setLoadingPrefs] = useState(true);
   const [guestData, setGuestData] = useState({ planCount: 0, hasBaseline: false });
+  
+  // Templates state
+  const [customTemplates, setCustomTemplates] = useState([]);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
+
+  // Load templates
+  const refreshTemplates = () => {
+    const loaded = loadCustomTemplates();
+    setCustomTemplates(loaded);
+  };
+
+  useEffect(() => {
+    refreshTemplates();
+  }, []);
+
+  const handleDeleteTemplate = () => {
+    if (templateToDelete) {
+      deleteCustomTemplate(templateToDelete.id);
+      refreshTemplates();
+      setTemplateToDelete(null);
+      toast.success('Template deleted');
+    }
+  };
 
   // Load user preferences
   useEffect(() => {
@@ -329,134 +345,125 @@ const AccountPage = () => {
                 </Card>
               </Grid>
 
-              {/* Features */}
+              {/* Features & Templates Column */}
               <Grid item xs={12} md={6}>
+                {/* Templates Manager */}
                 <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
-                  <CardHeader title={<Typography variant="h6" fontWeight={800}>App Features</Typography>} />
-                  <CardContent>
-                    <Stack spacing={1.25}>
-                      <FeatureCard title="Cloud Sync" description="Your data syncs across devices" status="Enabled" />
-                      <FeatureCard title="Meal Plans" description="Save unlimited meal plans" status="Available" />
-                      <FeatureCard title="Custom Ingredients" description="Add your own ingredients" status="Available" />
-                      <FeatureCard title="PDF Export" description="Export shopping lists" status="Available" />
-                    </Stack>
+                  <CardHeader 
+                    title={<Typography variant="h6" fontWeight={800}>My Templates</Typography>}
+                    subheader={`${customTemplates.length} saved custom meals`}
+                  />
+                  <CardContent sx={{ pt: 0 }}>
+                    {customTemplates.length === 0 ? (
+                      <Box sx={{ py: 4, textAlign: 'center', opacity: 0.7 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          No custom templates yet.
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Save a meal as a template in the Planner to see it here.
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {customTemplates.map((template) => (
+                          <Card 
+                            key={template.id} 
+                            variant="outlined" 
+                            sx={{ 
+                              borderRadius: 2,
+                              '&:hover': { bgcolor: (theme) => theme.palette.action.hover }
+                            }}
+                          >
+                            <CardContent sx={{ p: 1.5, '&:last-child': { p: 1.5 } }}>
+                              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                <Box>
+                                  <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
+                                    <Typography variant="subtitle2" fontWeight={700}>
+                                      {template.name}
+                                    </Typography>
+                                    <Chip 
+                                      label={template.category} 
+                                      size="small" 
+                                      sx={{ height: 20, fontSize: '0.65rem', textTransform: 'capitalize' }} 
+                                    />
+                                  </Stack>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {template.ingredients.length} ingredients
+                                  </Typography>
+                                </Box>
+                                <Tooltip title="Delete Template">
+                                  <IconButton 
+                                    size="small" 
+                                    color="error"
+                                    onClick={() => setTemplateToDelete(template)}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </Stack>
+                    )}
                   </CardContent>
                 </Card>
               </Grid>
             </Grid>
 
-            {/* Preferences */}
-            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
-              <CardHeader title={<Typography variant="h6" fontWeight={800}>Preferences</Typography>} />
-              <CardContent>
-                <Stack spacing={2}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      p: 2,
-                      borderRadius: 2,
-                      bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
-                    }}
-                  >
-                    <Box>
-                      <Typography fontWeight={600}>Show Recent Ingredients</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Display your recently used ingredients in the meal planner for quick access
-                      </Typography>
-                    </Box>
-                    <FormControlLabel
-                      control={
+            {/* Settings & Actions */}
+            <Grid container spacing={2} sx={{ mt: 0 }}>
+              {/* Preferences */}
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+                  <CardHeader title={<Typography variant="h6" fontWeight={800}>App Settings</Typography>} />
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography fontWeight={600}>Recent Ingredients</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Show recently used items in planner
+                          </Typography>
+                        </Box>
                         <Switch
                           checked={preferences.showRecentIngredients}
                           onChange={(e) => handleTogglePreference('showRecentIngredients', e.target.checked)}
                           disabled={loadingPrefs}
                         />
-                      }
-                      label=""
-                      sx={{ m: 0 }}
-                    />
-                  </Box>
+                      </Box>
+                      <Divider />
+                      <Stack spacing={1}>
+                        <Button variant="outlined" color="inherit" onClick={() => setShowDeleteConfirm(true)} fullWidth>
+                          Reset Local Data
+                        </Button>
+                        <Button variant="contained" color="error" onClick={handleLogout} fullWidth>
+                          Sign Out
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-                  <Typography variant="caption" color="text.secondary">
-                    More preferences coming soon! Let us know what options you'd like to customize.
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-
-            {/* Data Management */}
-            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
-              <CardHeader title={<Typography variant="h6" fontWeight={800}>Data Management</Typography>} />
-              <CardContent>
-                <Grid container spacing={2}>
-                  {[
-                    { title: 'Storage Used', value: '~1KB', detail: 'Per saved plan', color: 'primary.main' },
-                    { title: 'Backup Status', value: '✓', detail: 'Auto-backup enabled', color: 'success.main' },
-                    { title: 'Data Location', value: '🌐', detail: 'Cloud & Local', color: 'text.primary' },
-                  ].map((item) => (
-                    <Grid item xs={12} md={4} key={item.title}>
-                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                        <CardContent sx={{ textAlign: 'center' }}>
-                          <Typography fontWeight={700}>{item.title}</Typography>
-                          <Typography variant="h5" fontWeight={800} color={item.color}>
-                            {item.value}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {item.detail}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </Card>
-
-            {/* Support */}
-            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
-              <CardHeader title={<Typography variant="h6" fontWeight={800}>Support & Feedback</Typography>} />
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Typography variant="body2" color="text.secondary">
-                    Need help or have suggestions? We'd love to hear from you!
-                  </Typography>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                    <Button variant="contained">📧 Contact Support</Button>
-                    <Button variant="outlined">💡 Send Feedback</Button>
-                    <Button variant="contained" color="success">⭐ Rate App</Button>
-                  </Stack>
-                </Stack>
-              </CardContent>
-            </Card>
-
-            {/* Logout */}
-            <Card
-              variant="outlined"
-              sx={{
-                borderRadius: 3,
-                mt: 2,
-                backgroundColor: (theme) =>
-                  theme.palette.mode === 'dark' ? 'rgba(248,113,113,0.08)' : 'rgba(254,226,226,0.7)',
-                borderColor: 'error.light',
-              }}
-            >
-              <CardHeader title={<Typography variant="h6" fontWeight={800}>Account Actions</Typography>} />
-              <CardContent>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                  <Button variant="contained" color="error" onClick={handleLogout}>
-                    🚪 Sign Out
-                  </Button>
-                  <Button variant="outlined" color="inherit" onClick={() => setShowDeleteConfirm(true)}>
-                    🗑️ Reset Local Data
-                  </Button>
-                </Stack>
-                <Typography variant="body2" color="text.secondary" mt={1}>
-                  Signing out keeps your data safe in the cloud. Reset Local Data only clears this device.
-                </Typography>
-              </CardContent>
-            </Card>
+              {/* Support */}
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
+                  <CardHeader title={<Typography variant="h6" fontWeight={800}>Support</Typography>} />
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Typography variant="body2" color="text.secondary">
+                        Prep Thy Meal is currently in Beta. Your feedback helps us improve!
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        <Button variant="outlined" fullWidth>Feedback</Button>
+                        <Button variant="contained" color="primary" fullWidth>Rate App</Button>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
           </CardContent>
         </Card>
 
@@ -469,6 +476,16 @@ const AccountPage = () => {
           confirmText="Clear Local Data"
           cancelText="Keep Data"
           variant="warning"
+        />
+
+        <ConfirmDialog
+          isOpen={Boolean(templateToDelete)}
+          onClose={() => setTemplateToDelete(null)}
+          onConfirm={handleDeleteTemplate}
+          title="Delete Template?"
+          message={`Are you sure you want to delete "${templateToDelete?.name}"?`}
+          confirmText="Delete"
+          variant="danger"
         />
       </Stack>
     </Box>

@@ -20,8 +20,10 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
+  Zoom,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 import {
   Flame,
   Info,
@@ -33,6 +35,7 @@ import {
 import { useUser } from "../auth/UserContext.jsx";
 import { validateAllMacros } from "../../shared/utils/macroValidation.js";
 import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
+import SmartTextField from "../../shared/components/ui/SmartTextField";
 
 // Preset configurations
 const GOAL_PRESETS = {
@@ -563,35 +566,32 @@ const CalorieCalculator = () => {
               {/* Age, Weight, Height */}
               <Grid container spacing={2}>
                 <Grid item xs={4}>
-                  <TextField
+                  <SmartTextField
                     fullWidth
                     size="small"
-                    type="number"
                     label="Age"
                     value={age}
-                    onChange={(e) => setAge(Number(e.target.value))}
+                    onChange={setAge}
                     inputProps={{ min: 10, max: 90 }}
                   />
                 </Grid>
                 <Grid item xs={4}>
-                  <TextField
+                  <SmartTextField
                     fullWidth
                     size="small"
-                    type="number"
                     label={`Weight (${unitLabelW})`}
                     value={weight}
-                    onChange={(e) => setWeight(Number(e.target.value))}
+                    onChange={setWeight}
                     inputProps={{ min: 60, max: 400, step: 0.1 }}
                   />
                 </Grid>
                 <Grid item xs={4}>
-                  <TextField
+                  <SmartTextField
                     fullWidth
                     size="small"
-                    type="number"
                     label={`Height (${unitLabelH})`}
                     value={height}
-                    onChange={(e) => setHeight(Number(e.target.value))}
+                    onChange={setHeight}
                     inputProps={{ min: 48, max: 96 }}
                   />
                 </Grid>
@@ -724,7 +724,7 @@ const CalorieCalculator = () => {
 
                 {macroMethod === "bodyweight" ? (
                   /* Bodyweight-Based Method (Simple) */
-                  <Paper variant="outlined" sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "primary.50" }}>
+                  <Paper variant="outlined" sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
                     <Typography variant="caption" color="primary.main" fontWeight={600} mb={1} display="block">
                       Protein & fat based on bodyweight (g/lb), carbs auto-fill
                     </Typography>
@@ -749,6 +749,7 @@ const CalorieCalculator = () => {
                             {proteinPerLb.toFixed(2)} g/lb = {macros.p}g ({percentages.p}%)
                           </Typography>
                         </Stack>
+                        <Stack direction="row" spacing={2} alignItems="center">
                         <Slider
                           value={proteinPerLb}
                           onChange={(_, v) => setProteinPerLb(v)}
@@ -762,8 +763,18 @@ const CalorieCalculator = () => {
                           ]}
                           sx={{
                             '& .MuiSlider-markLabel': { fontSize: '0.65rem' },
+                            mr: 2,
+                            flex: 1
                           }}
                         />
+                        <SmartTextField
+                          size="small"
+                          value={proteinPerLb}
+                          onChange={setProteinPerLb}
+                          inputProps={{ step: 0.05, min: 0.6, max: 1.5 }}
+                          sx={{ width: 70 }}
+                        />
+                      </Stack>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                           Recommended: {smartRecommendations[0].range}
                         </Typography>
@@ -790,21 +801,31 @@ const CalorieCalculator = () => {
                             {fatPerLb.toFixed(2)} g/lb = {macros.f}g ({percentages.f}%)
                           </Typography>
                         </Stack>
-                        <Slider
-                          value={fatPerLb}
-                          onChange={(_, v) => setFatPerLb(v)}
-                          min={0.2}
-                          max={0.6}
-                          step={0.05}
-                          marks={[
-                            { value: 0.25, label: "0.25" },
-                            { value: 0.3, label: "0.3" },
-                            { value: 0.4, label: "0.4" },
-                          ]}
-                          sx={{
-                            '& .MuiSlider-markLabel': { fontSize: '0.65rem' },
-                          }}
-                        />
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Slider
+                            value={fatPerLb}
+                            onChange={(_, v) => setFatPerLb(v)}
+                            min={0.2}
+                            max={0.6}
+                            step={0.05}
+                            marks={[
+                              { value: 0.25, label: "0.25" },
+                              { value: 0.3, label: "0.3" },
+                              { value: 0.4, label: "0.4" },
+                            ]}
+                            sx={{
+                              '& .MuiSlider-markLabel': { fontSize: '0.65rem' },
+                              flex: 1
+                            }}
+                          />
+                          <SmartTextField
+                            size="small"
+                            value={fatPerLb}
+                            onChange={setFatPerLb}
+                            inputProps={{ step: 0.05, min: 0.2, max: 0.6 }}
+                            sx={{ width: 70 }}
+                          />
+                        </Stack>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                           Recommended: {smartRecommendations[1].range}
                         </Typography>
@@ -974,8 +995,8 @@ const CalorieCalculator = () => {
                       sx={{
                         p: 2,
                         borderRadius: 2,
-                        bgcolor: item.highlight ? "primary.50" : "background.paper",
-                        borderColor: item.highlight ? "primary.200" : "divider",
+                        bgcolor: item.highlight ? alpha(theme.palette.primary.main, 0.1) : "background.paper",
+                        borderColor: item.highlight ? alpha(theme.palette.primary.main, 0.3) : "divider",
                       }}
                     >
                       <Typography variant="caption" color="text.secondary">
@@ -1216,6 +1237,42 @@ const CalorieCalculator = () => {
           </Box>
         )}
       </Popover>
+
+      {/* Mobile Sticky Summary */}
+      <Zoom in={useMediaQuery(theme.breakpoints.down('md'))}>
+        <Paper
+          elevation={4}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            p: 2,
+            borderRadius: '16px 16px 0 0',
+            zIndex: 1100,
+            borderTop: `1px solid ${theme.palette.divider}`,
+            bgcolor: alpha(theme.palette.background.paper, 0.9),
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Box>
+               <Typography variant="caption" color="text.secondary">Target</Typography>
+               <Typography variant="h6" fontWeight={800} color="primary.main">
+                 {target} kcal
+               </Typography>
+            </Box>
+            <Button 
+              variant="contained" 
+              size="small"
+              onClick={sendToPlanner}
+              sx={{ borderRadius: 2 }}
+            >
+              Apply to Plan
+            </Button>
+          </Stack>
+        </Paper>
+      </Zoom>
     </Container>
   );
 };

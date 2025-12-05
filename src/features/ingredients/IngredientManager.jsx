@@ -47,6 +47,7 @@ import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import { searchFoods, getFoodDetails } from '../../shared/services/usda';
 import ServingSizePreviewModal from './ServingSizePreviewModal';
 import { SearchResultSkeleton } from "../../shared/components/ui/SkeletonLoader";
+import SmartTextField from "../../shared/components/ui/SmartTextField";
 
 const CATEGORIES = [
   "Produce - Vegetables",
@@ -625,7 +626,7 @@ const IngredientManager = ({ onChange }) => {
                   Serving Size
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
-                  Enter the serving size for which you'll provide nutrition values.
+                  Nutrition will be calculated per <strong>{form.servingSize || 100}{form.servingUnit === 'unit' ? '' : ''}{form.servingUnit}</strong> of <strong>{form.name || 'this item'}</strong>.
                 </Typography>
 
                 <Grid container spacing={1.5}>
@@ -633,12 +634,11 @@ const IngredientManager = ({ onChange }) => {
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Amount
                     </Typography>
-                    <TextField
+                    <SmartTextField
                       fullWidth
                       size="small"
-                      type="number"
                       value={form.servingSize}
-                      onChange={(e) => setForm((f) => ({ ...f, servingSize: e.target.value }))}
+                      onChange={(val) => setForm((f) => ({ ...f, servingSize: val }))}
                       placeholder="100"
                       sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
                     />
@@ -681,12 +681,11 @@ const IngredientManager = ({ onChange }) => {
                       <Typography variant="caption" color="#92400e" fontWeight={500}>
                         Weight per unit (optional):
                       </Typography>
-                      <TextField
+                      <SmartTextField
                         size="small"
-                        type="number"
                         placeholder="e.g., 50"
                         value={form.weightPerServing}
-                        onChange={(e) => setForm((f) => ({ ...f, weightPerServing: e.target.value }))}
+                        onChange={(val) => setForm((f) => ({ ...f, weightPerServing: val }))}
                         InputProps={{
                           endAdornment: <InputAdornment position="end">g</InputAdornment>,
                         }}
@@ -721,12 +720,11 @@ const IngredientManager = ({ onChange }) => {
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Calories
                     </Typography>
-                    <TextField
+                    <SmartTextField
                       fullWidth
                       size="small"
-                      type="number"
                       value={form.calories}
-                      onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))}
+                      onChange={(val) => setForm((f) => ({ ...f, calories: val }))}
                       sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
                     />
                   </Grid>
@@ -734,12 +732,11 @@ const IngredientManager = ({ onChange }) => {
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Protein (g)
                     </Typography>
-                    <TextField
+                    <SmartTextField
                       fullWidth
                       size="small"
-                      type="number"
                       value={form.protein}
-                      onChange={(e) => setForm((f) => ({ ...f, protein: e.target.value }))}
+                      onChange={(val) => setForm((f) => ({ ...f, protein: val }))}
                       sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
                     />
                   </Grid>
@@ -747,12 +744,11 @@ const IngredientManager = ({ onChange }) => {
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Carbs (g)
                     </Typography>
-                    <TextField
+                    <SmartTextField
                       fullWidth
                       size="small"
-                      type="number"
                       value={form.carbs}
-                      onChange={(e) => setForm((f) => ({ ...f, carbs: e.target.value }))}
+                      onChange={(val) => setForm((f) => ({ ...f, carbs: val }))}
                       sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
                     />
                   </Grid>
@@ -760,12 +756,11 @@ const IngredientManager = ({ onChange }) => {
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Fat (g)
                     </Typography>
-                    <TextField
+                    <SmartTextField
                       fullWidth
                       size="small"
-                      type="number"
                       value={form.fat}
-                      onChange={(e) => setForm((f) => ({ ...f, fat: e.target.value }))}
+                      onChange={(val) => setForm((f) => ({ ...f, fat: val }))}
                       sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
                     />
                   </Grid>

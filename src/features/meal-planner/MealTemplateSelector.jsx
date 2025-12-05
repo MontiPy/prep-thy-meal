@@ -15,6 +15,7 @@ import {
   Box,
   Divider,
 } from '@mui/material';
+import { useTheme, alpha } from '@mui/material/styles';
 import {
   BookmarkBorder as TemplateIcon,
   Delete as DeleteIcon,
@@ -44,6 +45,7 @@ const MealTemplateSelector = ({
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
+  const theme = useTheme();
 
   // Get templates for this meal type
   const templates = useMemo(() => {
@@ -226,7 +228,15 @@ const MealTemplateSelector = ({
 
             {/* Save Current Meal Section */}
             {showSaveDialog ? (
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'success.light' }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.success.main, 0.1),
+                  borderColor: alpha(theme.palette.success.main, 0.3),
+                }}
+              >
                 <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
                   Save Current Meal as Template
                 </Typography>
