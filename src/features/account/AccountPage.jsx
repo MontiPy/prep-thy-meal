@@ -313,7 +313,9 @@ const AccountPage = () => {
                         </Stack>
                         <Stack direction="row" justifyContent="space-between">
                           <Typography fontWeight={600}>Sign-in Provider:</Typography>
-                          <Typography variant="body2" color="text.secondary">Google</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {user?.providerData?.[0]?.providerId === 'google.com' ? 'Google' : user?.providerData?.[0]?.providerId || 'Email'}
+                          </Typography>
                         </Stack>
                         <Stack direction="row" justifyContent="space-between">
                           <Typography fontWeight={600}>Account Created:</Typography>
@@ -382,51 +384,6 @@ const AccountPage = () => {
                   <Typography variant="caption" color="text.secondary">
                     More preferences coming soon! Let us know what options you'd like to customize.
                   </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
-
-            {/* Data Management */}
-            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
-              <CardHeader title={<Typography variant="h6" fontWeight={800}>Data Management</Typography>} />
-              <CardContent>
-                <Grid container spacing={2}>
-                  {[
-                    { title: 'Storage Used', value: '~1KB', detail: 'Per saved plan', color: 'primary.main' },
-                    { title: 'Backup Status', value: '✓', detail: 'Auto-backup enabled', color: 'success.main' },
-                    { title: 'Data Location', value: '🌐', detail: 'Cloud & Local', color: 'text.primary' },
-                  ].map((item) => (
-                    <Grid item xs={12} md={4} key={item.title}>
-                      <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                        <CardContent sx={{ textAlign: 'center' }}>
-                          <Typography fontWeight={700}>{item.title}</Typography>
-                          <Typography variant="h5" fontWeight={800} color={item.color}>
-                            {item.value}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {item.detail}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              </CardContent>
-            </Card>
-
-            {/* Support */}
-            <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
-              <CardHeader title={<Typography variant="h6" fontWeight={800}>Support & Feedback</Typography>} />
-              <CardContent>
-                <Stack spacing={1.5}>
-                  <Typography variant="body2" color="text.secondary">
-                    Need help or have suggestions? We'd love to hear from you!
-                  </Typography>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                    <Button variant="contained">📧 Contact Support</Button>
-                    <Button variant="outlined">💡 Send Feedback</Button>
-                    <Button variant="contained" color="success">⭐ Rate App</Button>
-                  </Stack>
                 </Stack>
               </CardContent>
             </Card>

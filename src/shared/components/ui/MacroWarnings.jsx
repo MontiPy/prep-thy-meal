@@ -12,11 +12,12 @@ import { SEVERITY_COLORS } from '../../constants/macroValidation';
  * Single macro warning/alert
  */
 function MacroAlert({ validation, macroName, onDismiss }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (!validation || !validation.severity || validation.severity === 'success') {
     return null;
   }
 
-  const [expanded, setExpanded] = useState(false);
   const severity = SEVERITY_COLORS[validation.severity];
 
   return (

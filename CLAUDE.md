@@ -14,6 +14,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Preview production build**: `npm run preview`
 - **Install dependencies**: `npm install`
 
+## Agent Workflow Protocol
+
+This project uses a multi-agent architecture. You are the **Session Lead**.
+
+### Routing Rules
+
+1. **New Features**: ALWAYS call `@orchestrator` first to plan.
+2. **Architecture**: If the plan requires a DB change, call `@senior-architect`.
+3. **Coding**: Once planned, call `@lead-engineer` to write the files.
+4. **Styling**: If the user complains about "ugly" UI, call `@ui-designer`.
+5. **Review**: Before marking a task done, call `@qa-security-critic` to double-check the work.
+
+### Commands
+
+- Use `@agentname` to invoke a specific agent explicitly.
+
 ## Project Architecture
 
 This is a React + Vite meal preparation application with Firebase authentication and USDA FoodData Central API integration.

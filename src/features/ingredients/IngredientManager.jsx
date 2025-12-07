@@ -10,6 +10,7 @@ import {
   IconButton,
   InputAdornment,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -34,6 +35,7 @@ import KitchenIcon from "@mui/icons-material/KitchenRounded";
 import SearchIcon from "@mui/icons-material/Search";
 import UploadIcon from "@mui/icons-material/UploadRounded";
 import CloudSearchIcon from "@mui/icons-material/TravelExplore";
+import CalculateIcon from "@mui/icons-material/Calculate";
 import {
   addCustomIngredient,
   removeCustomIngredient,
@@ -45,8 +47,16 @@ import { getAllBaseIngredients } from './nutritionHelpers';
 import { cleanupDuplicateIngredients } from './cleanupDuplicates';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import { searchFoods, getFoodDetails } from '../../shared/services/usda';
+import { searchOpenFoodFacts, getProductByBarcode } from '../../shared/services/openFoodFacts';
 import ServingSizePreviewModal from './ServingSizePreviewModal';
 import { SearchResultSkeleton } from "../../shared/components/ui/SkeletonLoader";
+import EmptyState from "../../shared/components/ui/EmptyState";
+import HighlightedText from "../../shared/components/ui/HighlightedText";
+import { parseNutritionText } from "../../shared/utils/smartParser";
+import ContentPasteIcon from '@mui/icons-material/ContentPaste';
+import ImageUploader from "../../shared/components/ui/ImageUploader";
+import { extractNutritionFromImage } from "../../shared/services/ocrService";
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
 
 const CATEGORIES = [
   "Produce - Vegetables",
@@ -104,6 +114,12 @@ const IngredientManager = ({ onChange }) => {
   const [previewFood, setPreviewFood] = useState(null);
   const [previewServingSizes, setPreviewServingSizes] = useState([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // OCR image upload state
+  const [ocrProcessing, setOcrProcessing] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState({ stage: '', progress: 0 });
+  const [highlightedFields, setHighlightedFields] = useState([]);
+  const [fieldConfidence, setFieldConfidence] = useState({});
 
   // Sync form when editingId changes (only on initial edit, not on every ingredient refresh)
   useEffect(() => {
@@ -173,8 +189,8 @@ const IngredientManager = ({ onChange }) => {
     onChange && onChange(base);
   }, [onChange]);
 
-  // USDA FoodData Central API search function
-  const searchUSDAAPI = useCallback(async (searchQuery) => {
+  // Unified search function
+  const handleSearch = useCallback(async (searchQuery) => {
     if (!searchQuery || searchQuery.length < 2) {
       setApiResults([]);
       setApiSearched(false);
@@ -188,24 +204,79 @@ const IngredientManager = ({ onChange }) => {
 
     setApiLoading(true);
     setApiSearched(true);
+    
     try {
-      const results = await searchFoods(searchQuery);
-      setApiResults(results);
-      if (results.length === 0) {
-        // No results is okay, just show empty state
+      // Determine if query looks like a barcode (all numbers, 8-13 digits)
+      const isBarcode = /^\d{8,14}$/.test(searchQuery);
+      
+      let results = [];
+      
+      if (isBarcode) {
+        // Barcode search: Try OFF first
+        const product = await getProductByBarcode(searchQuery);
+        if (product) results.push(product);
+        // Could also try USDA by barcode if needed, but OFF is usually better for UPCs
+      } else {
+        // Text search: Run both in parallel
+        const [usdaResults, offResults] = await Promise.all([
+          searchFoods(searchQuery).catch(e => { console.error(e); return []; }),
+          searchOpenFoodFacts(searchQuery).catch(e => { console.error(e); return []; })
+        ]);
+        
+        // Combine results
+        // Sort logic:
+        // 1. Exact name match (case-insensitive)
+        // 2. Popularity (OFF unique_scans_n)
+        // 3. USDA Foundation/SR Legacy data types (usually cleaner/more common)
+        // 4. Length of name (shorter often means more generic/common)
+        
+        results = [...offResults, ...usdaResults].sort((a, b) => {
+          const queryLower = searchQuery.toLowerCase();
+          const aName = a.name.toLowerCase();
+          const bName = b.name.toLowerCase();
+          
+          // 1. Exact match
+          if (aName === queryLower && bName !== queryLower) return -1;
+          if (bName === queryLower && aName !== queryLower) return 1;
+          
+          // 2. Starts with match
+          const aStarts = aName.startsWith(queryLower);
+          const bStarts = bName.startsWith(queryLower);
+          if (aStarts && !bStarts) return -1;
+          if (bStarts && !aStarts) return 1;
+
+          // 3. Popularity (OFF specific)
+          const aPop = a.popularity || 0;
+          const bPop = b.popularity || 0;
+          if (aPop !== bPop) return bPop - aPop;
+          
+          // 4. Data Type (USDA specific preference)
+          const highValueTypes = ['Foundation', 'SR Legacy'];
+          const aIsHighValue = highValueTypes.includes(a.dataType);
+          const bIsHighValue = highValueTypes.includes(b.dataType);
+          if (aIsHighValue && !bIsHighValue) return -1;
+          if (bIsHighValue && !aIsHighValue) return 1;
+          
+          // 5. Name length (shorter is usually better/more generic)
+          return aName.length - bName.length;
+        });
       }
+
+      setApiResults(results);
     } catch (err) {
-      console.error("USDA search failed:", err);
-      toast.error("Failed to search USDA database");
+      console.error("Search failed:", err);
+      toast.error("Failed to search food databases");
       setApiResults([]);
     } finally {
       setApiLoading(false);
     }
   }, []);
 
+  // Keep this for backward compat if passed as prop, but use handleSearch internally
+  const searchUSDAAPI = handleSearch;
+
   // Open serving size preview modal before adding from API
   const openServingPreview = async (apiItem) => {
-    // Check if ingredient with same name already exists
     const existing = ingredients.find(
       (i) => i.name.toLowerCase() === apiItem.name.toLowerCase()
     );
@@ -214,11 +285,17 @@ const IngredientManager = ({ onChange }) => {
       return;
     }
 
-    // Open modal and fetch detailed info with serving sizes
     setPreviewFood(apiItem);
     setPreviewModalOpen(true);
-    setPreviewLoading(true);
 
+    // OpenFoodFacts items already have serving sizes in our transform
+    if (apiItem.source === 'OpenFoodFacts' && apiItem.servingSizes) {
+      setPreviewServingSizes(apiItem.servingSizes);
+      return;
+    }
+
+    // For USDA, fetch details
+    setPreviewLoading(true);
     try {
       const details = await getFoodDetails(apiItem.id);
       if (details?.servingSizes) {
@@ -238,12 +315,12 @@ const IngredientManager = ({ onChange }) => {
   const confirmAddFromApi = async (servingSizes) => {
     if (!previewFood) return;
 
-    // USDA provides per-100g values directly - use new serving model
+    const isOff = previewFood.source === 'OpenFoodFacts';
+    
     const ingredientToAdd = {
       name: previewFood.name,
-      category: "Other", // User can edit later
-      // New serving model - USDA is always per 100g
-      servingSize: 100,
+      category: "Other",
+      servingSize: isOff ? previewFood.servingSize : 100,
       servingUnit: "g",
       servingLabel: null,
       weightPerServing: null,
@@ -253,22 +330,20 @@ const IngredientManager = ({ onChange }) => {
       protein: previewFood.protein || 0,
       carbs: previewFood.carbs || 0,
       fat: previewFood.fat || 0,
-      // Backward compatibility fields
+      // Backward compatibility
       unit: "g",
       gramsPerUnit: 100,
       grams: 100,
       notes: previewFood.brandName
-        ? `${previewFood.brandName} (via USDA)`
-        : `Added from USDA FoodData Central`,
+        ? `${previewFood.brandName} (via ${previewFood.source || 'USDA'})`
+        : `Added from ${previewFood.source || 'USDA'}`,
     };
 
     try {
       await addCustomIngredient(ingredientToAdd, user?.uid);
       toast.success(`Added "${previewFood.name}" to your ingredients`);
       refresh();
-      // Remove from API results
       setApiResults((prev) => prev.filter((r) => r.id !== previewFood.id));
-      // Close modal
       setPreviewModalOpen(false);
       setPreviewFood(null);
       setPreviewServingSizes([]);
@@ -524,6 +599,152 @@ const IngredientManager = ({ onChange }) => {
     event.target.value = '';
   };
 
+  // Handle OCR image upload
+  const handleImageUpload = async (imageFile) => {
+    setOcrProcessing(true);
+    setOcrProgress({ stage: 'ocr', progress: 0 });
+
+    try {
+      // Extract nutrition data from image
+      const result = await extractNutritionFromImage(
+        imageFile,
+        (text) => parseNutritionText(text, { includeConfidence: true }),
+        (progress) => setOcrProgress(progress)
+      );
+
+      if (!result.success || !result.data) {
+        toast.error(result.error || 'Could not extract nutrition data from image');
+        setOcrProcessing(false);
+        return;
+      }
+
+      // Update form with extracted data
+      const parsed = result.data;
+      const fieldsToHighlight = [];
+      const confidence = parsed.confidence || {};
+
+      setForm(prev => {
+        const updated = { ...prev };
+
+        if (parsed.name) {
+          updated.name = parsed.name;
+          fieldsToHighlight.push('name');
+        }
+        if (parsed.servingSize) {
+          updated.servingSize = parsed.servingSize;
+          fieldsToHighlight.push('servingSize');
+        }
+        if (parsed.servingUnit) {
+          updated.servingUnit = parsed.servingUnit;
+        }
+        if (parsed.servingLabel) {
+          updated.servingLabel = parsed.servingLabel;
+        }
+        if (parsed.calories) {
+          updated.calories = parsed.calories;
+          fieldsToHighlight.push('calories');
+        }
+        if (parsed.protein) {
+          updated.protein = parsed.protein;
+          fieldsToHighlight.push('protein');
+        }
+        if (parsed.carbs) {
+          updated.carbs = parsed.carbs;
+          fieldsToHighlight.push('carbs');
+        }
+        if (parsed.fat) {
+          updated.fat = parsed.fat;
+          fieldsToHighlight.push('fat');
+        }
+
+        return updated;
+      });
+
+      // Set confidence scores and highlighted fields
+      setFieldConfidence(confidence);
+      setHighlightedFields(fieldsToHighlight);
+
+      // Clear highlights after 3 seconds
+      setTimeout(() => {
+        setHighlightedFields([]);
+      }, 3000);
+
+      // Show success message with confidence indicator
+      const overallConfidence = confidence.overall || result.confidence || 0;
+      const confidencePercent = Math.round(overallConfidence * 100);
+
+      if (confidencePercent >= 70) {
+        toast.success(`Extracted nutrition data! (${confidencePercent}% confidence)`);
+      } else {
+        toast.success(`Data extracted - please review values (${confidencePercent}% confidence)`, {
+          duration: 5000
+        });
+      }
+
+      setOcrProcessing(false);
+      setOcrProgress({ stage: 'complete', progress: 1 });
+
+    } catch (error) {
+      console.error('OCR error:', error);
+      toast.error('Failed to process image. Try taking a clearer photo.');
+      setOcrProcessing(false);
+      setOcrProgress({ stage: '', progress: 0 });
+    }
+  };
+
+  const handleImageUploadError = (error) => {
+    toast.error(error);
+  };
+
+  // Handle paste image from clipboard
+  const handlePasteFromClipboard = async () => {
+    try {
+      // Check if Clipboard API is supported
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        toast.error('Clipboard image paste is not supported in this browser');
+        return;
+      }
+
+      // Read from clipboard
+      const clipboardItems = await navigator.clipboard.read();
+
+      // Find image in clipboard
+      let imageBlob = null;
+      for (const item of clipboardItems) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            imageBlob = await item.getType(type);
+            break;
+          }
+        }
+        if (imageBlob) break;
+      }
+
+      if (!imageBlob) {
+        toast.error('No image found in clipboard. Copy an image first.');
+        return;
+      }
+
+      // Convert blob to File object
+      const file = new File([imageBlob], 'clipboard-image.png', {
+        type: imageBlob.type,
+        lastModified: Date.now()
+      });
+
+      // Process the image through OCR
+      toast.success('Image pasted from clipboard!');
+      await handleImageUpload(file);
+
+    } catch (error) {
+      console.error('Clipboard paste error:', error);
+      if (error.name === 'NotAllowedError') {
+        toast.error('Permission denied. Please allow clipboard access.');
+      } else {
+        toast.error('Failed to paste from clipboard. Try uploading the image instead.');
+      }
+    }
+  };
+
   // Category pill component
   const CategoryPill = ({ label, active, onClick }) => (
     <Chip
@@ -590,7 +811,17 @@ const IngredientManager = ({ onChange }) => {
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="e.g., Chicken breast, Jasmine rice"
                   size="small"
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                      ...(highlightedFields.includes('name') && {
+                        borderColor: "#10b981",
+                        borderWidth: 2,
+                        bgcolor: "#f0fdf4",
+                        transition: "all 0.3s ease"
+                      })
+                    }
+                  }}
                 />
               </Box>
 
@@ -727,7 +958,39 @@ const IngredientManager = ({ onChange }) => {
                       type="number"
                       value={form.calories}
                       onChange={(e) => setForm((f) => ({ ...f, calories: e.target.value }))}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 2,
+                          bgcolor: "#fff",
+                          ...(highlightedFields.includes('calories') && {
+                            borderColor: "#10b981",
+                            borderWidth: 2,
+                            bgcolor: "#f0fdf4",
+                            transition: "all 0.3s ease"
+                          })
+                        }
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Tooltip title="Calculate from macros (4-4-9 rule)">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const p = Number(form.protein) || 0;
+                                  const c = Number(form.carbs) || 0;
+                                  const f = Number(form.fat) || 0;
+                                  const cal = Math.round(p * 4 + c * 4 + f * 9);
+                                  setForm((prev) => ({ ...prev, calories: cal }));
+                                  toast.success(`Calculated ${cal} kcal`);
+                                }}
+                              >
+                                <CalculateIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </InputAdornment>
+                        ),
+                      }}
                     />
                   </Grid>
                   <Grid size={6}>
@@ -740,7 +1003,24 @@ const IngredientManager = ({ onChange }) => {
                       type="number"
                       value={form.protein}
                       onChange={(e) => setForm((f) => ({ ...f, protein: e.target.value }))}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 2,
+                          bgcolor: "#fff",
+                          ...(highlightedFields.includes('protein') && {
+                            borderColor: "#10b981",
+                            borderWidth: 2,
+                            bgcolor: "#f0fdf4",
+                            transition: "all 0.3s ease"
+                          })
+                        }
+                      }}
+                      helperText={
+                        fieldConfidence.protein > 0 && fieldConfidence.protein < 0.7
+                          ? `Low confidence (${Math.round(fieldConfidence.protein * 100)}%) - please review`
+                          : undefined
+                      }
+                      error={fieldConfidence.protein > 0 && fieldConfidence.protein < 0.7}
                     />
                   </Grid>
                   <Grid size={6}>
@@ -753,7 +1033,24 @@ const IngredientManager = ({ onChange }) => {
                       type="number"
                       value={form.carbs}
                       onChange={(e) => setForm((f) => ({ ...f, carbs: e.target.value }))}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 2,
+                          bgcolor: "#fff",
+                          ...(highlightedFields.includes('carbs') && {
+                            borderColor: "#10b981",
+                            borderWidth: 2,
+                            bgcolor: "#f0fdf4",
+                            transition: "all 0.3s ease"
+                          })
+                        }
+                      }}
+                      helperText={
+                        fieldConfidence.carbs > 0 && fieldConfidence.carbs < 0.7
+                          ? `Low confidence (${Math.round(fieldConfidence.carbs * 100)}%) - please review`
+                          : undefined
+                      }
+                      error={fieldConfidence.carbs > 0 && fieldConfidence.carbs < 0.7}
                     />
                   </Grid>
                   <Grid size={6}>
@@ -766,7 +1063,24 @@ const IngredientManager = ({ onChange }) => {
                       type="number"
                       value={form.fat}
                       onChange={(e) => setForm((f) => ({ ...f, fat: e.target.value }))}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 2,
+                          bgcolor: "#fff",
+                          ...(highlightedFields.includes('fat') && {
+                            borderColor: "#10b981",
+                            borderWidth: 2,
+                            bgcolor: "#f0fdf4",
+                            transition: "all 0.3s ease"
+                          })
+                        }
+                      }}
+                      helperText={
+                        fieldConfidence.fat > 0 && fieldConfidence.fat < 0.7
+                          ? `Low confidence (${Math.round(fieldConfidence.fat * 100)}%) - please review`
+                          : undefined
+                      }
+                      error={fieldConfidence.fat > 0 && fieldConfidence.fat < 0.7}
                     />
                   </Grid>
                 </Grid>
@@ -823,6 +1137,101 @@ const IngredientManager = ({ onChange }) => {
                   Clear
                 </Button>
               </Stack>
+
+              {/* Image Upload for OCR */}
+              <Box sx={{ mt: 2, mb: 2, pt: 2, borderTop: "1px solid", borderColor: "#f1f5f9" }}>
+                <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ display: "block", mb: 2 }}>
+                  Quick import
+                </Typography>
+                <ImageUploader
+                  onImageSelected={handleImageUpload}
+                  onError={handleImageUploadError}
+                  enableCrop={false}
+                  buttonText="Upload Nutrition Label Photo"
+                  dropzoneText="Drop nutrition label image here, or click to browse"
+                />
+
+                {/* Paste from Clipboard Button */}
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<ContentPasteIcon />}
+                  onClick={handlePasteFromClipboard}
+                  disabled={ocrProcessing}
+                  sx={{
+                    textTransform: "none",
+                    fontWeight: 600,
+                    color: "#10b981",
+                    borderColor: "#d1fae5",
+                    borderRadius: 2,
+                    mt: 2,
+                    bgcolor: "#f0fdf4",
+                    "&:hover": { borderColor: "#6ee7b7", bgcolor: "#d1fae5" },
+                  }}
+                >
+                  Paste Image from Clipboard
+                </Button>
+
+                {ocrProcessing && (
+                  <Box sx={{ mt: 2 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={ocrProgress.progress * 100}
+                      sx={{ mb: 1 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {ocrProgress.stage === 'ocr' && 'Extracting text from image...'}
+                      {ocrProgress.stage === 'parsing' && 'Parsing nutrition data...'}
+                      {ocrProgress.stage === 'complete' && 'Done!'}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Smart Paste Feature */}
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<ContentPasteIcon />}
+                onClick={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    const parsed = parseNutritionText(text);
+                    if (parsed) {
+                      setForm(prev => ({
+                        ...prev,
+                        name: parsed.name || prev.name,
+                        servingSize: parsed.servingSize || prev.servingSize,
+                        servingUnit: parsed.servingUnit || prev.servingUnit,
+                        servingLabel: parsed.servingLabel || prev.servingLabel,
+                        calories: parsed.calories || prev.calories,
+                        protein: parsed.protein || prev.protein,
+                        carbs: parsed.carbs || prev.carbs,
+                        fat: parsed.fat || prev.fat,
+                        notes: text.length < 100 ? text : 'Pasted from clipboard',
+                      }));
+                      toast.success('Pasted and parsed nutrition info!');
+                    } else {
+                      toast.error('Could not find nutrition data in clipboard');
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    toast.error('Failed to read clipboard. Try manually entering data.');
+                  }
+                }}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 600,
+                  color: "#4f46e5",
+                  borderColor: "#c7d2fe",
+                  borderRadius: 2,
+                  mt: 1,
+                  bgcolor: "#eef2ff",
+                  "&:hover": { borderColor: "#818cf8", bgcolor: "#e0e7ff" },
+                }}
+              >
+                Smart Paste from Clipboard
+              </Button>
 
               {/* Library Actions */}
               <Box sx={{ pt: 1, borderTop: "1px solid", borderColor: "#f1f5f9" }}>
@@ -918,7 +1327,7 @@ const IngredientManager = ({ onChange }) => {
                         searchUSDAAPI(query);
                       }
                     }}
-                    placeholder="Search ingredients..."
+                    placeholder="Search name or UPC..."
                     sx={{
                       minWidth: 200,
                       "& .MuiOutlinedInput-root": { borderRadius: 2 },
@@ -1018,7 +1427,7 @@ const IngredientManager = ({ onChange }) => {
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                   <CloudSearchIcon sx={{ color: "#4f46e5", fontSize: 20 }} />
                   <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#1e1b4b" }}>
-                    USDA Results
+                    Database Results
                   </Typography>
                   {apiLoading && <CircularProgress size={18} sx={{ ml: 1 }} />}
                   {!apiLoading && apiResults.length > 0 && (
@@ -1039,7 +1448,7 @@ const IngredientManager = ({ onChange }) => {
                 ) : apiResults.length === 0 ? (
                   <Box sx={{ textAlign: "center", py: 2 }}>
                     <Typography variant="body2" color="text.secondary">
-                      No results found for "{query}". Try a different search term.
+                      No results found for "{query}". Try a different search term or barcode.
                     </Typography>
                   </Box>
                 ) : (
@@ -1052,7 +1461,7 @@ const IngredientManager = ({ onChange }) => {
                           p: 1.5,
                           borderRadius: 2,
                           bgcolor: "#fff",
-                          borderColor: "#c7d2fe",
+                          borderColor: item.source === 'OpenFoodFacts' ? '#fed7aa' : '#c7d2fe',
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
@@ -1060,13 +1469,40 @@ const IngredientManager = ({ onChange }) => {
                           flexWrap: "wrap",
                         }}
                       >
-                        <Box sx={{ minWidth: 150, flex: 1 }}>
-                          <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a", textTransform: "capitalize" }}>
-                            {item.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {item.brandName ? `${item.brandName} · ` : ""}{item.servingDescription || `${item.grams}g`}
-                          </Typography>
+                        <Box sx={{ minWidth: 150, flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+                          {item.image ? (
+                            <Box 
+                              component="img" 
+                              src={item.image} 
+                              alt={item.name}
+                              sx={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 1 }}
+                            />
+                          ) : null}
+                          <Box>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <HighlightedText 
+                                text={item.name} 
+                                highlight={query}
+                                variant="body2"
+                                sx={{ fontWeight: 600, color: "#0f172a", textTransform: "capitalize" }} 
+                              />
+                              <Chip 
+                                label={item.source === 'OpenFoodFacts' ? 'OFF' : 'USDA'} 
+                                size="small"
+                                sx={{ 
+                                  height: 16, 
+                                  fontSize: '0.6rem', 
+                                  bgcolor: item.source === 'OpenFoodFacts' ? '#fff7ed' : '#eff6ff',
+                                  color: item.source === 'OpenFoodFacts' ? '#c2410c' : '#1e40af',
+                                  border: '1px solid',
+                                  borderColor: item.source === 'OpenFoodFacts' ? '#fdba74' : '#bfdbfe'
+                                }} 
+                              />
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.brandName ? `${item.brandName} · ` : ""}{item.servingDescription || `${item.grams || 100}g`}
+                            </Typography>
+                          </Box>
                         </Box>
                         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                           <Chip
@@ -1112,7 +1548,7 @@ const IngredientManager = ({ onChange }) => {
                 )}
 
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2, textAlign: "center" }}>
-                  Data provided by USDA FoodData Central. Values are per 100g.
+                  Data provided by USDA FoodData Central & OpenFoodFacts.
                 </Typography>
               </Paper>
             )}
@@ -1145,20 +1581,23 @@ const IngredientManager = ({ onChange }) => {
                     <TableBody>
                       {filtered.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                            <Typography variant="body2" color="text.secondary">
-                              No ingredients found.
-                            </Typography>
+                          <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                            <EmptyState
+                              title="No ingredients found"
+                              description={`No ingredients match "${query}". Try adjusting your search or filters, or look up a new food.`}
+                            />
                           </TableCell>
                         </TableRow>
                       ) : (
                         filtered.map((it) => (
                           <TableRow key={it.id} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
                             <TableCell sx={{ py: 1.5 }}>
-                              <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a" }}>
-                                {it.name}
-                              </Typography>
-                              {it.notes && (
+                                                          <HighlightedText 
+                                                            text={it.name} 
+                                                            highlight={query}
+                                                            variant="body2" 
+                                                            sx={{ fontWeight: 600, color: "#0f172a", display: "block" }} 
+                                                          />                              {it.notes && (
                                 <Typography variant="caption" color="text.secondary">
                                   {it.notes}
                                 </Typography>
@@ -1238,19 +1677,22 @@ const IngredientManager = ({ onChange }) => {
                 /* Mobile List */
                 <Stack divider={<Box sx={{ borderBottom: "1px solid", borderColor: "divider" }} />}>
                   {filtered.length === 0 ? (
-                    <Box sx={{ p: 3, textAlign: "center" }}>
-                      <Typography variant="body2" color="text.secondary">
-                        No ingredients found.
-                      </Typography>
-                    </Box>
+                    <EmptyState
+                      title="No ingredients found"
+                      description={`No ingredients match "${query}".`}
+                      sx={{ py: 6 }}
+                    />
                   ) : (
                     filtered.map((it) => (
                       <Box key={it.id} sx={{ p: 2 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Box>
-                            <Typography variant="body2" fontWeight={600}>
-                              {it.name}
-                            </Typography>
+                            <HighlightedText 
+                              text={it.name} 
+                              highlight={query}
+                              variant="body2"
+                              sx={{ fontWeight: 600, display: "block" }} 
+                            />
                             <Typography variant="caption" color="text.secondary">
                               {it.category || "—"} · {it.id < 1000 ? "DB" : "Custom"}
                             </Typography>
