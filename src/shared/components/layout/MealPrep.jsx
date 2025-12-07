@@ -40,7 +40,7 @@ import ThemeToggle from "./ThemeToggle";
 
 const TABS = {
   CALCULATOR: "calculator",
-  CALORIE_CALC: "calorie-calc", 
+  CALORIE_CALC: "calorie-calc",
   INSTRUCTIONS: "instructions",
   INGREDIENTS: "ingredients",
   ACCOUNT: "account",
@@ -55,7 +55,7 @@ const TAB_CONFIG = [
 ];
 
 const MealPrep = () => {
-  const { user, isGuest, logout } = useUser();
+  const { user, logout } = useUser();
   const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
   const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
   const [lastSync, setLastSync] = useState(null);
@@ -95,7 +95,7 @@ const MealPrep = () => {
         syncFromRemote(user.uid),
         loadUserPreferences(user.uid)
       ])
-        .then(([_, prefs]) => {
+        .then(([, prefs]) => {
           setAllIngredients(getAllBaseIngredients());
           setUserPreferences(prefs);
           setLastSync(new Date());
@@ -129,15 +129,13 @@ const MealPrep = () => {
         minHeight: "100vh",
         pb: isDesktop ? 4 : 10,
         background: isDesktop
-          ? `radial-gradient(circle at 20% 20%, ${
-              theme.palette.mode === "dark"
-                ? "rgba(148, 163, 184, 0.12)"
-                : "rgba(148, 163, 184, 0.2)"
-            }, transparent 40%), radial-gradient(circle at 80% 0%, ${
-              theme.palette.mode === "dark"
-                ? "rgba(59, 130, 246, 0.12)"
-                : "rgba(59, 130, 246, 0.18)"
-            }, transparent 35%), ${theme.palette.background.default}`
+          ? `radial-gradient(circle at 20% 20%, ${theme.palette.mode === "dark"
+            ? "rgba(148, 163, 184, 0.12)"
+            : "rgba(148, 163, 184, 0.2)"
+          }, transparent 40%), radial-gradient(circle at 80% 0%, ${theme.palette.mode === "dark"
+            ? "rgba(59, 130, 246, 0.12)"
+            : "rgba(59, 130, 246, 0.18)"
+          }, transparent 35%), ${theme.palette.background.default}`
           : theme.palette.background.default,
         transition: theme.transitions.create("background-color"),
       }}

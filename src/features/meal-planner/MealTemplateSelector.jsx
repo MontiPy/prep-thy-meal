@@ -97,7 +97,7 @@ const MealTemplateSelector = ({
       setShowSaveDialog(false);
       setNewTemplateName('');
       setNewTemplateDesc('');
-    } catch (err) {
+    } catch {
       toast.error('Failed to save template');
     }
   };
@@ -111,7 +111,7 @@ const MealTemplateSelector = ({
       if (selectedTemplate?.id === templateId) {
         setSelectedTemplate(null);
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete template');
     }
   };

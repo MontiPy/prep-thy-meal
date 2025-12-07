@@ -19,7 +19,7 @@ import {
  * @param {string} activityLevel - Activity level (sedentary, light, moderate, high, athlete)
  * @returns {Object} { severity, message, gramsPerPound, isInRange }
  */
-export function validateProtein(proteinGrams, bodyweightLbs, activityLevel = 'moderate') {
+export function validateProtein(proteinGrams, bodyweightLbs) {
   if (!proteinGrams || !bodyweightLbs || bodyweightLbs <= 0) {
     return { severity: null, message: null, gramsPerPound: 0, isInRange: false };
   }
@@ -221,7 +221,7 @@ export function validateFatByPercentage(fatGrams, totalCalories) {
  * @param {number} totalCalories - Total daily calories
  * @returns {Object} { severity, message, isKeto, isLowCarb }
  */
-export function validateCarbs(carbGrams, totalCalories) {
+export function validateCarbs(carbGrams) {
   if (carbGrams === null || carbGrams === undefined) {
     return { severity: null, message: null, isKeto: false, isLowCarb: false };
   }
@@ -353,13 +353,12 @@ export function validateAllMacros(params) {
     carbGrams,
     totalCalories,
     bodyweightLbs,
-    activityLevel = 'moderate',
   } = params;
 
-  const protein = validateProtein(proteinGrams, bodyweightLbs, activityLevel);
+  const protein = validateProtein(proteinGrams, bodyweightLbs);
   const fatByBodyweight = validateFatByBodyweight(fatGrams, bodyweightLbs);
   const fatByPercentage = validateFatByPercentage(fatGrams, totalCalories);
-  const carbs = validateCarbs(carbGrams, totalCalories);
+  const carbs = validateCarbs(carbGrams);
   const calories = validateCalories(totalCalories);
 
   // Use percentage-based fat validation as primary (more common)
