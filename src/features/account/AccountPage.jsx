@@ -174,8 +174,8 @@ const AccountPage = () => {
                     borderRadius: 3,
                     background: (theme) =>
                       theme.palette.mode === 'dark'
-                        ? 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(99,102,241,0.1) 100%)'
-                        : 'linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(99,102,241,0.05) 100%)',
+                        ? 'linear-gradient(135deg, rgba(255,45,120,0.06) 0%, rgba(168,85,247,0.06) 100%)'
+                        : 'linear-gradient(135deg, rgba(214,36,94,0.04) 0%, rgba(139,63,212,0.04) 100%)',
                     borderColor: 'primary.main',
                   }}
                 >
@@ -395,8 +395,9 @@ const AccountPage = () => {
                 borderRadius: 3,
                 mt: 2,
                 backgroundColor: (theme) =>
-                  theme.palette.mode === 'dark' ? 'rgba(248,113,113,0.08)' : 'rgba(254,226,226,0.7)',
-                borderColor: 'error.light',
+                  theme.palette.mode === 'dark' ? 'rgba(255,71,87,0.06)' : 'rgba(224,62,78,0.04)',
+                borderColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,71,87,0.2)' : 'error.light',
               }}
             >
               <CardHeader title={<Typography variant="h6" fontWeight={800}>Account Actions</Typography>} />

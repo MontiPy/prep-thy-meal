@@ -22,13 +22,21 @@ export const useAppTheme = () => {
   return context;
 };
 
+// Tokyo Nights neon glow helpers
+const neonGlow = {
+  pink: '0 0 20px rgba(255,45,120,0.3), 0 0 60px rgba(255,45,120,0.1)',
+  cyan: '0 0 20px rgba(0,229,255,0.3), 0 0 60px rgba(0,229,255,0.1)',
+  amber: '0 0 20px rgba(255,176,32,0.3)',
+  green: '0 0 20px rgba(57,255,127,0.3)',
+  purple: '0 0 20px rgba(168,85,247,0.3)',
+};
+
 export const ThemeProvider = ({ children }) => {
   const prefersDarkMode =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   const [isDark, setIsDark] = useState(() => {
-    // Check localStorage first
     const saved =
       typeof localStorage !== 'undefined'
         ? localStorage.getItem('theme')
@@ -36,16 +44,13 @@ export const ThemeProvider = ({ children }) => {
     if (saved) {
       return saved === 'dark';
     }
-    // Check system preference
     return prefersDarkMode;
   });
 
   useEffect(() => {
-    // Apply theme to document
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', isDark);
     }
-    // Save preference for the next session
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     }
@@ -61,49 +66,116 @@ export const ThemeProvider = ({ children }) => {
         palette: {
           mode: isDark ? 'dark' : 'light',
           primary: {
-            main: '#2563eb',
+            main: isDark ? '#ff2d78' : '#d6245e',
+            light: isDark ? '#ff6da0' : '#e8507a',
+            dark: isDark ? '#c4205d' : '#a81c4a',
+            contrastText: '#ffffff',
           },
           secondary: {
-            main: '#10b981',
+            main: isDark ? '#00e5ff' : '#00b8d4',
+            light: isDark ? '#6effff' : '#62efff',
+            dark: isDark ? '#00b2c8' : '#008ba3',
+            contrastText: isDark ? '#0a0a12' : '#ffffff',
           },
           success: {
-            main: '#16a34a',
-            light: '#dcfce7',
-            dark: '#15803d',
+            main: isDark ? '#39ff7f' : '#2ecc71',
+            light: isDark ? '#80ffb0' : '#a3e4bc',
+            dark: isDark ? '#1fb85c' : '#1fa04e',
           },
           warning: {
-            main: '#f59e0b',
-            light: '#fef3c7',
-            dark: '#b45309',
+            main: isDark ? '#ffb020' : '#e09b18',
+            light: isDark ? '#ffd070' : '#f5d890',
+            dark: isDark ? '#c88a18' : '#b07812',
+          },
+          error: {
+            main: isDark ? '#ff4757' : '#e03e4e',
+            light: isDark ? '#ff8a94' : '#f0888f',
+            dark: isDark ? '#cc3644' : '#b0303e',
           },
           info: {
-            main: '#0ea5e9',
-            light: '#e0f2fe',
-            dark: '#0369a1',
+            main: isDark ? '#a855f7' : '#8b3fd4',
+            light: isDark ? '#c88aff' : '#b48ae0',
+            dark: isDark ? '#7c3aed' : '#6d2eb0',
           },
           background: {
-            default: isDark ? '#0b1220' : '#f8fafc',
-            paper: isDark ? '#0f172a' : '#ffffff',
-            accent: isDark ? '#0f172a' : '#eef2ff',
+            default: isDark ? '#0a0a12' : '#f4f2ee',
+            paper: isDark ? '#12121e' : '#ffffff',
+            accent: isDark ? '#1a1a2e' : '#eae7e0',
           },
+          text: {
+            primary: isDark ? '#e8e6f0' : '#1a1a2e',
+            secondary: isDark ? '#7a78a0' : '#6b6980',
+          },
+          divider: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)',
         },
         shape: {
           borderRadius: 12,
         },
-          typography: {
-            fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
-            h1: { fontWeight: 700, letterSpacing: -0.5 },
-            h2: { fontWeight: 700, letterSpacing: -0.25 },
-            h3: { fontWeight: 700 },
-            subtitle1: { fontWeight: 600 },
-            button: { textTransform: 'none', fontWeight: 600, letterSpacing: 0 },
-            body2: { color: isDark ? '#cbd5e1' : '#475569' },
+        typography: {
+          fontFamily: '"Urbanist", system-ui, -apple-system, sans-serif',
+          h1: {
+            fontFamily: '"Orbitron", sans-serif',
+            fontWeight: 900,
+            letterSpacing: 1,
+            textTransform: 'uppercase',
           },
+          h2: {
+            fontFamily: '"Orbitron", sans-serif',
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+          },
+          h3: {
+            fontFamily: '"Orbitron", sans-serif',
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+          },
+          h4: {
+            fontFamily: '"Orbitron", sans-serif',
+            fontWeight: 700,
+            letterSpacing: 0.25,
+          },
+          h5: {
+            fontFamily: '"Urbanist", sans-serif',
+            fontWeight: 700,
+          },
+          h6: {
+            fontFamily: '"Urbanist", sans-serif',
+            fontWeight: 700,
+          },
+          subtitle1: { fontWeight: 600 },
+          subtitle2: { fontWeight: 600 },
+          button: {
+            textTransform: 'none',
+            fontWeight: 600,
+            letterSpacing: 0.25,
+          },
+          body2: {
+            color: isDark ? '#9a98b8' : '#6b6980',
+          },
+        },
         components: {
           MuiButton: {
             styleOverrides: {
               root: {
-                borderRadius: 10,
+                borderRadius: 8,
+                transition: 'all 250ms ease-out',
+              },
+              contained: {
+                boxShadow: isDark ? neonGlow.pink : 'none',
+                '&:hover': {
+                  boxShadow: isDark
+                    ? '0 0 30px rgba(255,45,120,0.4), 0 0 80px rgba(255,45,120,0.15)'
+                    : '0 4px 16px rgba(214,36,94,0.3)',
+                },
+              },
+              outlined: {
+                borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+                '&:hover': {
+                  borderColor: isDark ? '#ff2d78' : '#d6245e',
+                  boxShadow: isDark ? '0 0 12px rgba(255,45,120,0.2)' : 'none',
+                },
               },
             },
           },
@@ -111,7 +183,15 @@ export const ThemeProvider = ({ children }) => {
             styleOverrides: {
               root: {
                 borderRadius: 16,
-                transition: 'box-shadow 200ms ease, transform 200ms ease',
+                backgroundImage: 'none',
+                transition: 'box-shadow 250ms ease-out, border-color 250ms ease-out',
+                ...(isDark && {
+                  backgroundColor: '#12121e',
+                  border: '1px solid rgba(255,255,255,0.04)',
+                  '&:hover': {
+                    borderColor: 'rgba(255,45,120,0.15)',
+                  },
+                }),
               },
             },
           },
@@ -121,15 +201,16 @@ export const ThemeProvider = ({ children }) => {
             },
             styleOverrides: {
               root: {
-                border: `1px solid ${isDark ? '#1f2937' : '#e2e8f0'}`,
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#e2e0d8'}`,
                 boxShadow: isDark
-                  ? '0 12px 30px rgba(15,23,42,0.35)'
-                  : '0 12px 30px rgba(15,23,42,0.08)',
+                  ? '0 4px 30px rgba(0,0,0,0.4)'
+                  : '0 4px 20px rgba(0,0,0,0.06)',
+                transition: 'all 250ms ease-out',
                 '&:hover': {
-                  transform: 'translateY(-2px)',
+                  borderColor: isDark ? 'rgba(255,45,120,0.2)' : 'rgba(214,36,94,0.15)',
                   boxShadow: isDark
-                    ? '0 14px 34px rgba(15,23,42,0.5)'
-                    : '0 14px 34px rgba(15,23,42,0.12)',
+                    ? '0 4px 30px rgba(0,0,0,0.4), 0 0 20px rgba(255,45,120,0.1)'
+                    : '0 8px 30px rgba(0,0,0,0.08)',
                 },
               },
             },
@@ -148,11 +229,143 @@ export const ThemeProvider = ({ children }) => {
             styleOverrides: {
               root: {
                 backgroundColor: isDark
-                  ? 'rgba(15, 23, 42, 0.92)'
-                  : 'rgba(255, 255, 255, 0.92)',
+                  ? 'rgba(10, 10, 18, 0.92)'
+                  : 'rgba(244, 242, 238, 0.95)',
                 backdropFilter: 'blur(14px)',
-                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.08)',
-                borderBottom: `1px solid ${isDark ? '#1f2937' : '#e2e8f0'}`,
+                boxShadow: 'none',
+                borderBottom: isDark
+                  ? '1px solid rgba(255,255,255,0.04)'
+                  : '1px solid rgba(0,0,0,0.06)',
+                '&::after': isDark ? {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: '1px',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,45,120,0.4), rgba(0,229,255,0.4), transparent)',
+                } : {},
+              },
+            },
+          },
+          MuiChip: {
+            styleOverrides: {
+              outlined: {
+                borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+              },
+            },
+          },
+          MuiTab: {
+            styleOverrides: {
+              root: {
+                transition: 'all 250ms ease-out',
+                '&.Mui-selected': {
+                  color: isDark ? '#ff2d78' : '#d6245e',
+                },
+              },
+            },
+          },
+          MuiTabs: {
+            styleOverrides: {
+              indicator: {
+                backgroundColor: isDark ? '#ff2d78' : '#d6245e',
+                height: 3,
+                borderRadius: '3px 3px 0 0',
+                boxShadow: isDark ? '0 0 10px rgba(255,45,120,0.5)' : 'none',
+              },
+            },
+          },
+          MuiTextField: {
+            styleOverrides: {
+              root: {
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: isDark ? '#00e5ff' : '#00b8d4',
+                    boxShadow: isDark ? '0 0 12px rgba(0,229,255,0.2)' : 'none',
+                  },
+                },
+              },
+            },
+          },
+          MuiAccordion: {
+            styleOverrides: {
+              root: {
+                backgroundColor: isDark ? '#12121e' : '#ffffff',
+                '&::before': {
+                  display: 'none',
+                },
+              },
+            },
+          },
+          MuiDialog: {
+            styleOverrides: {
+              paper: {
+                backgroundColor: isDark ? 'rgba(18, 18, 30, 0.85)' : '#ffffff',
+                backdropFilter: isDark ? 'blur(20px)' : 'none',
+                border: isDark ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                boxShadow: isDark
+                  ? '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,45,120,0.08)'
+                  : '0 24px 80px rgba(0,0,0,0.15)',
+              },
+              backdrop: {
+                backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)',
+              },
+            },
+          },
+          MuiBottomNavigation: {
+            styleOverrides: {
+              root: {
+                backgroundColor: isDark
+                  ? 'rgba(10, 10, 18, 0.95)'
+                  : 'rgba(244, 242, 238, 0.98)',
+                backdropFilter: 'blur(14px)',
+              },
+            },
+          },
+          MuiBottomNavigationAction: {
+            styleOverrides: {
+              root: {
+                color: isDark ? '#7a78a0' : '#6b6980',
+                '&.Mui-selected': {
+                  color: isDark ? '#ff2d78' : '#d6245e',
+                },
+              },
+            },
+          },
+          MuiLinearProgress: {
+            styleOverrides: {
+              root: {
+                borderRadius: 4,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+              },
+              bar: {
+                borderRadius: 4,
+              },
+            },
+          },
+          MuiFab: {
+            styleOverrides: {
+              root: {
+                boxShadow: isDark ? neonGlow.pink : '0 4px 16px rgba(214,36,94,0.3)',
+              },
+            },
+          },
+          MuiSwitch: {
+            styleOverrides: {
+              switchBase: {
+                '&.Mui-checked': {
+                  color: isDark ? '#ff2d78' : '#d6245e',
+                  '& + .MuiSwitch-track': {
+                    backgroundColor: isDark ? '#ff2d78' : '#d6245e',
+                  },
+                },
+              },
+            },
+          },
+          MuiAlert: {
+            styleOverrides: {
+              root: {
+                borderRadius: 12,
               },
             },
           },
@@ -168,6 +381,7 @@ export const ThemeProvider = ({ children }) => {
         toggleTheme,
         paletteMode: isDark ? 'dark' : 'light',
         muiTheme,
+        neonGlow,
       }}
     >
       <MuiThemeProvider theme={muiTheme}>

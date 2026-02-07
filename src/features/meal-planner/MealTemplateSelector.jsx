@@ -98,6 +98,7 @@ const MealTemplateSelector = ({
       setNewTemplateName('');
       setNewTemplateDesc('');
     } catch (err) {
+      console.error('Failed to save template:', err);
       toast.error('Failed to save template');
     }
   };
@@ -112,6 +113,7 @@ const MealTemplateSelector = ({
         setSelectedTemplate(null);
       }
     } catch (err) {
+      console.error('Failed to delete template:', err);
       toast.error('Failed to delete template');
     }
   };
@@ -144,7 +146,12 @@ const MealTemplateSelector = ({
                       borderColor: selectedTemplate?.id === template.id ? 'primary.main' : 'divider',
                       borderWidth: selectedTemplate?.id === template.id ? 2 : 1,
                       '&:hover': { borderColor: 'primary.light' },
-                      transition: 'all 0.2s',
+                      transition: 'all 250ms ease-out',
+                      boxShadow: selectedTemplate?.id === template.id
+                        ? (theme) => theme.palette.mode === 'dark'
+                          ? '0 0 16px rgba(255,45,120,0.15)'
+                          : 'none'
+                        : 'none',
                     }}
                     onClick={() => setSelectedTemplate(template)}
                   >
@@ -226,7 +233,7 @@ const MealTemplateSelector = ({
 
             {/* Save Current Meal Section */}
             {showSaveDialog ? (
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'success.light' }}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.accent' }}>
                 <Typography variant="subtitle1" fontWeight={700} mb={1.5}>
                   Save Current Meal as Template
                 </Typography>

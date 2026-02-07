@@ -19,10 +19,16 @@ import {
   Scale as ScaleIcon,
   Restaurant as RestaurantIcon,
 } from '@mui/icons-material';
+import { alpha, useTheme } from '@mui/material/styles';
 
-/**
- * Modal to preview and select serving sizes when adding an ingredient from USDA
- */
+// Tokyo Nights macro color mapping for nutrition chips
+const CHIP_COLORS = {
+  calories: '#ffb020',
+  protein: '#00e5ff',
+  carbs: '#ff2d78',
+  fat: '#a855f7',
+};
+
 export default function ServingSizePreviewModal({
   open,
   onClose,
@@ -31,10 +37,12 @@ export default function ServingSizePreviewModal({
   loading,
   onConfirm,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const chipAlpha = isDark ? 0.15 : 0.1;
   const [selectedDefault, setSelectedDefault] = useState('100g');
 
   const handleConfirm = () => {
-    // Mark the selected serving as default
     const updatedServingSizes = servingSizes.map(s => ({
       ...s,
       isDefault: s.name === selectedDefault,
@@ -42,9 +50,33 @@ export default function ServingSizePreviewModal({
     onConfirm(updatedServingSizes);
   };
 
-  // Calculate nutrition preview for selected serving
   const selectedServing = servingSizes?.find(s => s.name === selectedDefault);
   const scale = selectedServing ? selectedServing.grams / 100 : 1;
+
+  const NutritionChips = ({ cal, p, c, f }) => (
+    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+      <Chip
+        size="small"
+        label={`${cal} kcal`}
+        sx={{ bgcolor: alpha(CHIP_COLORS.calories, chipAlpha), color: CHIP_COLORS.calories }}
+      />
+      <Chip
+        size="small"
+        label={`P: ${p}g`}
+        sx={{ bgcolor: alpha(CHIP_COLORS.protein, chipAlpha), color: CHIP_COLORS.protein }}
+      />
+      <Chip
+        size="small"
+        label={`C: ${c}g`}
+        sx={{ bgcolor: alpha(CHIP_COLORS.carbs, chipAlpha), color: CHIP_COLORS.carbs }}
+      />
+      <Chip
+        size="small"
+        label={`F: ${f}g`}
+        sx={{ bgcolor: alpha(CHIP_COLORS.fat, chipAlpha), color: CHIP_COLORS.fat }}
+      />
+    </Stack>
+  );
 
   return (
     <Dialog
@@ -73,7 +105,6 @@ export default function ServingSizePreviewModal({
           </Box>
         ) : (
           <>
-            {/* Food Info */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="h6" gutterBottom>
                 {food?.name}
@@ -84,29 +115,14 @@ export default function ServingSizePreviewModal({
                 </Typography>
               )}
 
-              {/* Nutrition per 100g */}
-              <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
-                <Chip
-                  size="small"
-                  label={`${food?.calories || 0} kcal`}
-                  sx={{ bgcolor: '#fef3c7', color: '#92400e' }}
+              <Box sx={{ mt: 1.5 }}>
+                <NutritionChips
+                  cal={food?.calories || 0}
+                  p={food?.protein || 0}
+                  c={food?.carbs || 0}
+                  f={food?.fat || 0}
                 />
-                <Chip
-                  size="small"
-                  label={`P: ${food?.protein || 0}g`}
-                  sx={{ bgcolor: '#dbeafe', color: '#1e40af' }}
-                />
-                <Chip
-                  size="small"
-                  label={`C: ${food?.carbs || 0}g`}
-                  sx={{ bgcolor: '#dcfce7', color: '#166534' }}
-                />
-                <Chip
-                  size="small"
-                  label={`F: ${food?.fat || 0}g`}
-                  sx={{ bgcolor: '#fce7f3', color: '#9d174d' }}
-                />
-              </Stack>
+              </Box>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
                 Values per 100g
               </Typography>
@@ -114,7 +130,6 @@ export default function ServingSizePreviewModal({
 
             <Divider sx={{ my: 2 }} />
 
-            {/* Serving Size Selection */}
             <Box>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                 <ScaleIcon fontSize="small" color="action" />
@@ -167,34 +182,19 @@ export default function ServingSizePreviewModal({
               )}
             </Box>
 
-            {/* Preview for selected serving */}
             {selectedServing && selectedServing.grams !== 100 && (
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'background.accent', borderRadius: 2 }}>
                 <Typography variant="caption" color="text.secondary" gutterBottom>
                   Nutrition for {selectedServing.name}:
                 </Typography>
-                <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
-                  <Chip
-                    size="small"
-                    label={`${Math.round(food?.calories * scale)} kcal`}
-                    sx={{ bgcolor: '#fef3c7', color: '#92400e' }}
+                <Box sx={{ mt: 1 }}>
+                  <NutritionChips
+                    cal={Math.round(food?.calories * scale)}
+                    p={Math.round(food?.protein * scale * 10) / 10}
+                    c={Math.round(food?.carbs * scale * 10) / 10}
+                    f={Math.round(food?.fat * scale * 10) / 10}
                   />
-                  <Chip
-                    size="small"
-                    label={`P: ${Math.round(food?.protein * scale * 10) / 10}g`}
-                    sx={{ bgcolor: '#dbeafe', color: '#1e40af' }}
-                  />
-                  <Chip
-                    size="small"
-                    label={`C: ${Math.round(food?.carbs * scale * 10) / 10}g`}
-                    sx={{ bgcolor: '#dcfce7', color: '#166534' }}
-                  />
-                  <Chip
-                    size="small"
-                    label={`F: ${Math.round(food?.fat * scale * 10) / 10}g`}
-                    sx={{ bgcolor: '#fce7f3', color: '#9d174d' }}
-                  />
-                </Stack>
+                </Box>
               </Box>
             )}
           </>

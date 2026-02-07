@@ -21,15 +21,13 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import {
-  Flame,
-  Info,
-  ArrowRight,
-  AlertTriangle,
-  Save,
-  FolderOpen,
-} from "lucide-react";
+import { alpha, useTheme } from "@mui/material/styles";
+import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartmentRounded";
+import InfoIcon from "@mui/icons-material/InfoOutlined";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForwardRounded";
+import WarningAmberIcon from "@mui/icons-material/WarningAmberRounded";
+import SaveIcon from "@mui/icons-material/SaveRounded";
+import FolderOpenIcon from "@mui/icons-material/FolderOpenRounded";
 import { useUser } from "../auth/UserContext.jsx";
 import { validateAllMacros } from "../../shared/utils/macroValidation.js";
 import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
@@ -184,11 +182,13 @@ const CalorieCalculator = () => {
         f: fatGrams,
       };
 
+      const roundToOne = (value) => Math.round(value * 10) / 10;
+
       // Calculate actual percentages for display
       actualPercentages = {
-        p: Math.round((proteinCals / targetCalc) * 100),
-        c: Math.round((carbCals / targetCalc) * 100),
-        f: Math.round((fatCals / targetCalc) * 100),
+        p: roundToOne((proteinCals / targetCalc) * 100),
+        c: roundToOne((carbCals / targetCalc) * 100),
+        f: roundToOne((fatCals / targetCalc) * 100),
       };
     } else {
       // Percentage-based calculation (legacy)
@@ -517,7 +517,7 @@ const CalorieCalculator = () => {
                   color: "white",
                 }}
               >
-                <Flame size={20} />
+                <LocalFireDepartmentIcon sx={{ fontSize: 20 }} />
               </Box>
               <Box>
                 <Typography variant="h6" fontWeight={700}>
@@ -602,8 +602,8 @@ const CalorieCalculator = () => {
                 <InputLabel>
                   Activity Level
                   <Tooltip title="Pick the option that matches your typical week">
-                    <IconButton size="small" sx={{ ml: 0.5, p: 0 }}>
-                      <Info size={14} />
+                    <IconButton size="small" sx={{ ml: 0.5, p: 0 }} aria-label="Activity level help">
+                      <InfoIcon sx={{ fontSize: 14 }} />
                     </IconButton>
                   </Tooltip>
                 </InputLabel>
@@ -629,7 +629,7 @@ const CalorieCalculator = () => {
                 </Typography>
                 <Grid container spacing={1}>
                   {Object.entries(GOAL_PRESETS).map(([key, { label }]) => (
-                    <Grid item xs={3} key={key}>
+                    <Grid item xs={6} sm={3} key={key}>
                       <Button
                         fullWidth
                         size="small"
@@ -724,7 +724,15 @@ const CalorieCalculator = () => {
 
                 {macroMethod === "bodyweight" ? (
                   /* Bodyweight-Based Method (Simple) */
-                  <Paper variant="outlined" sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "primary.50" }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      mt: 2,
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.12),
+                    }}
+                  >
                     <Typography variant="caption" color="primary.main" fontWeight={600} mb={1} display="block">
                       Protein & fat based on bodyweight (g/lb), carbs auto-fill
                     </Typography>
@@ -741,8 +749,9 @@ const CalorieCalculator = () => {
                               size="small"
                               onClick={(e) => handleHelpClick(e, macroHelp.protein)}
                               sx={{ p: 0.25 }}
+                              aria-label="Protein macro help"
                             >
-                              <Info size={14} />
+                              <InfoIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Stack>
                           <Typography variant="body2" fontWeight={700} color="primary.main">
@@ -782,8 +791,9 @@ const CalorieCalculator = () => {
                               size="small"
                               onClick={(e) => handleHelpClick(e, macroHelp.fat)}
                               sx={{ p: 0.25 }}
+                              aria-label="Fat macro help"
                             >
-                              <Info size={14} />
+                              <InfoIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Stack>
                           <Typography variant="body2" fontWeight={700} color="success.main">
@@ -823,8 +833,9 @@ const CalorieCalculator = () => {
                               size="small"
                               onClick={(e) => handleHelpClick(e, macroHelp.carbs)}
                               sx={{ p: 0.25 }}
+                              aria-label="Carbs macro help"
                             >
-                              <Info size={14} />
+                              <InfoIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                           </Stack>
                           <Typography variant="body2" fontWeight={700} color="warning.main">
@@ -845,7 +856,7 @@ const CalorieCalculator = () => {
                     </Typography>
                     <Grid container spacing={1}>
                       {Object.entries(MACRO_PRESETS).map(([key, { label }]) => (
-                        <Grid item xs={3} key={key}>
+                        <Grid item xs={6} sm={3} key={key}>
                           <Button
                             fullWidth
                             size="small"
@@ -915,7 +926,7 @@ const CalorieCalculator = () => {
                 <Button
                   fullWidth
                   variant="contained"
-                  startIcon={<Save size={18} />}
+                  startIcon={<SaveIcon sx={{ fontSize: 18 }} />}
                   onClick={saveProfile}
                   sx={{ textTransform: "none", fontWeight: 600 }}
                 >
@@ -924,7 +935,7 @@ const CalorieCalculator = () => {
                 <Button
                   fullWidth
                   variant="outlined"
-                  startIcon={<FolderOpen size={18} />}
+                  startIcon={<FolderOpenIcon sx={{ fontSize: 18 }} />}
                   onClick={loadProfile}
                   sx={{ textTransform: "none", fontWeight: 600 }}
                 >
@@ -974,8 +985,12 @@ const CalorieCalculator = () => {
                       sx={{
                         p: 2,
                         borderRadius: 2,
-                        bgcolor: item.highlight ? "primary.50" : "background.paper",
-                        borderColor: item.highlight ? "primary.200" : "divider",
+                        bgcolor: item.highlight
+                          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.18 : 0.12)
+                          : "background.paper",
+                        borderColor: item.highlight
+                          ? alpha(theme.palette.primary.main, 0.35)
+                          : "divider",
                       }}
                     >
                       <Typography variant="caption" color="text.secondary">
@@ -996,7 +1011,7 @@ const CalorieCalculator = () => {
               {warning && (
                 <Alert
                   severity="warning"
-                  icon={<AlertTriangle size={18} />}
+                  icon={<WarningAmberIcon sx={{ fontSize: 18 }} />}
                   sx={{ mt: 2, borderRadius: 2 }}
                 >
                   {warning}
@@ -1008,12 +1023,29 @@ const CalorieCalculator = () => {
                 fullWidth
                 variant="contained"
                 size="large"
-                endIcon={<ArrowRight size={18} />}
+                color="success"
+                endIcon={<ArrowForwardIcon sx={{ fontSize: 18 }} />}
                 onClick={sendToPlanner}
-                sx={{ mt: 3, textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+                sx={{ 
+                  mt: 3, 
+                  mb: 1,
+                  textTransform: "none", 
+                  fontWeight: 700, 
+                  borderRadius: 2,
+                  py: 1.5,
+                  fontSize: '1rem',
+                  boxShadow: 2,
+                  '&:hover': {
+                    boxShadow: 4,
+                  },
+                  minHeight: { xs: 48, sm: 'auto' }
+                }}
               >
-                Use these targets in Planner
+                Apply to Meal Planner
               </Button>
+              <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ mb: 1 }}>
+                Switch to the Planner tab to confirm
+              </Typography>
             </Paper>
 
             {/* Macro Breakdown */}
@@ -1129,16 +1161,16 @@ const CalorieCalculator = () => {
                     width: 28,
                     height: 28,
                     borderRadius: 1,
-                    bgcolor: "info.50",
+                    bgcolor: alpha(theme.palette.info.main, theme.palette.mode === "dark" ? 0.18 : 0.12),
                     border: `1px solid`,
-                    borderColor: "info.200",
+                    borderColor: alpha(theme.palette.info.main, 0.35),
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "info.main",
                   }}
                 >
-                  <Info size={16} />
+                  <InfoIcon sx={{ fontSize: 16 }} />
                 </Box>
                 <Typography variant="subtitle1" fontWeight={700}>
                   Understanding the Numbers

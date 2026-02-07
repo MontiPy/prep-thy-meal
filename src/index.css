@@ -1,22 +1,22 @@
-/* Base styles */
+/* ============================================================================
+   TOKYO NIGHTS — Base Styles
+   ============================================================================ */
+
 body {
   margin: 0;
-  font-family: "Inter", system-ui, sans-serif;
-  background-color: #f6f7fb;
-  color: #0f172a;
+  font-family: "Urbanist", system-ui, sans-serif;
+  background-color: #0a0a12;
+  color: #e8e6f0;
 }
 
 /* ============================================================================
    MOBILE TOUCH OPTIMIZATIONS
-   Prevents 300ms tap delay and improves touch responsiveness
    ============================================================================ */
 
-/* Remove tap highlight on mobile */
 * {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Prevent zoom on double-tap for interactive elements */
 button,
 input,
 select,
@@ -26,21 +26,16 @@ a,
   touch-action: manipulation;
 }
 
-/* Improve scroll performance */
 .MuiAccordion-root,
 .MuiPaper-root,
 .MuiStack-root {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Disable hover effects on touch devices for better performance */
 @media (hover: none) and (pointer: coarse) {
-  /* Disable MUI hover elevations on mobile */
   .MuiPaper-root:hover {
     transform: none !important;
   }
-
-  /* Faster active states instead of hover */
   button:active,
   [role="button"]:active {
     opacity: 0.7;
@@ -48,20 +43,65 @@ a,
   }
 }
 
+/* ============================================================================
+   TYPOGRAPHY — Orbitron headings
+   ============================================================================ */
+
 h1,
 h2,
 h3 {
-  font-family: "Fredoka", sans-serif;
+  font-family: "Orbitron", sans-serif;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
-/* Animations */
-@keyframes wiggle {
+/* ============================================================================
+   NEON KEYFRAME ANIMATIONS
+   ============================================================================ */
+
+@keyframes neonPulse {
   0%, 100% {
-    transform: rotate(0deg);
+    box-shadow: 0 0 10px rgba(255, 45, 120, 0.3), 0 0 40px rgba(255, 45, 120, 0.1);
   }
   50% {
-    transform: rotate(15deg);
+    box-shadow: 0 0 20px rgba(255, 45, 120, 0.5), 0 0 60px rgba(255, 45, 120, 0.2);
   }
+}
+
+@keyframes neonFlicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes cyanPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 229, 255, 0.3), 0 0 30px rgba(0, 229, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 229, 255, 0.5), 0 0 50px rgba(0, 229, 255, 0.2);
+  }
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(57, 255, 127, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(57, 255, 127, 0.7);
+  }
+}
+
+/* ============================================================================
+   EXISTING ANIMATIONS (updated)
+   ============================================================================ */
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(15deg); }
 }
 
 .wiggle:hover {
@@ -69,14 +109,8 @@ h3 {
 }
 
 @keyframes confetti {
-  0% {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -100%);
-  }
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -100%); }
 }
 
 .confetti {
@@ -90,71 +124,116 @@ h3 {
 }
 
 .tab-content {
-  animation: slideIn 0.3s ease;
+  animation: slideIn 0.3s ease-out;
 }
 
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateX(20px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
+
+@keyframes neonFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-1 { animation: neonFadeIn 0.35s ease-out 50ms both; }
+.stagger-2 { animation: neonFadeIn 0.35s ease-out 100ms both; }
+.stagger-3 { animation: neonFadeIn 0.35s ease-out 150ms both; }
+.stagger-4 { animation: neonFadeIn 0.35s ease-out 200ms both; }
+.stagger-5 { animation: neonFadeIn 0.35s ease-out 250ms both; }
+.stagger-6 { animation: neonFadeIn 0.35s ease-out 300ms both; }
 
 .cheer {
   position: fixed;
   top: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #fef08a;
-  color: #854d0e;
+  background-color: rgba(255, 176, 32, 0.15);
+  color: #ffb020;
   padding: 0.5rem 1rem;
   border-radius: 9999px;
+  border: 1px solid rgba(255, 176, 32, 0.3);
   animation: confetti 2s forwards;
 }
 
-/* Custom scrollbar */
+/* ============================================================================
+   SCROLLBAR — Dark glass with neon thumb
+   ============================================================================ */
+
 .overflow-x-auto {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 .overflow-x-auto::-webkit-scrollbar {
-  height: 8px;
+  height: 6px;
 }
 
 .overflow-x-auto::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+  background: rgba(255, 45, 120, 0.4);
+  border-radius: 3px;
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: rgba(255, 45, 120, 0.6);
 }
 
-/* Custom slider styling */
+/* Global scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 45, 120, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 45, 120, 0.5);
+}
+
+/* ============================================================================
+   CUSTOM SLIDER — Neon glow thumb
+   ============================================================================ */
+
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   height: 20px;
   width: 20px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #ff2d78;
   cursor: pointer;
+  box-shadow: 0 0 10px rgba(255, 45, 120, 0.5);
 }
 
 input[type="range"]::-moz-range-thumb {
   height: 20px;
   width: 20px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #ff2d78;
   cursor: pointer;
   border: none;
+  box-shadow: 0 0 10px rgba(255, 45, 120, 0.5);
 }

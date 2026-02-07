@@ -40,7 +40,7 @@ import ThemeToggle from "./ThemeToggle";
 
 const TABS = {
   CALCULATOR: "calculator",
-  CALORIE_CALC: "calorie-calc", 
+  CALORIE_CALC: "calorie-calc",
   INSTRUCTIONS: "instructions",
   INGREDIENTS: "ingredients",
   ACCOUNT: "account",
@@ -55,7 +55,7 @@ const TAB_CONFIG = [
 ];
 
 const MealPrep = () => {
-  const { user, isGuest, logout } = useUser();
+  const { user, logout } = useUser();
   const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
   const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
   const [lastSync, setLastSync] = useState(null);
@@ -67,6 +67,7 @@ const MealPrep = () => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const trigger = useScrollTrigger({ threshold: 8 });
+  const isDark = theme.palette.mode === "dark";
 
   const handleIngredientChange = (list) => {
     setAllIngredients(list);
@@ -81,7 +82,6 @@ const MealPrep = () => {
     }
   }, [logout]);
 
-  // Refresh ingredients when switching tabs to pick up any changes
   useEffect(() => {
     if (activeTab === TABS.CALCULATOR || activeTab === TABS.INGREDIENTS) {
       setAllIngredients(getAllBaseIngredients());
@@ -90,12 +90,11 @@ const MealPrep = () => {
 
   useEffect(() => {
     if (user) {
-      // Sync ingredients and preferences
       Promise.all([
         syncFromRemote(user.uid),
         loadUserPreferences(user.uid)
       ])
-        .then(([_, prefs]) => {
+        .then(([, prefs]) => {
           setAllIngredients(getAllBaseIngredients());
           setUserPreferences(prefs);
           setLastSync(new Date());
@@ -130,13 +129,13 @@ const MealPrep = () => {
         pb: isDesktop ? 4 : 10,
         background: isDesktop
           ? `radial-gradient(circle at 20% 20%, ${
-              theme.palette.mode === "dark"
-                ? "rgba(148, 163, 184, 0.12)"
-                : "rgba(148, 163, 184, 0.2)"
+              isDark
+                ? "rgba(255,45,120,0.06)"
+                : "rgba(214,36,94,0.04)"
             }, transparent 40%), radial-gradient(circle at 80% 0%, ${
-              theme.palette.mode === "dark"
-                ? "rgba(59, 130, 246, 0.12)"
-                : "rgba(59, 130, 246, 0.18)"
+              isDark
+                ? "rgba(0,229,255,0.06)"
+                : "rgba(0,184,212,0.04)"
             }, transparent 35%), ${theme.palette.background.default}`
           : theme.palette.background.default,
         transition: theme.transitions.create("background-color"),
@@ -152,31 +151,30 @@ const MealPrep = () => {
           minHeight: 72,
           display: "flex",
           justifyContent: "center",
-          backdropFilter: "blur(12px)",
-          backgroundColor:
-            theme.palette.mode === "dark"
-              ? "rgba(15,23,42,0.92)"
-              : "rgba(255,255,255,0.96)",
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          transition: theme.transitions.create(["box-shadow"], {
-            duration: theme.transitions.duration.shorter,
-          }),
         }}
       >
         <Toolbar disableGutters sx={{ gap: { xs: 1, md: 2 }, alignItems: "center" }}>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 200 }}>
+            {/* PTM Logo with neon glow */}
             <Box
               sx={{
                 width: 44,
                 height: 44,
                 borderRadius: 2,
-                background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                background: isDark
+                  ? "linear-gradient(135deg, #ff2d78 0%, #a855f7 100%)"
+                  : "linear-gradient(135deg, #d6245e 0%, #8b3fd4 100%)",
                 color: "#fff",
                 display: "grid",
                 placeItems: "center",
+                fontFamily: '"Orbitron", sans-serif',
                 fontWeight: 700,
-                letterSpacing: 0.5,
-                boxShadow: "0 12px 30px rgba(99, 102, 241, 0.45)",
+                fontSize: "0.75rem",
+                letterSpacing: 1,
+                boxShadow: isDark
+                  ? "0 0 20px rgba(255,45,120,0.4), 0 0 60px rgba(255,45,120,0.15)"
+                  : "0 4px 16px rgba(214,36,94,0.3)",
+                animation: isDark ? "neonPulse 3s ease-in-out infinite" : "none",
               }}
             >
               PTM
@@ -192,9 +190,14 @@ const MealPrep = () => {
                 <Chip
                   label="beta"
                   size="small"
-                  color="primary"
-                  variant="outlined"
-                  sx={{ height: 22, fontWeight: 700 }}
+                  sx={{
+                    height: 22,
+                    fontWeight: 700,
+                    fontSize: "0.65rem",
+                    borderColor: isDark ? "rgba(255,45,120,0.4)" : "primary.main",
+                    color: "primary.main",
+                    border: "1px solid",
+                  }}
                 />
               </Stack>
             </Box>
@@ -209,7 +212,12 @@ const MealPrep = () => {
               sx={{
                 ml: 2,
                 minHeight: 52,
-                "& .MuiTab-root": { minHeight: 52 },
+                "& .MuiTab-root": {
+                  minHeight: 52,
+                  fontFamily: '"Urbanist", sans-serif',
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                },
               }}
             >
               {TAB_CONFIG.map(({ key, label, icon }) => (
@@ -237,6 +245,7 @@ const MealPrep = () => {
           )}
 
           <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: "auto" }}>
+            {/* Status indicator with neon pulse */}
             <Stack
               direction="row"
               spacing={0.75}
@@ -246,9 +255,15 @@ const MealPrep = () => {
                 py: 0.5,
                 borderRadius: 9999,
                 border: "1px solid",
-                borderColor: isOffline ? "warning.main" : "success.main",
-                backgroundColor: isOffline ? "warning.light" : "success.light",
-                color: isOffline ? "warning.dark" : "success.dark",
+                borderColor: isOffline
+                  ? isDark ? "rgba(255,176,32,0.4)" : "warning.main"
+                  : isDark ? "rgba(57,255,127,0.4)" : "success.main",
+                backgroundColor: isOffline
+                  ? isDark ? "rgba(255,176,32,0.08)" : "warning.light"
+                  : isDark ? "rgba(57,255,127,0.08)" : "success.light",
+                color: isOffline
+                  ? isDark ? "#ffb020" : "warning.dark"
+                  : isDark ? "#39ff7f" : "success.dark",
               }}
             >
               <Box
@@ -258,6 +273,7 @@ const MealPrep = () => {
                   height: 8,
                   borderRadius: "50%",
                   bgcolor: isOffline ? "warning.main" : "success.main",
+                  animation: !isOffline ? "statusPulse 2s ease-in-out infinite" : "none",
                 }}
               />
               <Typography variant="caption" fontWeight={700}>
@@ -276,7 +292,14 @@ const MealPrep = () => {
                   <Avatar
                     src={user?.photoURL || ""}
                     alt={user?.displayName || "Profile"}
-                    sx={{ width: 38, height: 38, bgcolor: "primary.main", fontWeight: 700 }}
+                    sx={{
+                      width: 38,
+                      height: 38,
+                      bgcolor: "primary.main",
+                      fontWeight: 700,
+                      border: isDark ? "2px solid rgba(255,45,120,0.4)" : "2px solid",
+                      borderColor: isDark ? undefined : "primary.light",
+                    }}
                   >
                     {(user?.displayName || "User").charAt(0).toUpperCase()}
                   </Avatar>
@@ -295,9 +318,11 @@ const MealPrep = () => {
                   <Chip
                     label="Guest Mode"
                     size="small"
-                    color="default"
                     variant="outlined"
-                    sx={{ fontWeight: 600 }}
+                    sx={{
+                      fontWeight: 600,
+                      borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                    }}
                   />
                   <Button
                     onClick={() => setShowLoginModal(true)}
@@ -323,7 +348,18 @@ const MealPrep = () => {
             left: 0,
             right: 0,
             zIndex: (t) => t.zIndex.appBar,
-            backdropFilter: "blur(10px)",
+            borderTop: isDark
+              ? "1px solid rgba(255,255,255,0.04)"
+              : "1px solid rgba(0,0,0,0.06)",
+            "&::before": isDark ? {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "1px",
+              background: "linear-gradient(90deg, transparent, rgba(255,45,120,0.3), rgba(0,229,255,0.3), transparent)",
+            } : {},
           }}
         >
           <BottomNavigation
@@ -347,14 +383,14 @@ const MealPrep = () => {
       )}
 
       <Container
-        maxWidth="xl"
+        maxWidth={false}
         component="main"
         sx={{
           pt: 3,
+          px: { xs: 1.5, sm: 2.5, md: 4 },
           pb: isDesktop ? 0 : 10,
         }}
       >
-        {/* Keep MealPrepCalculator mounted to preserve state */}
         <Box
           role="tabpanel"
           id="tabpanel-calculator"
@@ -371,7 +407,6 @@ const MealPrep = () => {
           </ErrorBoundary>
         </Box>
 
-        {/* Other tabs can mount/unmount as they don't have complex state */}
         {activeTab === TABS.CALORIE_CALC && (
           <Box role="tabpanel" id="tabpanel-calorie-calc" aria-labelledby="tab-calorie-calc">
             <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
@@ -402,13 +437,11 @@ const MealPrep = () => {
         )}
       </Container>
 
-      {/* Login Modal for Guest Users */}
       <Login
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onSuccess={(user) => {
           setShowLoginModal(false);
-          // Sync will happen automatically via useEffect on user change
           toast.success(`Welcome, ${user.displayName}!`);
         }}
       />

@@ -33,7 +33,7 @@ export const migrateGuestData = async (uid) => {
     for (const plan of guestPlans) {
       try {
         // Remove guest-specific fields
-        const { id, uid: _uid, ...planData } = plan;
+        const { id: _id, uid: _uid, ...planData } = plan;
 
         // Add plan to Firebase with user's uid
         await addPlan(uid, planData);

@@ -19,6 +19,12 @@ function MacroAlert({ validation, macroName, onDismiss }) {
   }
 
   const severity = SEVERITY_COLORS[validation.severity];
+  const severityLabel =
+    validation.severity === 'critical'
+      ? 'Critical'
+      : validation.severity === 'warning'
+        ? 'Warning'
+        : 'Info';
 
   return (
     <Alert
@@ -38,7 +44,7 @@ function MacroAlert({ validation, macroName, onDismiss }) {
       }
     >
       <AlertTitle sx={{ fontWeight: 600, mb: 0.5 }}>
-        {macroName} {validation.severity === 'critical' ? 'Issue' : 'Notice'}
+        {macroName} {severityLabel}
       </AlertTitle>
 
       <Box sx={{ fontSize: '0.875rem' }}>{validation.message}</Box>
@@ -170,7 +176,7 @@ export function MacroWarningsBadge({ validation }) {
 /**
  * Inline indicator (compact chip/badge)
  */
-export function MacroValidationIndicator({ validation, macroName }) {
+export function MacroValidationIndicator({ validation }) {
   if (!validation || !validation.severity || validation.severity === 'success') {
     return null;
   }
