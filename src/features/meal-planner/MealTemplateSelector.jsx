@@ -135,7 +135,7 @@ const MealTemplateSelector = ({
             {/* Template Grid */}
             <Grid container spacing={2}>
               {templates.map((template) => (
-                <Grid item xs={12} sm={6} key={template.id}>
+                <Grid key={template.id} size={{ xs: 12, sm: 6 }}>
                   <Paper
                     variant={selectedTemplate?.id === template.id ? 'elevation' : 'outlined'}
                     elevation={selectedTemplate?.id === template.id ? 4 : 0}

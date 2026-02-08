@@ -406,9 +406,9 @@ const IngredientManager = ({ onChange }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]); // Only run when user changes, not when refresh changes
 
-  // Make cleanup function available globally for emergency use
+  // Make cleanup function available globally for emergency use (dev mode only)
   useEffect(() => {
-    if (user) {
+    if (import.meta.env.DEV && user) {
       window.cleanupDuplicates = async () => {
         try {
           await cleanupDuplicateIngredients(user.uid);
@@ -435,10 +435,14 @@ const IngredientManager = ({ onChange }) => {
         console.log(`Found ${invalid.length} ingredients with invalid IDs:`, invalid);
         return all;
       };
+
+      console.log('Debug: cleanupDuplicates() and debugIngredients() available in console');
     }
     return () => {
-      delete window.cleanupDuplicates;
-      delete window.debugIngredients;
+      if (import.meta.env.DEV) {
+        delete window.cleanupDuplicates;
+        delete window.debugIngredients;
+      }
     };
   }, [user, refresh]);
 
@@ -1369,24 +1373,26 @@ const IngredientManager = ({ onChange }) => {
                     }}
                   />
                   <Tooltip title="Search USDA food database">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={apiLoading ? <CircularProgress size={16} /> : <CloudSearchIcon />}
-                      onClick={() => searchUSDAAPI(query)}
-                      disabled={query.length < 2 || apiLoading}
-                      sx={{
-                        textTransform: "none",
-                        fontWeight: 600,
-                        color: "text.secondary",
-                        borderColor: "divider",
-                        borderRadius: 2,
-                        height: 40,
-                        "&:hover": { borderColor: "divider", bgcolor: "action.hover" },
-                      }}
-                    >
-                      {apiLoading ? "Searching..." : "Lookup"}
-                    </Button>
+                    <span>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={apiLoading ? <CircularProgress size={16} /> : <CloudSearchIcon />}
+                        onClick={() => searchUSDAAPI(query)}
+                        disabled={query.length < 2 || apiLoading}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 600,
+                          color: "text.secondary",
+                          borderColor: "divider",
+                          borderRadius: 2,
+                          height: 40,
+                          "&:hover": { borderColor: "divider", bgcolor: "action.hover" },
+                        }}
+                      >
+                        {apiLoading ? "Searching..." : "Lookup"}
+                      </Button>
+                    </span>
                   </Tooltip>
                   <Box>
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
@@ -1618,8 +1624,8 @@ const IngredientManager = ({ onChange }) => {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filtered.map((it) => (
-                            <TableRow key={it.id} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                        filtered.map((it, idx) => (
+                            <TableRow key={`${it.id ?? "ingredient"}-${it.name ?? "item"}-${idx}`} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
                               <TableCell sx={{ py: 1.5 }}>
                                                           <HighlightedText 
                                                             text={it.name} 

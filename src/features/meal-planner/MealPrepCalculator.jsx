@@ -1,5 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+  memo,
+} from "react";
 import toast from "react-hot-toast";
+import { db } from "../../shared/services/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import AddIcon from "@mui/icons-material/AddRounded";
 import RemoveIcon from "@mui/icons-material/RemoveRounded";
 import EditIcon from "@mui/icons-material/EditOutlined";
@@ -56,6 +67,7 @@ import {
   updatePlan,
 } from '../../shared/services/storage';
 import { useUser } from '../auth/UserContext.jsx';
+import { useMacroTargets } from '../../shared/context/MacroTargetsContext';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import { PageSkeleton } from "../../shared/components/ui/SkeletonLoader";
 import { useUndoRedo } from "../../shared/hooks/useUndoRedo";
@@ -206,8 +218,10 @@ const getCategoryColors = (cat, isDark = true) => {
   return { header: "#e5e7eb", bg: "#f9fafb" };
 };
 
-const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences = {} }) => {
+const MealPrepCalculator = memo(
+  forwardRef(function MealPrepCalculator({ allIngredients, userPreferences = {} }, ref) {
   const { user } = useUser();
+  const { pendingTargets, consumePendingTargets, hasPendingTargets } = useMacroTargets();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -236,8 +250,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
         // Try to load from Firebase first if user is logged in
         if (user) {
           try {
-            const { getFirestore, doc, getDoc } = await import("firebase/firestore");
-            const db = getFirestore();
             const docRef = doc(db, "userProfiles", user.uid);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists() && docSnap.data().calorieProfile) {
@@ -316,8 +328,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   // Import file input ref
   const importFileRef = useRef(null);
 
-  // Pending targets from Calorie Calculator
-  const [pendingTargets, setPendingTargets] = useState(null);
+  // Targets prompt state (targets come from context)
   const [showTargetsPrompt, setShowTargetsPrompt] = useState(false);
 
   // Meal template selector state
@@ -327,67 +338,35 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   // Recent ingredients state
   const [recentIngredients, setRecentIngredients] = useState([]);
 
-  // Check for pending targets from Calorie Calculator
+  const checkPendingTargets = useCallback(() => {
+    if (hasPendingTargets()) {
+      setShowTargetsPrompt(true);
+    }
+  }, [hasPendingTargets]);
+
+  useImperativeHandle(ref, () => ({ onTabActive: checkPendingTargets }), [checkPendingTargets]);
+
   useEffect(() => {
-    // Only check when tab becomes active
-    if (!isActive) return;
-
-    const checkPendingTargets = () => {
-      const stored = localStorage.getItem("plannerTargetsFromCalculator");
-      if (stored) {
-        try {
-          const targets = JSON.parse(stored);
-          // Only show if saved within last 5 minutes
-          const savedAt = new Date(targets.savedAt);
-          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-          if (savedAt > fiveMinutesAgo) {
-            setPendingTargets(targets);
-            setShowTargetsPrompt(true);
-          } else {
-            // Clear old targets
-            localStorage.removeItem("plannerTargetsFromCalculator");
-          }
-        } catch (e) {
-          console.error("Error parsing pending targets:", e);
-          localStorage.removeItem("plannerTargetsFromCalculator");
-        }
-      }
-    };
-
-    // Check when tab becomes active
     checkPendingTargets();
-
-    // Also listen for storage events (in case another tab updates)
-    const handleStorage = (e) => {
-      if (e.key === "plannerTargetsFromCalculator") {
-        checkPendingTargets();
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [isActive]);
+  }, [checkPendingTargets]);
 
   // Apply pending targets from Calorie Calculator
   const applyPendingTargets = () => {
-    if (!pendingTargets) return;
+    const targets = consumePendingTargets();
+    if (!targets) return;
 
-    setCalorieTarget(pendingTargets.calorieTarget);
-    setTempTarget(pendingTargets.calorieTarget);
-    setTargetPercentages(pendingTargets.targetPercentages);
+    setCalorieTarget(targets.calorieTarget);
+    setTempTarget(targets.calorieTarget);
+    setTargetPercentages(targets.targetPercentages);
     setHasUnsavedChanges(true);
-
-    // Clear the pending targets
-    localStorage.removeItem("plannerTargetsFromCalculator");
-    setPendingTargets(null);
     setShowTargetsPrompt(false);
 
-    toast.success(`Applied ${pendingTargets.calorieTarget} kcal target with new macro split!`);
+    toast.success(`Applied ${targets.calorieTarget} kcal target with new macro split!`);
   };
 
   // Dismiss pending targets
   const dismissPendingTargets = () => {
-    localStorage.removeItem("plannerTargetsFromCalculator");
-    setPendingTargets(null);
+    consumePendingTargets(); // Clear from context
     setShowTargetsPrompt(false);
   };
 
@@ -672,10 +651,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to save plans.");
-      return;
-    }
     const name = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
       name,
@@ -738,7 +713,14 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 2000);
       setLastPlanSavedAt(new Date());
-      toast.success("Plan saved");
+
+      if (uid) {
+        toast.success("Plan saved to cloud");
+      } else {
+        toast.success("Plan saved locally. Sign in to sync across devices.", {
+          duration: 5000
+        });
+      }
     } catch (err) {
       console.error("Error saving plan", err);
       setHasUnsavedChanges(true);
@@ -1838,24 +1820,40 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                             {meal === "dinner" && matchDinner && (
                               <Chip size="small" icon={<LinkIcon sx={{ fontSize: 14 }} />} label="Mirroring Lunch" />
                             )}
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<BookmarkBorderIcon />}
+                            <Box
+                              component="span"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setTemplateMealType(meal);
-                                setTemplateModalOpen(true);
+                                if (!disabled) {
+                                  setTemplateMealType(meal);
+                                  setTemplateModalOpen(true);
+                                }
                               }}
-                              disabled={disabled}
                               sx={{
-                                textTransform: "none",
-                                fontWeight: 600,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                px: 1.5,
+                                py: 0.5,
+                                border: "1px solid",
+                                borderColor: disabled ? "action.disabled" : "primary.main",
                                 borderRadius: 2,
+                                color: disabled ? "text.disabled" : "primary.main",
+                                fontSize: "0.875rem",
+                                fontWeight: 600,
+                                textTransform: "none",
+                                cursor: disabled ? "default" : "pointer",
+                                opacity: disabled ? 0.6 : 1,
+                                transition: "all 0.2s",
+                                "&:hover": disabled ? {} : {
+                                  bgcolor: "primary.main",
+                                  color: "primary.contrastText",
+                                },
                               }}
                             >
+                              <BookmarkBorderIcon sx={{ fontSize: 16 }} />
                               Templates
-                            </Button>
+                            </Box>
                           </Stack>
                           {meal === "dinner" && (
                             <FormControlLabel
@@ -2661,6 +2659,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       />
     </Box>
   );
-};
+}));
 
 export default MealPrepCalculator;

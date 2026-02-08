@@ -129,7 +129,7 @@ const AccountPage = () => {
                   <CardHeader title={<Typography variant="h6" fontWeight={800}>Your Guest Data</Typography>} />
                   <CardContent>
                     <Grid container spacing={2}>
-                      <Grid item xs={6} md={3}>
+                      <Grid size={{ xs: 6, md: 3 }}>
                         <Card variant="outlined" sx={{ borderRadius: 2, textAlign: 'center' }}>
                           <CardContent>
                             <Typography variant="h4" fontWeight={800} color="primary">
@@ -141,7 +141,7 @@ const AccountPage = () => {
                           </CardContent>
                         </Card>
                       </Grid>
-                      <Grid item xs={6} md={3}>
+                      <Grid size={{ xs: 6, md: 3 }}>
                         <Card variant="outlined" sx={{ borderRadius: 2, textAlign: 'center' }}>
                           <CardContent>
                             <Typography variant="h4" fontWeight={800} color="primary">
@@ -153,7 +153,7 @@ const AccountPage = () => {
                           </CardContent>
                         </Card>
                       </Grid>
-                      <Grid item xs={12} md={6}>
+                      <Grid size={{ xs: 12, md: 6 }}>
                         <Card variant="outlined" sx={{ borderRadius: 2 }}>
                           <CardContent>
                             <Typography fontWeight={700} gutterBottom>Storage Location</Typography>
@@ -193,7 +193,7 @@ const AccountPage = () => {
                         { icon: '💾', title: 'Auto-Save', desc: 'Automatic cloud backup' },
                         { icon: '🎯', title: 'Keep Your Data', desc: 'All guest data migrates automatically!' },
                       ].map((feature) => (
-                        <Grid item xs={12} sm={6} md={4} key={feature.title}>
+                        <Grid key={feature.title} size={{ xs: 12, sm: 6, md: 4 }}>
                           <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                             <CardContent>
                               <Stack spacing={0.5}>
@@ -281,7 +281,7 @@ const AccountPage = () => {
           <CardContent>
             <Grid container spacing={2}>
               {/* Profile */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
                   <CardHeader
                     title={<Typography variant="h6" fontWeight={800}>Profile Information</Typography>}
@@ -332,7 +332,7 @@ const AccountPage = () => {
               </Grid>
 
               {/* Features */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
                   <CardHeader title={<Typography variant="h6" fontWeight={800}>App Features</Typography>} />
                   <CardContent>

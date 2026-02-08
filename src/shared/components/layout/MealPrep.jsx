@@ -1,5 +1,5 @@
 // src/shared/components/layout/MealPrep.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef, Profiler, Suspense, lazy } from "react";
 import toast from "react-hot-toast";
 import { loadUserPreferences } from "../../../shared/services/userPreferences";
 import AccountCircleIcon from "@mui/icons-material/AccountCircleRounded";
@@ -15,6 +15,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Container,
   Paper,
   Stack,
@@ -26,11 +27,14 @@ import {
   useScrollTrigger,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+// Eager load: Default tab (critical for first paint)
 import MealPrepCalculator from "../../../features/meal-planner/MealPrepCalculator";
-import MealPrepInstructions from "../../../features/instructions/MealPrepInstructions";
-import IngredientManager from "../../../features/ingredients/IngredientManager";
-import CalorieCalculator from "../../../features/calorie-calculator/CalorieCalculator";
-import AccountPage from "../../../features/account/AccountPage";
+// Lazy load: Non-default tabs (loaded on demand)
+const CalorieCalculator = lazy(() => import("../../../features/calorie-calculator/CalorieCalculator"));
+const MealPrepInstructions = lazy(() => import("../../../features/instructions/MealPrepInstructions"));
+const IngredientManager = lazy(() => import("../../../features/ingredients/IngredientManager"));
+const AccountPage = lazy(() => import("../../../features/account/AccountPage"));
+// Non-tab components (always loaded)
 import Login from "../../../features/auth/Login";
 import ErrorBoundary from "../ui/ErrorBoundary";
 import { getAllBaseIngredients } from "../../../features/ingredients/nutritionHelpers";
@@ -56,7 +60,29 @@ const TAB_CONFIG = [
 
 const MealPrep = () => {
   const { user, logout } = useUser();
-  const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
+  // Initialize tab from URL query param (deep linking support)
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === 'undefined') return TABS.CALCULATOR;
+
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+
+    // Map tab param to TABS constant
+    const tabMap = {
+      'planner': TABS.CALCULATOR,
+      'calories': TABS.CALORIE_CALC,
+      'guide': TABS.INSTRUCTIONS,
+      'ingredients': TABS.INGREDIENTS,
+      'account': TABS.ACCOUNT
+    };
+
+    return tabMap[tabParam] || TABS.CALCULATOR;
+  });
+  // Track which tabs have been mounted (for state preservation)
+  const [mountedTabs, setMountedTabs] = useState(new Set([TABS.CALCULATOR]));
+  const [perfSamples, setPerfSamples] = useState([]);
+  const perfStartRef = useRef(null);
+  const perfFromRef = useRef(null);
   const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
   const [lastSync, setLastSync] = useState(null);
   const [isOffline, setIsOffline] = useState(
@@ -64,9 +90,44 @@ const MealPrep = () => {
   );
   const [userPreferences, setUserPreferences] = useState({ showRecentIngredients: true });
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const plannerRef = useRef(null);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const isNarrowMobile = useMediaQuery('(max-width:375px)');
   const trigger = useScrollTrigger({ threshold: 8 });
+
+  const perfEnabled = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("perf")) return true;
+    try {
+      return window.localStorage?.getItem("ptm_perf") === "1";
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handleProfilerRender = useCallback(
+    (id, phase, actualDuration, baseDuration) => {
+      if (!perfEnabled || typeof console === "undefined") return;
+      const actual = actualDuration.toFixed(1);
+      const base = baseDuration.toFixed(1);
+      console.info(`[perf] ${id} ${phase} actual:${actual}ms base:${base}ms`);
+    },
+    [perfEnabled]
+  );
+
+  const withProfiler = useCallback(
+    (id, node) => {
+      if (!perfEnabled) return node;
+      return (
+        <Profiler id={id} onRender={handleProfilerRender}>
+          {node}
+        </Profiler>
+      );
+    },
+    [perfEnabled, handleProfilerRender]
+  );
   const isDark = theme.palette.mode === "dark";
 
   const handleIngredientChange = (list) => {
@@ -81,6 +142,44 @@ const MealPrep = () => {
       toast.error("Failed to sign out. Please try again.");
     }
   }, [logout]);
+
+  const handleTabChange = useCallback(
+    (_, value) => {
+      if (value === activeTab) return;
+      if (perfEnabled && typeof performance !== "undefined") {
+        perfStartRef.current = performance.now();
+        perfFromRef.current = activeTab;
+        try {
+          performance.mark(`tab:${activeTab}->${value}:start`);
+        } catch {
+          // Ignore unsupported environments.
+        }
+      }
+      setActiveTab(value);
+      // Mark tab as mounted for state preservation
+      setMountedTabs((prev) => new Set(prev).add(value));
+
+      // Update URL with tab param for deep linking
+      if (typeof window !== 'undefined') {
+        const tabParamMap = {
+          [TABS.CALCULATOR]: 'planner',
+          [TABS.CALORIE_CALC]: 'calories',
+          [TABS.INSTRUCTIONS]: 'guide',
+          [TABS.INGREDIENTS]: 'ingredients',
+          [TABS.ACCOUNT]: 'account'
+        };
+
+        const tabParam = tabParamMap[value];
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tabParam);
+        window.history.pushState({}, '', url);
+      }
+      if (value === TABS.CALCULATOR) {
+        plannerRef.current?.onTabActive?.();
+      }
+    },
+    [activeTab, perfEnabled]
+  );
 
   // Ingredients are refreshed via sync and IngredientManager updates.
 
@@ -106,6 +205,36 @@ const MealPrep = () => {
       setLastSync(new Date());
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!perfEnabled || perfStartRef.current == null || typeof performance === "undefined") return;
+    const start = perfStartRef.current;
+    const from = perfFromRef.current || "unknown";
+    const to = activeTab;
+    perfStartRef.current = null;
+
+    const finalize = () => {
+      const end = performance.now();
+      const duration = Math.round(end - start);
+      setPerfSamples((prev) => [
+        { from, to, duration, ts: new Date().toLocaleTimeString() },
+        ...prev,
+      ].slice(0, 5));
+      try {
+        performance.mark(`tab:${from}->${to}:end`);
+        performance.measure(`tab:${from}->${to}`, `tab:${from}->${to}:start`, `tab:${from}->${to}:end`);
+      } catch {
+        // Ignore unsupported environments.
+      }
+      console.info(`[perf] tab ${from} -> ${to}: ${duration}ms`);
+    };
+
+    if (typeof window !== "undefined" && window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(finalize));
+    } else {
+      setTimeout(finalize, 0);
+    }
+  }, [activeTab, perfEnabled]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -175,34 +304,36 @@ const MealPrep = () => {
             >
               PTM
             </Box>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>
-                Prep Thy Meal
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="caption" color="text.secondary">
-                  {user?.displayName?.split(" ")[0] || "Welcome"}
+            {!isNarrowMobile && (
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Prep Thy Meal
                 </Typography>
-                <Chip
-                  label="beta"
-                  size="small"
-                  sx={{
-                    height: 22,
-                    fontWeight: 700,
-                    fontSize: "0.65rem",
-                    borderColor: isDark ? "rgba(255,45,120,0.4)" : "primary.main",
-                    color: "primary.main",
-                    border: "1px solid",
-                  }}
-                />
-              </Stack>
-            </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="caption" color="text.secondary">
+                    {user?.displayName?.split(" ")[0] || "Welcome"}
+                  </Typography>
+                  <Chip
+                    label="beta"
+                    size="small"
+                    sx={{
+                      height: 22,
+                      fontWeight: 700,
+                      fontSize: "0.65rem",
+                      borderColor: isDark ? "rgba(255,45,120,0.4)" : "primary.main",
+                      color: "primary.main",
+                      border: "1px solid",
+                    }}
+                  />
+                </Stack>
+              </Box>
+            )}
           </Stack>
 
           {isDesktop && (
             <Tabs
               value={activeTab}
-              onChange={(_, value) => setActiveTab(value)}
+              onChange={handleTabChange}
               textColor="primary"
               indicatorColor="primary"
               sx={{
@@ -241,41 +372,43 @@ const MealPrep = () => {
           )}
 
           <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: "auto" }}>
-            {/* Status indicator with neon pulse */}
-            <Stack
-              direction="row"
-              spacing={0.75}
-              alignItems="center"
-              sx={{
-                px: 1.25,
-                py: 0.5,
-                borderRadius: 9999,
-                border: "1px solid",
-                borderColor: isOffline
-                  ? isDark ? "rgba(255,176,32,0.4)" : "warning.main"
-                  : isDark ? "rgba(57,255,127,0.4)" : "success.main",
-                backgroundColor: isOffline
-                  ? isDark ? "rgba(255,176,32,0.08)" : "warning.light"
-                  : isDark ? "rgba(57,255,127,0.08)" : "success.light",
-                color: isOffline
-                  ? isDark ? "#ffb020" : "warning.dark"
-                  : isDark ? "#39ff7f" : "success.dark",
-              }}
-            >
-              <Box
-                component="span"
+            {/* Status indicator with neon pulse - hide on narrow mobile */}
+            {!isNarrowMobile && (
+              <Stack
+                direction="row"
+                spacing={0.75}
+                alignItems="center"
                 sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  bgcolor: isOffline ? "warning.main" : "success.main",
-                  animation: !isOffline ? "statusPulse 2s ease-in-out infinite" : "none",
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 9999,
+                  border: "1px solid",
+                  borderColor: isOffline
+                    ? isDark ? "rgba(255,176,32,0.4)" : "warning.main"
+                    : isDark ? "rgba(57,255,127,0.4)" : "success.main",
+                  backgroundColor: isOffline
+                    ? isDark ? "rgba(255,176,32,0.08)" : "warning.light"
+                    : isDark ? "rgba(57,255,127,0.08)" : "success.light",
+                  color: isOffline
+                    ? isDark ? "#ffb020" : "warning.dark"
+                    : isDark ? "#39ff7f" : "success.dark",
                 }}
-              />
-              <Typography variant="caption" fontWeight={700}>
-                {isOffline ? "Offline" : "Online"}
-              </Typography>
-            </Stack>
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: isOffline ? "warning.main" : "success.main",
+                    animation: !isOffline ? "statusPulse 2s ease-in-out infinite" : "none",
+                  }}
+                />
+                <Typography variant="caption" fontWeight={700}>
+                  {isOffline ? "Offline" : "Online"}
+                </Typography>
+              </Stack>
+            )}
             {lastSync && isDesktop && (
               <Typography variant="caption" color="text.secondary">
                 Synced {lastSync.toLocaleTimeString()}
@@ -361,7 +494,7 @@ const MealPrep = () => {
           <BottomNavigation
             showLabels
             value={activeTab}
-            onChange={(_, value) => setActiveTab(value)}
+            onChange={handleTabChange}
             component="nav"
             aria-label="Main navigation"
           >
@@ -387,6 +520,7 @@ const MealPrep = () => {
           pb: isDesktop ? 0 : 10,
         }}
       >
+        {/* Planner Tab - Always mounted (eager loaded) */}
         <Box
           role="tabpanel"
           id="tabpanel-calculator"
@@ -396,62 +530,88 @@ const MealPrep = () => {
           sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}
         >
           <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
-            <MealPrepCalculator
-              allIngredients={allIngredients}
-              isActive={activeTab === TABS.CALCULATOR}
-              userPreferences={userPreferences}
-            />
+            {withProfiler(
+              "PlannerTab",
+              <MealPrepCalculator
+                ref={plannerRef}
+                allIngredients={allIngredients}
+                userPreferences={userPreferences}
+              />
+            )}
           </ErrorBoundary>
         </Box>
 
-        <Box
-          role="tabpanel"
-          id="tabpanel-calorie-calc"
-          aria-labelledby="tab-calorie-calc"
-          hidden={activeTab !== TABS.CALORIE_CALC}
-          className={`tab-panel ${activeTab === TABS.CALORIE_CALC ? "tab-panel-active" : ""}`}
-          sx={{ display: activeTab === TABS.CALORIE_CALC ? "block" : "none" }}
-        >
-          <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
-            <CalorieCalculator />
-          </ErrorBoundary>
-        </Box>
-        <Box
-          role="tabpanel"
-          id="tabpanel-instructions"
-          aria-labelledby="tab-instructions"
-          hidden={activeTab !== TABS.INSTRUCTIONS}
-          className={`tab-panel ${activeTab === TABS.INSTRUCTIONS ? "tab-panel-active" : ""}`}
-          sx={{ display: activeTab === TABS.INSTRUCTIONS ? "block" : "none" }}
-        >
-          <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
-            <MealPrepInstructions />
-          </ErrorBoundary>
-        </Box>
-        <Box
-          role="tabpanel"
-          id="tabpanel-ingredients"
-          aria-labelledby="tab-ingredients"
-          hidden={activeTab !== TABS.INGREDIENTS}
-          className={`tab-panel ${activeTab === TABS.INGREDIENTS ? "tab-panel-active" : ""}`}
-          sx={{ display: activeTab === TABS.INGREDIENTS ? "block" : "none" }}
-        >
-          <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
-            <IngredientManager onChange={handleIngredientChange} />
-          </ErrorBoundary>
-        </Box>
-        <Box
-          role="tabpanel"
-          id="tabpanel-account"
-          aria-labelledby="tab-account"
-          hidden={activeTab !== TABS.ACCOUNT}
-          className={`tab-panel ${activeTab === TABS.ACCOUNT ? "tab-panel-active" : ""}`}
-          sx={{ display: activeTab === TABS.ACCOUNT ? "block" : "none" }}
-        >
-          <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
-            <AccountPage />
-          </ErrorBoundary>
-        </Box>
+        {/* Calorie Calculator Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.CALORIE_CALC) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-calorie-calc"
+            aria-labelledby="tab-calorie-calc"
+            hidden={activeTab !== TABS.CALORIE_CALC}
+            className={`tab-panel ${activeTab === TABS.CALORIE_CALC ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.CALORIE_CALC ? "block" : "none" }}
+          >
+            <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("CaloriesTab", <CalorieCalculator />)}
+              </Suspense>
+            </ErrorBoundary>
+          </Box>
+        )}
+
+        {/* Instructions Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.INSTRUCTIONS) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-instructions"
+            aria-labelledby="tab-instructions"
+            hidden={activeTab !== TABS.INSTRUCTIONS}
+            className={`tab-panel ${activeTab === TABS.INSTRUCTIONS ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.INSTRUCTIONS ? "block" : "none" }}
+          >
+            <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("GuideTab", <MealPrepInstructions />)}
+              </Suspense>
+            </ErrorBoundary>
+          </Box>
+        )}
+
+        {/* Ingredients Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.INGREDIENTS) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-ingredients"
+            aria-labelledby="tab-ingredients"
+            hidden={activeTab !== TABS.INGREDIENTS}
+            className={`tab-panel ${activeTab === TABS.INGREDIENTS ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.INGREDIENTS ? "block" : "none" }}
+          >
+            <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("IngredientsTab", <IngredientManager onChange={handleIngredientChange} />)}
+              </Suspense>
+            </ErrorBoundary>
+          </Box>
+        )}
+
+        {/* Account Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.ACCOUNT) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-account"
+            aria-labelledby="tab-account"
+            hidden={activeTab !== TABS.ACCOUNT}
+            className={`tab-panel ${activeTab === TABS.ACCOUNT ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.ACCOUNT ? "block" : "none" }}
+          >
+            <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("AccountTab", <AccountPage />)}
+              </Suspense>
+            </ErrorBoundary>
+          </Box>
+        )}
       </Container>
 
       <Login
@@ -462,6 +622,47 @@ const MealPrep = () => {
           toast.success(`Welcome, ${user.displayName}!`);
         }}
       />
+
+      {perfEnabled && (
+        <Paper
+          elevation={10}
+          sx={{
+            position: "fixed",
+            bottom: 16,
+            right: 16,
+            p: 1.5,
+            borderRadius: 2,
+            bgcolor: "rgba(10,10,18,0.88)",
+            color: "#e2e8f0",
+            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(12px)",
+            fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: 12,
+            zIndex: (t) => t.zIndex.tooltip + 1,
+            minWidth: 220,
+          }}
+        >
+          <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "#94a3b8" }}>
+            Tab Switch Latency
+          </Typography>
+          <Stack spacing={0.5}>
+            {perfSamples.length === 0 ? (
+              <Typography variant="caption">Switch tabs to record timings.</Typography>
+            ) : (
+              perfSamples.map((sample, idx) => (
+                <Box key={`${sample.ts}-${idx}`} sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="caption" sx={{ color: "#cbd5f5" }}>
+                    {sample.from} → {sample.to}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#38bdf8" }}>
+                    {sample.duration}ms
+                  </Typography>
+                </Box>
+              ))
+            )}
+          </Stack>
+        </Paper>
+      )}
     </Box>
   );
 };

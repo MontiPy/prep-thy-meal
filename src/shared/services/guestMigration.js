@@ -1,27 +1,50 @@
 // Guest data migration service - Transfer localStorage data to Firebase on sign-up
-import { loadGuestPlans, loadGuestBaseline, clearGuestData, hasGuestData } from './guestStorage';
+import {
+  loadGuestPlans,
+  loadGuestBaseline,
+  loadGuestIngredients,
+  loadGuestPreferences,
+  clearGuestData,
+  hasGuestData
+} from './guestStorage';
 import { loadPlans as loadFirebasePlans, addPlan, saveBaseline } from './firestore';
+import { saveCustomIngredients } from './firestore';
+import { saveUserPreferences } from './userPreferences';
 
 /**
- * Migrate all guest data (plans and baseline) to Firebase
+ * Migrate all guest data (plans, baseline, ingredients, preferences) to Firebase
  * Called automatically after successful authentication
  * @param {string} uid - User ID from Firebase authentication
- * @returns {Promise<Object>} Migration summary {migratedPlans, migratedBaseline, hadConflicts}
+ * @returns {Promise<Object>} Migration summary
  */
 export const migrateGuestData = async (uid) => {
   if (!uid) {
     console.error('Cannot migrate guest data without user ID');
-    return { migratedPlans: 0, migratedBaseline: false, hadConflicts: false };
+    return {
+      migratedPlans: 0,
+      migratedBaseline: false,
+      migratedIngredients: 0,
+      migratedPreferences: false,
+      hadConflicts: false
+    };
   }
 
   // Check if there's any guest data to migrate
   if (!hasGuestData()) {
-    return { migratedPlans: 0, migratedBaseline: false, hadConflicts: false };
+    return {
+      migratedPlans: 0,
+      migratedBaseline: false,
+      migratedIngredients: 0,
+      migratedPreferences: false,
+      hadConflicts: false
+    };
   }
 
   try {
     const guestPlans = loadGuestPlans();
     const guestBaseline = loadGuestBaseline();
+    const guestIngredients = loadGuestIngredients();
+    const guestPreferences = loadGuestPreferences();
 
     // Check if user already has cloud data
     const existingPlans = await loadFirebasePlans(uid);
@@ -55,17 +78,44 @@ export const migrateGuestData = async (uid) => {
       }
     }
 
+    // Migrate custom ingredients
+    let migratedIngredientsCount = 0;
+    if (guestIngredients.length > 0) {
+      try {
+        await saveCustomIngredients(uid, guestIngredients);
+        migratedIngredientsCount = guestIngredients.length;
+      } catch (error) {
+        console.error('Failed to migrate ingredients:', error);
+      }
+    }
+
+    // Migrate user preferences
+    let migratedPreferences = false;
+    if (guestPreferences && Object.keys(guestPreferences).length > 0) {
+      try {
+        await saveUserPreferences(uid, guestPreferences);
+        migratedPreferences = true;
+      } catch (error) {
+        console.error('Failed to migrate preferences:', error);
+      }
+    }
+
     // Clear guest storage after successful migration
     // Only clear if at least some data was migrated successfully
-    if (migratedCount > 0 || migratedBaseline) {
+    const somethingMigrated = migratedCount > 0 || migratedBaseline || migratedIngredientsCount > 0 || migratedPreferences;
+    if (somethingMigrated) {
       clearGuestData();
+      console.log(`Migration complete: ${migratedCount} plans, ${migratedIngredientsCount} ingredients, preferences: ${migratedPreferences}`);
     }
 
     return {
       migratedPlans: migratedCount,
       migratedBaseline,
+      migratedIngredients: migratedIngredientsCount,
+      migratedPreferences,
       hadConflicts,
-      totalGuestPlans: guestPlans.length
+      totalGuestPlans: guestPlans.length,
+      totalGuestIngredients: guestIngredients.length
     };
   } catch (error) {
     console.error('Migration failed:', error);
@@ -75,15 +125,19 @@ export const migrateGuestData = async (uid) => {
 
 /**
  * Get a summary of guest data available for migration
- * @returns {Object} {planCount, hasBaseline, estimatedSize}
+ * @returns {Object} Summary of all guest data
  */
 export const getGuestDataSummary = () => {
   const plans = loadGuestPlans();
   const baseline = loadGuestBaseline();
+  const ingredients = loadGuestIngredients();
+  const preferences = loadGuestPreferences();
 
   return {
     planCount: plans.length,
+    ingredientCount: ingredients.length,
     hasBaseline: baseline !== null,
+    hasPreferences: preferences && Object.keys(preferences).length > 0,
     hasAnyData: hasGuestData()
   };
 };

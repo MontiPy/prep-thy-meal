@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
+import { db } from "../../shared/services/firebase";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import {
   Alert,
   Box,
@@ -29,6 +31,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmberRounded";
 import SaveIcon from "@mui/icons-material/SaveRounded";
 import FolderOpenIcon from "@mui/icons-material/FolderOpenRounded";
 import { useUser } from "../auth/UserContext.jsx";
+import { useMacroTargets } from "../../shared/context/MacroTargetsContext";
 import { validateAllMacros } from "../../shared/utils/macroValidation.js";
 import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
 
@@ -57,6 +60,7 @@ const ACTIVITY_LEVELS = {
 
 const CalorieCalculator = () => {
   const { user } = useUser();
+  const { setTargets } = useMacroTargets();
   const theme = useTheme();
 
   // User inputs
@@ -266,8 +270,6 @@ const CalorieCalculator = () => {
 
     if (user) {
       try {
-        const { getFirestore, doc, setDoc } = await import("firebase/firestore");
-        const db = getFirestore();
         await setDoc(
           doc(db, "userProfiles", user.uid),
           { calorieProfile: profile },
@@ -290,8 +292,6 @@ const CalorieCalculator = () => {
 
       if (user) {
         try {
-          const { getFirestore, doc, getDoc } = await import("firebase/firestore");
-          const db = getFirestore();
           const docRef = doc(db, "userProfiles", user.uid);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists() && docSnap.data().calorieProfile) {
@@ -342,7 +342,7 @@ const CalorieCalculator = () => {
     loadProfile();
   }, [loadProfile]);
 
-  // Send targets to planner
+  // Send targets to planner via context
   const sendToPlanner = () => {
     const plannerTargets = {
       calorieTarget: target,
@@ -353,7 +353,7 @@ const CalorieCalculator = () => {
       },
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem("plannerTargetsFromCalculator", JSON.stringify(plannerTargets));
+    setTargets(plannerTargets);
     toast.success("Targets saved! Switch to the Planner tab to apply them.");
   };
 
@@ -507,7 +507,7 @@ const CalorieCalculator = () => {
     <Container maxWidth="xl" sx={{ py: 2 }}>
       <Grid container spacing={3}>
         {/* Left Column: Form */}
-        <Grid item xs={12} md={6} lg={5}>
+        <Grid size={{ xs: 12, md: 6, lg: 5 }}>
           <Paper
             elevation={0}
             sx={{
@@ -545,7 +545,7 @@ const CalorieCalculator = () => {
             <Stack spacing={2}>
               {/* Units & Gender */}
               <Grid container spacing={2}>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Units</InputLabel>
                     <Select
@@ -558,7 +558,7 @@ const CalorieCalculator = () => {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>Gender</InputLabel>
                     <Select
@@ -575,7 +575,7 @@ const CalorieCalculator = () => {
 
               {/* Age, Weight, Height */}
               <Grid container spacing={2}>
-                <Grid item xs={4}>
+                <Grid size={{ xs: 4 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -586,7 +586,7 @@ const CalorieCalculator = () => {
                     inputProps={{ min: 10, max: 90 }}
                   />
                 </Grid>
-                <Grid item xs={4}>
+                <Grid size={{ xs: 4 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -597,7 +597,7 @@ const CalorieCalculator = () => {
                     inputProps={{ min: 60, max: 400, step: 0.1 }}
                   />
                 </Grid>
-                <Grid item xs={4}>
+                <Grid size={{ xs: 4 }}>
                   <TextField
                     fullWidth
                     size="small"
@@ -642,7 +642,7 @@ const CalorieCalculator = () => {
                 </Typography>
                 <Grid container spacing={1}>
                   {Object.entries(GOAL_PRESETS).map(([key, { label }]) => (
-                    <Grid item xs={6} sm={3} key={key}>
+                    <Grid key={key} size={{ xs: 6, sm: 3 }}>
                       <Button
                         fullWidth
                         size="small"
@@ -869,7 +869,7 @@ const CalorieCalculator = () => {
                     </Typography>
                     <Grid container spacing={1}>
                       {Object.entries(MACRO_PRESETS).map(([key, { label }]) => (
-                        <Grid item xs={6} sm={3} key={key}>
+                        <Grid key={key} size={{ xs: 6, sm: 3 }}>
                           <Button
                             fullWidth
                             size="small"
@@ -965,7 +965,7 @@ const CalorieCalculator = () => {
         </Grid>
 
         {/* Right Column: Results */}
-        <Grid item xs={12} md={6} lg={7}>
+        <Grid size={{ xs: 12, md: 6, lg: 7 }}>
           <Stack spacing={2}>
             {/* Results Cards */}
             <Paper
@@ -992,7 +992,7 @@ const CalorieCalculator = () => {
                     highlight: false,
                   },
                 ].map((item) => (
-                  <Grid item xs={6} md={3} key={item.label}>
+                  <Grid key={item.label} size={{ xs: 6, md: 3 }}>
                     <Paper
                       variant="outlined"
                       sx={{
@@ -1139,7 +1139,7 @@ const CalorieCalculator = () => {
                   { label: "Carbs", pct: barPercentages.c, color: "warning.light", glow: glowColors.carbs },
                   { label: "Fat", pct: barPercentages.f, color: "success.light", glow: glowColors.fat },
                 ].map((item) => (
-                  <Grid item xs={4} key={item.label}>
+                  <Grid key={item.label} size={{ xs: 4 }}>
                     <Paper
                       variant="outlined"
                       sx={{ p: 1.5, borderRadius: 2, bgcolor: "background.default" }}

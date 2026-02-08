@@ -45,5 +45,8 @@ export const cleanupDuplicateIngredients = async (uid) => {
   return unique;
 };
 
-// Make it available globally for console access
-window.cleanupDuplicateIngredients = cleanupDuplicateIngredients;
+// Make it available globally for console access (dev mode only)
+if (import.meta.env.DEV) {
+  window.cleanupDuplicateIngredients = cleanupDuplicateIngredients;
+  console.log('Debug: cleanupDuplicateIngredients() available in console');
+}
