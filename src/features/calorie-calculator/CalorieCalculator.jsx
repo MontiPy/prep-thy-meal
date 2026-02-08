@@ -86,6 +86,7 @@ const CalorieCalculator = () => {
   // Helper popover state
   const [helpAnchor, setHelpAnchor] = useState(null);
   const [helpContent, setHelpContent] = useState(null);
+  const [animateBars, setAnimateBars] = useState(false);
 
   const handleHelpClick = (event, content) => {
     setHelpAnchor(event.currentTarget);
@@ -96,6 +97,11 @@ const CalorieCalculator = () => {
     setHelpAnchor(null);
     setHelpContent(null);
   };
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setAnimateBars(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Handle goal preset changes
   useEffect(() => {
@@ -488,6 +494,13 @@ const CalorieCalculator = () => {
         },
       ],
     },
+  };
+
+  const barPercentages = animateBars ? percentages : { p: 0, c: 0, f: 0 };
+  const glowColors = {
+    protein: 'rgba(239, 68, 68, 0.7)',
+    carbs: 'rgba(245, 158, 11, 0.7)',
+    fat: 'rgba(16, 185, 129, 0.7)',
   };
 
   return (
@@ -1070,6 +1083,13 @@ const CalorieCalculator = () => {
                   const bodyweightLbs = units === "imperial" ? weight : weight * 2.20462;
                   const gramsPerLb = (item.grams / bodyweightLbs).toFixed(2);
                   const showPerLb = item.macro === "protein" || item.macro === "fat";
+                  const value =
+                    item.macro === "protein"
+                      ? barPercentages.p
+                      : item.macro === "carbs"
+                        ? barPercentages.c
+                        : barPercentages.f;
+                  const glowColor = glowColors[item.macro];
 
                   return (
                     <Box key={item.label}>
@@ -1091,9 +1111,21 @@ const CalorieCalculator = () => {
                       </Stack>
                       <LinearProgress
                         variant="determinate"
-                        value={item.label.includes("Protein") ? percentages.p : item.label.includes("Carbs") ? percentages.c : percentages.f}
+                        value={value}
                         color={item.color}
-                        sx={{ height: 8, borderRadius: 1 }}
+                        sx={{
+                          height: 8,
+                          borderRadius: 1,
+                          overflow: "hidden",
+                          "--glow-color": glowColor,
+                          "& .MuiLinearProgress-bar": {
+                            transition: "transform 700ms ease",
+                            ...(value >= 100 && {
+                              animation: "glowPulse 1.6s ease-in-out infinite",
+                              boxShadow: "0 0 14px var(--glow-color)",
+                            }),
+                          },
+                        }}
                       />
                     </Box>
                   );
@@ -1103,9 +1135,9 @@ const CalorieCalculator = () => {
               {/* Visual Macro Bars */}
               <Grid container spacing={2} sx={{ mt: 2 }}>
                 {[
-                  { label: "Protein", pct: percentages.p, color: "error.light" },
-                  { label: "Carbs", pct: percentages.c, color: "warning.light" },
-                  { label: "Fat", pct: percentages.f, color: "success.light" },
+                  { label: "Protein", pct: barPercentages.p, color: "error.light", glow: glowColors.protein },
+                  { label: "Carbs", pct: barPercentages.c, color: "warning.light", glow: glowColors.carbs },
+                  { label: "Fat", pct: barPercentages.f, color: "success.light", glow: glowColors.fat },
                 ].map((item) => (
                   <Grid item xs={4} key={item.label}>
                     <Paper
@@ -1129,6 +1161,12 @@ const CalorieCalculator = () => {
                             width: `${item.pct}%`,
                             height: "100%",
                             bgcolor: item.color,
+                            transition: "width 700ms ease",
+                            "--glow-color": item.glow,
+                            ...(item.pct >= 100 && {
+                              animation: "glowPulse 1.6s ease-in-out infinite",
+                              boxShadow: "0 0 14px var(--glow-color)",
+                            }),
                           }}
                         />
                       </Box>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Button, Stack } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 
@@ -22,6 +22,7 @@ const NeonPlateIcon = ({ size = 48, color = '#ff2d78' }) => (
 );
 
 const EmptyState = ({
+  illustration,
   icon = SearchOffIcon,
   title = "No items found",
   description = "Try adjusting your search or filters",
@@ -50,7 +51,21 @@ const EmptyState = ({
       }}
     >
       <Box sx={{ p: 2, mb: 2 }}>
-        {icon === SearchOffIcon ? (
+        {illustration ? (
+          <Box
+            sx={{
+              bgcolor: isDark ? 'rgba(255,45,120,0.08)' : 'rgba(214,36,94,0.05)',
+              p: 2,
+              borderRadius: '50%',
+              '& svg': {
+                width: 96,
+                height: 96,
+              },
+            }}
+          >
+            {illustration}
+          </Box>
+        ) : icon === SearchOffIcon ? (
           <NeonPlateIcon size={48} color={isDark ? '#ff2d78' : '#d6245e'} />
         ) : (
           <Box

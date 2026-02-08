@@ -179,6 +179,27 @@ export const ThemeProvider = ({ children }) => {
               },
             },
           },
+          MuiBackdrop: {
+            styleOverrides: {
+              root: {
+                backgroundColor: isDark
+                  ? 'rgba(2, 6, 23, 0.6)'
+                  : 'rgba(15, 23, 42, 0.35)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+              },
+            },
+          },
+          MuiSkeleton: {
+            styleOverrides: {
+              root: {
+                backgroundImage:
+                  'linear-gradient(90deg, #12121e 0%, #1a1a2e 50%, #12121e 100%)',
+                backgroundSize: '200% 100%',
+                animation: 'skeletonShimmer 1.6s ease-in-out infinite',
+              },
+            },
+          },
           MuiPaper: {
             styleOverrides: {
               root: {
@@ -300,8 +321,9 @@ export const ThemeProvider = ({ children }) => {
           MuiDialog: {
             styleOverrides: {
               paper: {
-                backgroundColor: isDark ? 'rgba(18, 18, 30, 0.85)' : '#ffffff',
-                backdropFilter: isDark ? 'blur(20px)' : 'none',
+                backgroundColor: isDark ? 'rgba(18, 18, 30, 0.8)' : '#ffffff',
+                backdropFilter: isDark ? 'blur(20px) saturate(140%)' : 'none',
+                WebkitBackdropFilter: isDark ? 'blur(20px) saturate(140%)' : 'none',
                 border: isDark ? '1px solid rgba(255,255,255,0.06)' : 'none',
                 boxShadow: isDark
                   ? '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(255,45,120,0.08)'
@@ -309,6 +331,8 @@ export const ThemeProvider = ({ children }) => {
               },
               backdrop: {
                 backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
               },
             },
           },

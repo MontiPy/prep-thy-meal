@@ -82,11 +82,7 @@ const MealPrep = () => {
     }
   }, [logout]);
 
-  useEffect(() => {
-    if (activeTab === TABS.CALCULATOR || activeTab === TABS.INGREDIENTS) {
-      setAllIngredients(getAllBaseIngredients());
-    }
-  }, [activeTab]);
+  // Ingredients are refreshed via sync and IngredientManager updates.
 
   useEffect(() => {
     if (user) {
@@ -396,6 +392,7 @@ const MealPrep = () => {
           id="tabpanel-calculator"
           aria-labelledby="tab-calculator"
           hidden={activeTab !== TABS.CALCULATOR}
+          className={`tab-panel ${activeTab === TABS.CALCULATOR ? "tab-panel-active" : ""}`}
           sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}
         >
           <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
@@ -407,34 +404,54 @@ const MealPrep = () => {
           </ErrorBoundary>
         </Box>
 
-        {activeTab === TABS.CALORIE_CALC && (
-          <Box role="tabpanel" id="tabpanel-calorie-calc" aria-labelledby="tab-calorie-calc">
-            <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
-              <CalorieCalculator />
-            </ErrorBoundary>
-          </Box>
-        )}
-        {activeTab === TABS.INSTRUCTIONS && (
-          <Box role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions">
-            <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
-              <MealPrepInstructions />
-            </ErrorBoundary>
-          </Box>
-        )}
-        {activeTab === TABS.INGREDIENTS && (
-          <Box role="tabpanel" id="tabpanel-ingredients" aria-labelledby="tab-ingredients">
-            <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
-              <IngredientManager onChange={handleIngredientChange} />
-            </ErrorBoundary>
-          </Box>
-        )}
-        {activeTab === TABS.ACCOUNT && (
-          <Box role="tabpanel" id="tabpanel-account" aria-labelledby="tab-account">
-            <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
-              <AccountPage />
-            </ErrorBoundary>
-          </Box>
-        )}
+        <Box
+          role="tabpanel"
+          id="tabpanel-calorie-calc"
+          aria-labelledby="tab-calorie-calc"
+          hidden={activeTab !== TABS.CALORIE_CALC}
+          className={`tab-panel ${activeTab === TABS.CALORIE_CALC ? "tab-panel-active" : ""}`}
+          sx={{ display: activeTab === TABS.CALORIE_CALC ? "block" : "none" }}
+        >
+          <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
+            <CalorieCalculator />
+          </ErrorBoundary>
+        </Box>
+        <Box
+          role="tabpanel"
+          id="tabpanel-instructions"
+          aria-labelledby="tab-instructions"
+          hidden={activeTab !== TABS.INSTRUCTIONS}
+          className={`tab-panel ${activeTab === TABS.INSTRUCTIONS ? "tab-panel-active" : ""}`}
+          sx={{ display: activeTab === TABS.INSTRUCTIONS ? "block" : "none" }}
+        >
+          <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
+            <MealPrepInstructions />
+          </ErrorBoundary>
+        </Box>
+        <Box
+          role="tabpanel"
+          id="tabpanel-ingredients"
+          aria-labelledby="tab-ingredients"
+          hidden={activeTab !== TABS.INGREDIENTS}
+          className={`tab-panel ${activeTab === TABS.INGREDIENTS ? "tab-panel-active" : ""}`}
+          sx={{ display: activeTab === TABS.INGREDIENTS ? "block" : "none" }}
+        >
+          <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
+            <IngredientManager onChange={handleIngredientChange} />
+          </ErrorBoundary>
+        </Box>
+        <Box
+          role="tabpanel"
+          id="tabpanel-account"
+          aria-labelledby="tab-account"
+          hidden={activeTab !== TABS.ACCOUNT}
+          className={`tab-panel ${activeTab === TABS.ACCOUNT ? "tab-panel-active" : ""}`}
+          sx={{ display: activeTab === TABS.ACCOUNT ? "block" : "none" }}
+        >
+          <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
+            <AccountPage />
+          </ErrorBoundary>
+        </Box>
       </Container>
 
       <Login

@@ -1424,7 +1424,9 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
   if (isLoadingData) {
     return (
-      <Box sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}>
+      <Box
+        sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}
+      >
         <PageSkeleton />
       </Box>
     );
@@ -1434,9 +1436,19 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   const handleCloseActionsMenu = () => setActionsAnchor(null);
 
   return (
-    <Box sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}>
-      {(showConfetti || goalConfetti) && <div className="confetti">🎉🎉🎉</div>}
-      {cheer && <div className="cheer">{cheer}</div>}
+    <Box
+      sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}
+    >
+      {(showConfetti || goalConfetti) && (
+        <div className="confetti" data-stagger-skip>
+          🎉🎉🎉
+        </div>
+      )}
+      {cheer && (
+        <div className="cheer" data-stagger-skip>
+          {cheer}
+        </div>
+      )}
 
       {/* Header */}
       <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>

@@ -14,16 +14,18 @@ const Section = ({ title, children }) => {
         fontWeight={700}
         sx={{
           fontFamily: '"Orbitron", sans-serif',
-          fontSize: '0.85rem',
+          fontSize: "0.85rem",
           letterSpacing: 0.5,
-          textTransform: 'uppercase',
+          textTransform: "uppercase",
         }}
       >
         {title}
       </Typography>
-      <Divider sx={{
-        borderColor: isDark ? 'rgba(255,45,120,0.15)' : 'rgba(214,36,94,0.1)',
-      }} />
+      <Divider
+        sx={{
+          borderColor: isDark ? "rgba(255,45,120,0.15)" : "rgba(214,36,94,0.1)",
+        }}
+      />
       <Stack component="ul" spacing={0.75} sx={{ pl: 2, m: 0 }}>
         {children}
       </Stack>
@@ -44,9 +46,7 @@ const MealPrepInstructions = () => {
         backgroundColor: isDark
           ? "rgba(57,255,127,0.04)"
           : "rgba(46,204,113,0.04)",
-        borderColor: isDark
-          ? "rgba(57,255,127,0.15)"
-          : "success.light",
+        borderColor: isDark ? "rgba(57,255,127,0.15)" : "success.light",
       }}
     >
       <CardContent>

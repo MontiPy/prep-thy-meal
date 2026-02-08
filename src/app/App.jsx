@@ -60,32 +60,22 @@ const App = () => (
         <Toaster
           position="top-center"
           toastOptions={{
-            style: {
-              background: 'rgba(18, 18, 30, 0.92)',
-              backdropFilter: 'blur(12px)',
-              color: '#e8e6f0',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '12px',
-              fontFamily: '"Urbanist", sans-serif',
-              fontSize: '0.9rem',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(255,45,120,0.08)',
-            },
+            duration: 4000,
+            className: 'toast-neon',
             success: {
+              duration: 3000,
+              className: 'toast-neon toast-neon-success',
               iconTheme: {
                 primary: '#39ff7f',
                 secondary: '#12121e',
               },
-              style: {
-                border: '1px solid rgba(57,255,127,0.15)',
-              },
             },
             error: {
+              duration: 5000,
+              className: 'toast-neon toast-neon-error',
               iconTheme: {
                 primary: '#ff4757',
                 secondary: '#12121e',
-              },
-              style: {
-                border: '1px solid rgba(255,71,87,0.15)',
               },
             },
           }}

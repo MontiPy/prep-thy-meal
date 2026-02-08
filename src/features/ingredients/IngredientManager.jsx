@@ -52,6 +52,8 @@ import { searchOpenFoodFacts, getProductByBarcode } from '../../shared/services/
 import ServingSizePreviewModal from './ServingSizePreviewModal';
 import { SearchResultSkeleton } from "../../shared/components/ui/SkeletonLoader";
 import EmptyState from "../../shared/components/ui/EmptyState";
+import NeonPlate from "../../shared/components/ui/illustrations/NeonPlate";
+import NeonCart from "../../shared/components/ui/illustrations/NeonCart";
 import HighlightedText from "../../shared/components/ui/HighlightedText";
 import { parseNutritionText } from "../../shared/utils/smartParser";
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
@@ -1611,6 +1613,7 @@ const IngredientManager = ({ onChange }) => {
                             <EmptyState
                               title="No ingredients found"
                               description={`No ingredients match "${query}". Try adjusting your search or filters, or look up a new food.`}
+                              illustration={query ? <NeonCart size={96} /> : <NeonPlate size={96} />}
                             />
                           </TableCell>
                         </TableRow>
@@ -1708,6 +1711,7 @@ const IngredientManager = ({ onChange }) => {
                     <EmptyState
                       title="No ingredients found"
                       description={`No ingredients match "${query}".`}
+                      illustration={query ? <NeonCart size={96} /> : <NeonPlate size={96} />}
                       sx={{ py: 6 }}
                     />
                   ) : (
