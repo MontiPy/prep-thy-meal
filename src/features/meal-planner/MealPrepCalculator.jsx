@@ -461,14 +461,11 @@ const MealPrepCalculator = memo(
 
   useEffect(() => {
     const uid = user?.uid;
-    if (!uid) {
-      setIsLoadingData(false);
-      return;
-    }
 
     const loadData = async () => {
       try {
-        const plans = await loadPlans(uid);
+        const plans = await loadPlans(uid); // Works for both guest (uid=null) and authenticated
+        // Only proceed if user hasn't changed during async operation
         if (uid !== user?.uid) return;
         setSavedPlans(plans);
 
