@@ -105,7 +105,6 @@ export const migrateGuestData = async (uid) => {
     const somethingMigrated = migratedCount > 0 || migratedBaseline || migratedIngredientsCount > 0 || migratedPreferences;
     if (somethingMigrated) {
       clearGuestData();
-      console.log(`Migration complete: ${migratedCount} plans, ${migratedIngredientsCount} ingredients, preferences: ${migratedPreferences}`);
     }
 
     return {

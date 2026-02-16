@@ -14,10 +14,7 @@ let tesseractModule = null;
 async function loadTesseract() {
   if (tesseractModule) return tesseractModule;
 
-  console.log('[OCR] Loading Tesseract.js...');
   tesseractModule = await import('tesseract.js');
-  console.log('[OCR] Tesseract.js loaded');
-
   return tesseractModule;
 }
 
@@ -30,13 +27,7 @@ async function initializeWorker() {
   // Dynamic import of Tesseract
   const { createWorker } = await loadTesseract();
 
-  worker = await createWorker('eng', 1, {
-    logger: (m) => {
-      if (m.status === 'recognizing text') {
-        console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-      }
-    }
-  });
+  worker = await createWorker('eng', 1);
 
   return worker;
 }

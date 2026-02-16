@@ -27,7 +27,7 @@ export const enablePerf = () => {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage?.setItem('ptm_perf', '1');
-    console.log('[perf] Performance tracking enabled. Refresh to apply.');
+    if (import.meta.env.DEV) console.log('[perf] Performance tracking enabled. Refresh to apply.');
   } catch (e) {
     console.error('Failed to enable perf tracking:', e);
   }
@@ -40,7 +40,7 @@ export const disablePerf = () => {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage?.removeItem('ptm_perf');
-    console.log('[perf] Performance tracking disabled. Refresh to apply.');
+    if (import.meta.env.DEV) console.log('[perf] Performance tracking disabled. Refresh to apply.');
   } catch (e) {
     console.error('Failed to disable perf tracking:', e);
   }
@@ -156,7 +156,7 @@ export const clearPerformanceMetrics = () => {
   try {
     performance.clearMarks();
     performance.clearMeasures();
-    console.log('[perf] All performance metrics cleared');
+    if (import.meta.env.DEV) console.log('[perf] All performance metrics cleared');
   } catch {
     // Ignore unsupported environments
   }
@@ -191,5 +191,5 @@ if (import.meta.env.DEV) {
     clear: clearPerformanceMetrics,
     export: exportMetrics
   };
-  console.log('[perf] Performance utilities available: window.perfUtils');
+  console.log('[perf] Performance utilities available: window.perfUtils.enable()');
 }

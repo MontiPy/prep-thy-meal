@@ -141,13 +141,11 @@ class LocalStorageService {
     for (const key of nonCriticalKeys) {
       if (key !== failedKey) {
         this.remove(key);
-        console.log(`Cleared ${key} to free space`);
 
         // Try to set the failed key again
         try {
           const testValue = localStorage.getItem(failedKey);
           if (testValue !== null) {
-            console.log('Successfully freed space');
             return;
           }
         } catch {

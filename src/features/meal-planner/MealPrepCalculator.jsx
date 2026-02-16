@@ -318,6 +318,10 @@ const MealPrepCalculator = memo(
   const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
+  const hydrateTimeoutRef = useRef(null);
+  const cheerTimeoutRef = useRef(null);
+  const confettiTimeoutRef = useRef(null);
+  const goalConfettiTimeoutRef = useRef(null);
 
   // Confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -337,6 +341,16 @@ const MealPrepCalculator = memo(
 
   // Recent ingredients state
   const [recentIngredients, setRecentIngredients] = useState([]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (hydrateTimeoutRef.current) clearTimeout(hydrateTimeoutRef.current);
+      if (cheerTimeoutRef.current) clearTimeout(cheerTimeoutRef.current);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      if (goalConfettiTimeoutRef.current) clearTimeout(goalConfettiTimeoutRef.current);
+    };
+  }, []);
 
   const checkPendingTargets = useCallback(() => {
     if (hasPendingTargets()) {
@@ -451,7 +465,8 @@ const MealPrepCalculator = memo(
       }
 
       setMealIngredients(mealData);
-      setTimeout(() => {
+      if (hydrateTimeoutRef.current) clearTimeout(hydrateTimeoutRef.current);
+      hydrateTimeoutRef.current = setTimeout(() => {
         isHydratingRef.current = false;
       }, 0);
     },
@@ -565,7 +580,8 @@ const MealPrepCalculator = memo(
 
         if (ingredient.name === "Broccoli" && grams > ingredient.grams) {
           setCheer("You broc my world!");
-          setTimeout(() => setCheer(""), 2000);
+          if (cheerTimeoutRef.current) clearTimeout(cheerTimeoutRef.current);
+          cheerTimeoutRef.current = setTimeout(() => setCheer(""), 2000);
         }
 
         return { ...ingredient, quantity, grams, gramsPerUnit };
@@ -708,7 +724,8 @@ const MealPrepCalculator = memo(
       }
       setHasUnsavedChanges(false);
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      confettiTimeoutRef.current = setTimeout(() => setShowConfetti(false), 2000);
       setLastPlanSavedAt(new Date());
 
       if (uid) {
@@ -797,7 +814,8 @@ const MealPrepCalculator = memo(
       setPlanName(newName);
       setHasUnsavedChanges(false);
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      confettiTimeoutRef.current = setTimeout(() => setShowConfetti(false), 2000);
       setLastPlanSavedAt(new Date());
       toast.success("Saved as new plan");
     } catch (err) {
@@ -1370,7 +1388,8 @@ const MealPrepCalculator = memo(
   useEffect(() => {
     if (withinRange && !lastRange.current) {
       setGoalConfetti(true);
-      setTimeout(() => setGoalConfetti(false), 1500);
+      if (goalConfettiTimeoutRef.current) clearTimeout(goalConfettiTimeoutRef.current);
+      goalConfettiTimeoutRef.current = setTimeout(() => setGoalConfetti(false), 1500);
     }
     lastRange.current = withinRange;
   }, [withinRange]);

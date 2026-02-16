@@ -11,7 +11,6 @@ export const cleanupDuplicateIngredients = async (uid) => {
   }
 
   const ingredients = loadCustomIngredients();
-  console.log(`Found ${ingredients.length} total ingredients`);
 
   // Remove duplicates by name (keep the first occurrence)
   const seen = new Map();
@@ -32,21 +31,16 @@ export const cleanupDuplicateIngredients = async (uid) => {
     }
   });
 
-  console.log(`Reduced to ${unique.length} unique ingredients`);
-  console.log(`Removed ${ingredients.length - unique.length} duplicates`);
-
   // Save cleaned data
   await saveCustomIngredients(uid, unique);
 
   // Also save to localStorage
   localStorage.setItem('customIngredients', JSON.stringify(unique));
 
-  console.log('Cleanup complete! Refresh the page.');
   return unique;
 };
 
 // Make it available globally for console access (dev mode only)
 if (import.meta.env.DEV) {
   window.cleanupDuplicateIngredients = cleanupDuplicateIngredients;
-  console.log('Debug: cleanupDuplicateIngredients() available in console');
 }

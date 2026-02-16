@@ -125,6 +125,7 @@ const IngredientManager = ({ onChange }) => {
   const [ingredientToDelete, setIngredientToDelete] = useState(null);
   const jsonImportRef = useRef(null);
   const lastEditingIdRef = useRef(null); // Track last editingId to prevent duplicate syncs
+  const highlightTimeoutRef = useRef(null);
 
   // Search/filter state
   const [query, setQuery] = useState("");
@@ -148,6 +149,13 @@ const IngredientManager = ({ onChange }) => {
   const [ocrProgress, setOcrProgress] = useState({ stage: '', progress: 0 });
   const [highlightedFields, setHighlightedFields] = useState([]);
   const [fieldConfidence, setFieldConfidence] = useState({});
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, []);
 
   // Sync form when editingId changes (only on initial edit, not on every ingredient refresh)
   useEffect(() => {
@@ -435,8 +443,6 @@ const IngredientManager = ({ onChange }) => {
         console.log(`Found ${invalid.length} ingredients with invalid IDs:`, invalid);
         return all;
       };
-
-      console.log('Debug: cleanupDuplicates() and debugIngredients() available in console');
     }
     return () => {
       if (import.meta.env.DEV) {
@@ -696,7 +702,8 @@ const IngredientManager = ({ onChange }) => {
       setHighlightedFields(fieldsToHighlight);
 
       // Clear highlights after 3 seconds
-      setTimeout(() => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(() => {
         setHighlightedFields([]);
       }, 3000);
 

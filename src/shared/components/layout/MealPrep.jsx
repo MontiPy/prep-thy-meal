@@ -112,7 +112,7 @@ const MealPrep = () => {
       if (!perfEnabled || typeof console === "undefined") return;
       const actual = actualDuration.toFixed(1);
       const base = baseDuration.toFixed(1);
-      console.info(`[perf] ${id} ${phase} actual:${actual}ms base:${base}ms`);
+      if (import.meta.env.DEV) console.info(`[perf] ${id} ${phase} actual:${actual}ms base:${base}ms`);
     },
     [perfEnabled]
   );
@@ -226,7 +226,7 @@ const MealPrep = () => {
       } catch {
         // Ignore unsupported environments.
       }
-      console.info(`[perf] tab ${from} -> ${to}: ${duration}ms`);
+      if (import.meta.env.DEV) console.info(`[perf] tab ${from} -> ${to}: ${duration}ms`);
     };
 
     if (typeof window !== "undefined" && window.requestAnimationFrame) {

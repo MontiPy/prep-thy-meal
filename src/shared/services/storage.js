@@ -184,43 +184,30 @@ export const savePreferences = async (uid, preferences) => {
 /**
  * Load favorite ingredients - routes to guest storage if no uid
  */
-export const loadFavorites = async (uid) => {
-  if (!uid) return loadGuestFavorites();
-  // TODO: Implement Firestore favorites when needed
+export const loadFavorites = async () => {
+  // Stored per-device in localStorage only (not synced across devices)
   return loadGuestFavorites();
 };
 
 /**
- * Save favorite ingredients - routes to guest storage if no uid
+ * Save favorite ingredients - localStorage only (per-device)
  */
-export const saveFavorites = async (uid, favorites) => {
-  if (!uid) {
-    saveGuestFavorites(favorites);
-    return favorites;
-  }
-  // TODO: Implement Firestore favorites when needed
+export const saveFavorites = async (_uid, favorites) => {
   saveGuestFavorites(favorites);
   return favorites;
 };
 
 /**
- * Load recent ingredients - routes to guest storage if no uid
+ * Load recent ingredients - localStorage only (per-device)
  */
-export const loadRecents = async (uid) => {
-  if (!uid) return loadGuestRecents();
-  // TODO: Implement Firestore recents when needed
+export const loadRecents = async () => {
   return loadGuestRecents();
 };
 
 /**
- * Save recent ingredients - routes to guest storage if no uid
+ * Save recent ingredients - localStorage only (per-device)
  */
-export const saveRecents = async (uid, recents) => {
-  if (!uid) {
-    saveGuestRecents(recents);
-    return recents;
-  }
-  // TODO: Implement Firestore recents when needed
+export const saveRecents = async (_uid, recents) => {
   saveGuestRecents(recents);
   return recents;
 };
