@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -39,17 +39,53 @@ export default function ImageUploader({
   const [previewImage, setPreviewImage] = useState(null);
   const [originalFile, setOriginalFile] = useState(null);
   const [showCropDialog, setShowCropDialog] = useState(false);
-  const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 100, height: 100 });
+  const [cropArea] = useState({ x: 0, y: 0, width: 100, height: 100 });
   const [isProcessing, setIsProcessing] = useState(false);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-  const canvasRef = useRef(null);
+  const fileReaderRef = useRef(null);
+  const imageLoadRef = useRef(null);
+
+  /**
+   * Cleanup FileReader and Image on unmount to prevent memory leaks
+   */
+  useEffect(() => {
+    return () => {
+      // Abort any ongoing FileReader operations
+      if (fileReaderRef.current) {
+        fileReaderRef.current.abort();
+        fileReaderRef.current = null;
+      }
+      // Clear any pending Image loads
+      if (imageLoadRef.current) {
+        imageLoadRef.current.onload = null;
+        imageLoadRef.current.onerror = null;
+        imageLoadRef.current.src = '';
+        imageLoadRef.current = null;
+      }
+    };
+  }, []);
+
+  /**
+   * Cleanup on dialog close to prevent callbacks on unmounted components
+   */
+  useEffect(() => {
+    if (!showCropDialog) {
+      // Clear pending image loads when dialog closes
+      if (imageLoadRef.current) {
+        imageLoadRef.current.onload = null;
+        imageLoadRef.current.onerror = null;
+        imageLoadRef.current.src = '';
+        imageLoadRef.current = null;
+      }
+    }
+  }, [showCropDialog]);
 
   /**
    * Validate file type and size
    */
-  const validateFile = (file) => {
+  const validateFile = useCallback((file) => {
     if (!acceptedFormats.includes(file.type)) {
       onError?.(`File type not supported. Please use: ${acceptedFormats.join(', ')}`);
       return false;
@@ -62,7 +98,7 @@ export default function ImageUploader({
     }
 
     return true;
-  };
+  }, [acceptedFormats, maxSizeMB, onError]);
 
   /**
    * Handle file selection
@@ -74,7 +110,10 @@ export default function ImageUploader({
 
     // Create preview
     const reader = new FileReader();
+    fileReaderRef.current = reader;
+
     reader.onload = (e) => {
+      fileReaderRef.current = null; // Clear ref after successful load
       setPreviewImage(e.target.result);
       if (enableCrop) {
         setShowCropDialog(true);
@@ -83,10 +122,11 @@ export default function ImageUploader({
       }
     };
     reader.onerror = () => {
+      fileReaderRef.current = null; // Clear ref on error
       onError?.('Failed to read image file');
     };
     reader.readAsDataURL(file);
-  }, [enableCrop, onImageSelected, onError]);
+  }, [enableCrop, onImageSelected, onError, validateFile]);
 
   /**
    * Drag and drop handlers
@@ -132,7 +172,12 @@ export default function ImageUploader({
     try {
       // Create canvas and draw cropped image
       const img = new Image();
+      imageLoadRef.current = img;
+
       img.onload = () => {
+        // Check if image is still tracked (not cleaned up)
+        if (!imageLoadRef.current) return;
+
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
@@ -163,11 +208,15 @@ export default function ImageUploader({
 
         // Convert to blob
         canvas.toBlob((blob) => {
+          // Check again before setState to prevent updates on unmounted component
+          if (!imageLoadRef.current) return;
+
           const croppedFile = new File([blob], originalFile.name, {
             type: originalFile.type,
             lastModified: Date.now()
           });
 
+          imageLoadRef.current = null; // Clear ref after successful processing
           setShowCropDialog(false);
           setIsProcessing(false);
           onImageSelected?.(croppedFile);
@@ -175,12 +224,18 @@ export default function ImageUploader({
       };
 
       img.onerror = () => {
+        // Check if still mounted before setState
+        if (!imageLoadRef.current) return;
+
+        imageLoadRef.current = null; // Clear ref on error
         setIsProcessing(false);
         onError?.('Failed to process image');
       };
 
       img.src = previewImage;
     } catch (error) {
+      console.error('Failed to crop image:', error);
+      imageLoadRef.current = null; // Clear ref on exception
       setIsProcessing(false);
       onError?.('Failed to crop image');
     }
@@ -197,15 +252,6 @@ export default function ImageUploader({
   /**
    * Reset state
    */
-  const handleReset = () => {
-    setPreviewImage(null);
-    setOriginalFile(null);
-    setShowCropDialog(false);
-    setCropArea({ x: 0, y: 0, width: 100, height: 100 });
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    if (cameraInputRef.current) cameraInputRef.current.value = '';
-  };
-
   return (
     <Box>
       {/* Drag and Drop Zone */}
@@ -220,12 +266,12 @@ export default function ImageUploader({
           textAlign: 'center',
           cursor: 'pointer',
           border: '2px dashed',
-          borderColor: isDragging ? 'primary.main' : 'divider',
+          borderColor: isDragging ? 'secondary.main' : 'divider',
           bgcolor: isDragging ? 'action.hover' : 'background.paper',
-          transition: 'all 0.2s ease',
+          transition: 'all 250ms ease-out',
           '&:hover': {
-            borderColor: 'primary.main',
-            bgcolor: 'action.hover'
+            borderColor: 'secondary.main',
+            bgcolor: 'action.hover',
           }
         }}
       >

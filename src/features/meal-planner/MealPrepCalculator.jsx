@@ -1,6 +1,23 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+  memo,
+} from "react";
 import toast from "react-hot-toast";
-import { Plus, Minus, Edit2, Check, X, Link2, Undo2, Redo2 } from "lucide-react";
+import { db } from "../../shared/services/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import AddIcon from "@mui/icons-material/AddRounded";
+import RemoveIcon from "@mui/icons-material/RemoveRounded";
+import EditIcon from "@mui/icons-material/EditOutlined";
+import CloseIcon from "@mui/icons-material/CloseRounded";
+import LinkIcon from "@mui/icons-material/LinkRounded";
+import UndoIcon from "@mui/icons-material/UndoRounded";
+import RedoIcon from "@mui/icons-material/RedoRounded";
 import {
   Accordion,
   AccordionDetails,
@@ -50,6 +67,7 @@ import {
   updatePlan,
 } from '../../shared/services/storage';
 import { useUser } from '../auth/UserContext.jsx';
+import { useMacroTargets } from '../../shared/context/MacroTargetsContext';
 import ConfirmDialog from "../../shared/components/ui/ConfirmDialog";
 import { PageSkeleton } from "../../shared/components/ui/SkeletonLoader";
 import { useUndoRedo } from "../../shared/hooks/useUndoRedo";
@@ -69,6 +87,8 @@ import {
 import MacroTargetPopover from "./MacroTargetPopover";
 import { validateAllMacros } from "../../shared/utils/macroValidation.js";
 import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
+import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientSearchAutocomplete";
+import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 const roundVal = (n) => Math.round(Number(n) || 0);
@@ -176,8 +196,18 @@ const categorizeIngredient = (name) => {
   return "Other";
 };
 
-// Category colors for shopping list (moved outside component)
-const getCategoryColors = (cat) => {
+// Category colors for shopping list — Tokyo Nights neon tints
+const getCategoryColors = (cat, isDark = true) => {
+  if (isDark) {
+    if (cat.includes("Produce - Fruit")) return { header: "rgba(57,255,127,0.2)", bg: "rgba(57,255,127,0.04)" };
+    if (cat.includes("Produce - Vegetable")) return { header: "rgba(57,255,127,0.25)", bg: "rgba(57,255,127,0.04)" };
+    if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "rgba(255,45,120,0.2)", bg: "rgba(255,45,120,0.04)" };
+    if (cat.includes("Dairy")) return { header: "rgba(0,229,255,0.2)", bg: "rgba(0,229,255,0.04)" };
+    if (cat.includes("Grains") || cat.includes("Bread")) return { header: "rgba(255,176,32,0.2)", bg: "rgba(255,176,32,0.04)" };
+    if (cat.includes("Fats") || cat.includes("Oils")) return { header: "rgba(255,176,32,0.2)", bg: "rgba(255,176,32,0.04)" };
+    if (cat.includes("Beverages")) return { header: "rgba(168,85,247,0.2)", bg: "rgba(168,85,247,0.04)" };
+    return { header: "rgba(255,255,255,0.08)", bg: "rgba(255,255,255,0.02)" };
+  }
   if (cat.includes("Produce - Fruit")) return { header: "#86efac", bg: "#f0fdf4" };
   if (cat.includes("Produce - Vegetable")) return { header: "#4ade80", bg: "#f0fdf4" };
   if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "#fca5a5", bg: "#fef2f2" };
@@ -188,8 +218,10 @@ const getCategoryColors = (cat) => {
   return { header: "#e5e7eb", bg: "#f9fafb" };
 };
 
-const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences = {} }) => {
+const MealPrepCalculator = memo(
+  forwardRef(function MealPrepCalculator({ allIngredients, userPreferences = {} }, ref) {
   const { user } = useUser();
+  const { pendingTargets, consumePendingTargets, hasPendingTargets } = useMacroTargets();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -218,8 +250,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
         // Try to load from Firebase first if user is logged in
         if (user) {
           try {
-            const { getFirestore, doc, getDoc } = await import("firebase/firestore");
-            const db = getFirestore();
             const docRef = doc(db, "userProfiles", user.uid);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists() && docSnap.data().calorieProfile) {
@@ -255,6 +285,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
   const [prepDays, setPrepDays] = useState(6);
   const [matchDinner, setMatchDinner] = useState(false);
+  const [checkedShoppingItems, setCheckedShoppingItems] = useState({});
 
   // Use undo/redo for meal ingredients
   const {
@@ -287,6 +318,10 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
+  const hydrateTimeoutRef = useRef(null);
+  const cheerTimeoutRef = useRef(null);
+  const confettiTimeoutRef = useRef(null);
+  const goalConfettiTimeoutRef = useRef(null);
 
   // Confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -297,8 +332,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   // Import file input ref
   const importFileRef = useRef(null);
 
-  // Pending targets from Calorie Calculator
-  const [pendingTargets, setPendingTargets] = useState(null);
+  // Targets prompt state (targets come from context)
   const [showTargetsPrompt, setShowTargetsPrompt] = useState(false);
 
   // Meal template selector state
@@ -308,67 +342,45 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   // Recent ingredients state
   const [recentIngredients, setRecentIngredients] = useState([]);
 
-  // Check for pending targets from Calorie Calculator
+  // Cleanup timeouts on unmount
   useEffect(() => {
-    // Only check when tab becomes active
-    if (!isActive) return;
-
-    const checkPendingTargets = () => {
-      const stored = localStorage.getItem("plannerTargetsFromCalculator");
-      if (stored) {
-        try {
-          const targets = JSON.parse(stored);
-          // Only show if saved within last 5 minutes
-          const savedAt = new Date(targets.savedAt);
-          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-          if (savedAt > fiveMinutesAgo) {
-            setPendingTargets(targets);
-            setShowTargetsPrompt(true);
-          } else {
-            // Clear old targets
-            localStorage.removeItem("plannerTargetsFromCalculator");
-          }
-        } catch (e) {
-          console.error("Error parsing pending targets:", e);
-          localStorage.removeItem("plannerTargetsFromCalculator");
-        }
-      }
+    return () => {
+      if (hydrateTimeoutRef.current) clearTimeout(hydrateTimeoutRef.current);
+      if (cheerTimeoutRef.current) clearTimeout(cheerTimeoutRef.current);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      if (goalConfettiTimeoutRef.current) clearTimeout(goalConfettiTimeoutRef.current);
     };
+  }, []);
 
-    // Check when tab becomes active
+  const checkPendingTargets = useCallback(() => {
+    if (hasPendingTargets()) {
+      setShowTargetsPrompt(true);
+    }
+  }, [hasPendingTargets]);
+
+  useImperativeHandle(ref, () => ({ onTabActive: checkPendingTargets }), [checkPendingTargets]);
+
+  useEffect(() => {
     checkPendingTargets();
-
-    // Also listen for storage events (in case another tab updates)
-    const handleStorage = (e) => {
-      if (e.key === "plannerTargetsFromCalculator") {
-        checkPendingTargets();
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, [isActive]);
+  }, [checkPendingTargets]);
 
   // Apply pending targets from Calorie Calculator
   const applyPendingTargets = () => {
-    if (!pendingTargets) return;
+    const targets = consumePendingTargets();
+    if (!targets) return;
 
-    setCalorieTarget(pendingTargets.calorieTarget);
-    setTempTarget(pendingTargets.calorieTarget);
-    setTargetPercentages(pendingTargets.targetPercentages);
+    setCalorieTarget(targets.calorieTarget);
+    setTempTarget(targets.calorieTarget);
+    setTargetPercentages(targets.targetPercentages);
     setHasUnsavedChanges(true);
-
-    // Clear the pending targets
-    localStorage.removeItem("plannerTargetsFromCalculator");
-    setPendingTargets(null);
     setShowTargetsPrompt(false);
 
-    toast.success(`Applied ${pendingTargets.calorieTarget} kcal target with new macro split!`);
+    toast.success(`Applied ${targets.calorieTarget} kcal target with new macro split!`);
   };
 
   // Dismiss pending targets
   const dismissPendingTargets = () => {
-    localStorage.removeItem("plannerTargetsFromCalculator");
-    setPendingTargets(null);
+    consumePendingTargets(); // Clear from context
     setShowTargetsPrompt(false);
   };
 
@@ -453,24 +465,22 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       }
 
       setMealIngredients(mealData);
-      setTimeout(() => {
+      if (hydrateTimeoutRef.current) clearTimeout(hydrateTimeoutRef.current);
+      hydrateTimeoutRef.current = setTimeout(() => {
         isHydratingRef.current = false;
       }, 0);
     },
-    [allIngredients, refreshIngredientData, rememberLastPlan, savedPlans]
+    [allIngredients, refreshIngredientData, rememberLastPlan, savedPlans, setMealIngredients]
   );
 
 
   useEffect(() => {
     const uid = user?.uid;
-    if (!uid) {
-      setIsLoadingData(false);
-      return;
-    }
 
     const loadData = async () => {
       try {
-        const plans = await loadPlans(uid);
+        const plans = await loadPlans(uid); // Works for both guest (uid=null) and authenticated
+        // Only proceed if user hasn't changed during async operation
         if (uid !== user?.uid) return;
         setSavedPlans(plans);
 
@@ -516,7 +526,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
         snack: updateList(prev.snack),
       };
     });
-  }, [allIngredients]);
+  }, [allIngredients, setMealIngredients]);
 
   // Track changes to detect unsaved modifications
   useEffect(() => {
@@ -570,7 +580,8 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
         if (ingredient.name === "Broccoli" && grams > ingredient.grams) {
           setCheer("You broc my world!");
-          setTimeout(() => setCheer(""), 2000);
+          if (cheerTimeoutRef.current) clearTimeout(cheerTimeoutRef.current);
+          cheerTimeoutRef.current = setTimeout(() => setCheer(""), 2000);
         }
 
         return { ...ingredient, quantity, grams, gramsPerUnit };
@@ -653,10 +664,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to save plans.");
-      return;
-    }
     const name = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
       name,
@@ -717,9 +724,17 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       }
       setHasUnsavedChanges(false);
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      confettiTimeoutRef.current = setTimeout(() => setShowConfetti(false), 2000);
       setLastPlanSavedAt(new Date());
-      toast.success("Plan saved");
+
+      if (uid) {
+        toast.success("Plan saved to cloud");
+      } else {
+        toast.success("Plan saved locally. Sign in to sync across devices.", {
+          duration: 5000
+        });
+      }
     } catch (err) {
       console.error("Error saving plan", err);
       setHasUnsavedChanges(true);
@@ -799,13 +814,51 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       setPlanName(newName);
       setHasUnsavedChanges(false);
       setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      confettiTimeoutRef.current = setTimeout(() => setShowConfetti(false), 2000);
       setLastPlanSavedAt(new Date());
       toast.success("Saved as new plan");
     } catch (err) {
       console.error("Error saving new plan", err);
       setHasUnsavedChanges(true);
       toast.error(err?.message || "Could not save plan. Try again.");
+    }
+  };
+
+  const handleDuplicatePlan = async (planId) => {
+    const uid = user?.uid;
+    if (!uid) {
+      toast.error("Please sign in to duplicate plans.");
+      return;
+    }
+    const planToDuplicate = savedPlans.find((p) => p.id === planId);
+    if (!planToDuplicate) {
+      toast.error("Plan not found");
+      return;
+    }
+    const newName = `${planToDuplicate.name} (Copy)`;
+    const duplicatedPlan = {
+      ...planToDuplicate,
+      name: newName,
+      // Remove id, createdAt, updatedAt to create a new plan
+      id: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+    };
+    try {
+      const plans = await addPlan(uid, duplicatedPlan);
+      if (uid !== user?.uid) return;
+      setSavedPlans(plans);
+      const newPlanId = plans[plans.length - 1].id;
+      setCurrentPlanId(newPlanId);
+      setSelectedPlanId(newPlanId);
+      rememberLastPlan(newPlanId);
+      setPlanName(newName);
+      setHasUnsavedChanges(false);
+      toast.success("Plan duplicated");
+    } catch (err) {
+      console.error("Error duplicating plan", err);
+      toast.error(err?.message || "Could not duplicate plan. Try again.");
     }
   };
 
@@ -1236,6 +1289,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
     );
     return totals;
   }, [mealTotals]);
+  const calorieDelta = dailyTotals.calories - calorieTarget;
 
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
@@ -1334,7 +1388,8 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   useEffect(() => {
     if (withinRange && !lastRange.current) {
       setGoalConfetti(true);
-      setTimeout(() => setGoalConfetti(false), 1500);
+      if (goalConfettiTimeoutRef.current) clearTimeout(goalConfettiTimeoutRef.current);
+      goalConfettiTimeoutRef.current = setTimeout(() => setGoalConfetti(false), 1500);
     }
     lastRange.current = withinRange;
   }, [withinRange]);
@@ -1367,7 +1422,9 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
   if (isLoadingData) {
     return (
-      <Box sx={{ maxWidth: 1440, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}>
+      <Box
+        sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}
+      >
         <PageSkeleton />
       </Box>
     );
@@ -1377,9 +1434,19 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
   const handleCloseActionsMenu = () => setActionsAnchor(null);
 
   return (
-    <Box sx={{ maxWidth: 1440, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}>
-      {(showConfetti || goalConfetti) && <div className="confetti">🎉🎉🎉</div>}
-      {cheer && <div className="cheer">{cheer}</div>}
+    <Box
+      sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}
+    >
+      {(showConfetti || goalConfetti) && (
+        <div className="confetti" data-stagger-skip>
+          🎉🎉🎉
+        </div>
+      )}
+      {cheer && (
+        <div className="cheer" data-stagger-skip>
+          {cheer}
+        </div>
+      )}
 
       {/* Header */}
       <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
@@ -1405,11 +1472,39 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                 <MenuItem value="">
                   <em>New plan</em>
                 </MenuItem>
-                {savedPlans.map((plan) => (
-                  <MenuItem key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </MenuItem>
-                ))}
+                {savedPlans
+                  .sort((a, b) => {
+                    // Sort by last modified date if available, otherwise by name
+                    const aDate = a.updatedAt || a.createdAt || 0;
+                    const bDate = b.updatedAt || b.createdAt || 0;
+                    if (aDate && bDate) {
+                      return bDate - aDate; // Most recent first
+                    }
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map((plan) => {
+                    const modifiedDate = plan.updatedAt || plan.createdAt;
+                    const dateStr = modifiedDate
+                      ? new Date(modifiedDate.seconds ? modifiedDate.seconds * 1000 : modifiedDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                      : null;
+                    return (
+                      <MenuItem key={plan.id} value={plan.id}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
+                          <Typography variant="body2" fontWeight={600}>
+                            {plan.name}
+                          </Typography>
+                          {dateStr && (
+                            <Typography variant="caption" color="text.secondary">
+                              Modified {dateStr}
+                            </Typography>
+                          )}
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
               </Select>
             </FormControl>
             {/* Plan Name Input */}
@@ -1432,8 +1527,10 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                     onClick={undoMealChange}
                     disabled={!canUndo}
                     color="default"
+                    sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                    aria-label="Undo"
                   >
-                    <Undo2 size={18} />
+                    <UndoIcon fontSize="small" />
                   </IconButton>
                 </span>
               </Tooltip>
@@ -1444,13 +1541,19 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                     onClick={redoMealChange}
                     disabled={!canRedo}
                     color="default"
+                    sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                    aria-label="Redo"
                   >
-                    <Redo2 size={18} />
+                    <RedoIcon fontSize="small" />
                   </IconButton>
                 </span>
               </Tooltip>
             </Stack>
-            <Button variant="contained" onClick={handleSavePlan}>
+            <Button 
+              variant="contained" 
+              onClick={handleSavePlan}
+              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
+            >
               {currentPlanId ? "Update Plan" : "Save Plan"}
             </Button>
             <Button
@@ -1458,6 +1561,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
               color="inherit"
               onClick={handleOpenActionsMenu}
               endIcon={<ExpandMoreIcon />}
+              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
             >
               Plan actions
             </Button>
@@ -1466,6 +1570,16 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
               open={actionsMenuOpen}
               onClose={handleCloseActionsMenu}
             >
+              {currentPlanId && (
+                <MenuItem
+                  onClick={() => {
+                    handleDuplicatePlan(currentPlanId);
+                    handleCloseActionsMenu();
+                  }}
+                >
+                  Duplicate plan
+                </MenuItem>
+              )}
               {currentPlanId && (
                 <MenuItem
                   onClick={() => {
@@ -1560,7 +1674,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                   </Typography>
                   {!editingTarget && (
                     <IconButton size="small" onClick={() => setEditingTarget(true)} aria-label="Edit target">
-                      <Edit2 size={16} />
+                      <EditIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   )}
                 </Stack>
@@ -1636,22 +1750,36 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                 p: 2,
                 borderRadius: 2,
                 borderColor:
-                  (dailyTotals.calories - calorieTarget > 0 || dailyTotals.fat - targetMacros.fat > 0)
+                  (calorieDelta > 0 || dailyTotals.fat - targetMacros.fat > 0)
                     ? "error.light"
                     : "success.light",
               }}
             >
-              <Typography variant="subtitle2" color="text.secondary">
-                Over / under budget
-              </Typography>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Over / under budget
+                </Typography>
+                <Chip
+                  size="small"
+                  label={
+                    calorieDelta > 0
+                      ? "Over budget"
+                      : calorieDelta < 0
+                        ? "Under budget"
+                        : "On target"
+                  }
+                  color={calorieDelta > 0 ? "error" : calorieDelta < 0 ? "success" : "info"}
+                  sx={{ fontWeight: 600 }}
+                />
+              </Stack>
               <Typography
                 variant="h6"
                 fontWeight={800}
-                color={dailyTotals.calories - calorieTarget > 0 ? "error.main" : "success.main"}
+                color={calorieDelta > 0 ? "error.main" : "success.main"}
                 mt={0.5}
               >
-                {dailyTotals.calories - calorieTarget >= 0 ? "+" : ""}
-                {dailyTotals.calories - calorieTarget} kcal
+                {calorieDelta >= 0 ? "+" : ""}
+                {calorieDelta} kcal
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {dailyTotals.protein - targetMacros.protein >= 0 ? "+" : ""}
@@ -1706,26 +1834,42 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                               {meal}
                             </Typography>
                             {meal === "dinner" && matchDinner && (
-                              <Chip size="small" icon={<Link2 size={14} />} label="Mirroring Lunch" />
+                              <Chip size="small" icon={<LinkIcon sx={{ fontSize: 14 }} />} label="Mirroring Lunch" />
                             )}
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<BookmarkBorderIcon />}
+                            <Box
+                              component="span"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setTemplateMealType(meal);
-                                setTemplateModalOpen(true);
+                                if (!disabled) {
+                                  setTemplateMealType(meal);
+                                  setTemplateModalOpen(true);
+                                }
                               }}
-                              disabled={disabled}
                               sx={{
-                                textTransform: "none",
-                                fontWeight: 600,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                                px: 1.5,
+                                py: 0.5,
+                                border: "1px solid",
+                                borderColor: disabled ? "action.disabled" : "primary.main",
                                 borderRadius: 2,
+                                color: disabled ? "text.disabled" : "primary.main",
+                                fontSize: "0.875rem",
+                                fontWeight: 600,
+                                textTransform: "none",
+                                cursor: disabled ? "default" : "pointer",
+                                opacity: disabled ? 0.6 : 1,
+                                transition: "all 0.2s",
+                                "&:hover": disabled ? {} : {
+                                  bgcolor: "primary.main",
+                                  color: "primary.contrastText",
+                                },
                               }}
                             >
+                              <BookmarkBorderIcon sx={{ fontSize: 16 }} />
                               Templates
-                            </Button>
+                            </Box>
                           </Stack>
                           {meal === "dinner" && (
                             <FormControlLabel
@@ -1757,31 +1901,23 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                     <AccordionDetails>
                       <Stack spacing={1.5}>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 220 } }}>
-                            <InputLabel id={`${meal}-ingredient-label`}>Select ingredient</InputLabel>
-                            <Select
-                              labelId={`${meal}-ingredient-label`}
-                              label="Select ingredient"
-                              value={selectedId}
-                              onChange={(e) => setSelectedId(e.target.value)}
-                              disabled={disabled}
-                            >
-                              <MenuItem value="">Select ingredient</MenuItem>
-                              {allIngredients
-                                .filter((i) => i.id && i.id !== undefined && i.id !== null && i.name)
-                                .filter((i) => !list.some((p) => p.id === i.id))
-                                .map((i) => (
-                                  <MenuItem key={i.id} value={i.id}>
-                                    {i.name}
-                                  </MenuItem>
-                                ))}
-                            </Select>
-                          </FormControl>
+                          <IngredientSearchAutocomplete
+                            options={allIngredients.filter((i) => i.id && i.id !== undefined && i.id !== null && i.name)}
+                            value={selectedId}
+                            onChange={(id) => setSelectedId(id)}
+                            label="Select ingredient"
+                            placeholder="Search ingredients..."
+                            disabled={disabled}
+                            excludeIds={list.map((i) => i.id)}
+                            recentIngredients={recentIngredients}
+                            sx={{ flex: 1, minWidth: { xs: "100%", sm: 220 } }}
+                          />
                           <Button
                             variant="contained"
                             color="success"
                             onClick={() => handleAddIngredient(meal)}
                             disabled={!selectedId || disabled}
+                            sx={{ minHeight: { xs: 44, sm: 'auto' } }}
                           >
                             Add ingredient
                           </Button>
@@ -1848,181 +1984,192 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                         )}
 
                         {isDesktop ? (
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell>Ingredient</TableCell>
-                                <TableCell align="center">Serving</TableCell>
-                                <TableCell align="center">Quantity</TableCell>
-                                <TableCell align="center">Grams</TableCell>
-                                <TableCell align="center">Calories</TableCell>
-                                <TableCell align="center">Protein (g)</TableCell>
-                                <TableCell align="center">Carbs (g)</TableCell>
-                                <TableCell align="center">Fat (g)</TableCell>
-                                <TableCell align="center">-</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {list.map((ingredient) => {
-                                const nutrition = calculateNutrition(ingredient);
-                                const disabledRow = matchDinner && meal === "dinner";
-                                const unit = ingredient.unit || "g";
+                          <Box sx={{ mx: 0 }}>
+                            <Table size="small" sx={{ width: "100%" }}>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell width="40px"></TableCell>
+                                  <TableCell>Ingredient</TableCell>
+                                  <TableCell align="center">Serving</TableCell>
+                                  <TableCell align="center">Quantity</TableCell>
+                                  <TableCell align="center">Grams</TableCell>
+                                  <TableCell align="center">Calories</TableCell>
+                                  <TableCell align="center">Protein (g)</TableCell>
+                                  <TableCell align="center">Carbs (g)</TableCell>
+                                  <TableCell align="center">Fat (g)</TableCell>
+                                  <TableCell align="center">-</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {list.map((ingredient) => {
+                                  const nutrition = calculateNutrition(ingredient);
+                                  const disabledRow = matchDinner && meal === "dinner";
+                                  const unit = ingredient.unit || "g";
 
-                                let displayQuantity, totalGrams, incrementStep, unitLabel;
+                                  let displayQuantity, totalGrams, incrementStep, unitLabel;
 
-                                if (unit === "g") {
-                                  displayQuantity = ingredient.grams || 100;
-                                  totalGrams = Math.round(displayQuantity);
-                                  incrementStep = 5;
-                                  unitLabel = "g";
-                                } else {
-                                  displayQuantity = ingredient.quantity || 1;
-                                  totalGrams = Math.round(
-                                    displayQuantity * (ingredient.gramsPerUnit || 100)
-                                  );
-                                  incrementStep = 0.5;
-                                  unitLabel = "unit";
-                                }
+                                  if (unit === "g") {
+                                    displayQuantity = ingredient.grams || 100;
+                                    totalGrams = Math.round(displayQuantity);
+                                    incrementStep = 5;
+                                    unitLabel = "g";
+                                  } else {
+                                    displayQuantity = ingredient.quantity || 1;
+                                    totalGrams = Math.round(
+                                      displayQuantity * (ingredient.gramsPerUnit || 100)
+                                    );
+                                    incrementStep = 0.5;
+                                    unitLabel = "unit";
+                                  }
 
-                                // Get available serving sizes for this ingredient
-                                const servingSizes = getServingSizes(ingredient.id);
-                                const currentServing = ingredient.selectedServing || servingSizes[0]?.name || '100g';
+                                  // Get available serving sizes for this ingredient
+                                  const servingSizes = getServingSizes(ingredient.id);
+                                  const currentServing = ingredient.selectedServing || servingSizes[0]?.name || '100g';
 
-                                return (
-                                  <TableRow key={ingredient.id} hover>
-                                    <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
-                                      {ingredient.name}
-                                    </TableCell>
-                                    <TableCell align="center">
-                                      {servingSizes.length > 1 ? (
-                                        <Select
-                                          size="small"
-                                          value={currentServing}
-                                          onChange={(e) => updateIngredientServing(meal, ingredient.id, e.target.value)}
-                                          disabled={disabledRow}
+                                  return (
+                                    <TableRow key={ingredient.id} hover>
+                                      <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
+                                        {ingredient.name}
+                                      </TableCell>
+                                      <TableCell align="center">
+                                        {servingSizes.length > 1 ? (
+                                          <Select
+                                            size="small"
+                                            value={currentServing}
+                                            onChange={(e) => updateIngredientServing(meal, ingredient.id, e.target.value)}
+                                            disabled={disabledRow}
+                                            sx={{
+                                              minWidth: 100,
+                                              fontSize: '0.75rem',
+                                              '& .MuiSelect-select': { py: 0.5, px: 1 },
+                                            }}
+                                          >
+                                            {servingSizes.map((serving) => (
+                                              <MenuItem key={serving.name} value={serving.name} sx={{ fontSize: '0.75rem' }}>
+                                                {serving.name}
+                                              </MenuItem>
+                                            ))}
+                                          </Select>
+                                        ) : (
+                                          <Typography variant="caption" color="text.secondary">
+                                            {servingSizes[0]?.name || '100g'}
+                                          </Typography>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Stack
+                                          direction="row"
+                                          spacing={0.5}
+                                          alignItems="center"
+                                          justifyContent="center"
                                           sx={{
-                                            minWidth: 100,
-                                            fontSize: '0.75rem',
-                                            '& .MuiSelect-select': { py: 0.5, px: 1 },
+                                            border: "1px solid",
+                                            borderColor: "divider",
+                                            borderRadius: 999,
+                                            px: 0.5,
+                                            backgroundColor: "background.paper",
                                           }}
                                         >
-                                          {servingSizes.map((serving) => (
-                                            <MenuItem key={serving.name} value={serving.name} sx={{ fontSize: '0.75rem' }}>
-                                              {serving.name}
-                                            </MenuItem>
-                                          ))}
-                                        </Select>
-                                      ) : (
-                                        <Typography variant="caption" color="text.secondary">
-                                          {servingSizes[0]?.name || '100g'}
-                                        </Typography>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Stack
-                                        direction="row"
-                                        spacing={0.5}
-                                        alignItems="center"
-                                        justifyContent="center"
-                                        sx={{
-                                          border: "1px solid",
-                                          borderColor: "divider",
-                                          borderRadius: 999,
-                                          px: 0.5,
-                                          backgroundColor: "background.paper",
-                                        }}
-                                      >
-                                    <IconButton
-                                      size="small"
-                                      color="inherit"
-                                      onClick={() =>
-                                        updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
-                                      }
-                                      disabled={disabledRow}
-                                    >
-                                      <Minus size={18} />
-                                    </IconButton>
-                                    <InputBase
-                                      value={displayQuantity}
-                                      type="number"
-                                      onChange={(e) =>
-                                        updateIngredientAmount(
-                                          meal,
-                                          ingredient.id,
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      inputProps={{
-                                        min: 0,
-                                        step: unitLabel === "g" ? 1 : 0.1,
-                                        style: { textAlign: "center" },
-                                      }}
-                                      disabled={disabledRow}
-                                      sx={{
-                                        width: 60,
-                                        px: 0.5,
-                                        py: 0.25,
-                                        borderRadius: 999,
-                                        bgcolor: "transparent",
-                                      }}
-                                    />
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      sx={{ minWidth: 24 }}
-                                    >
-                                      {unitLabel}
-                                    </Typography>
-                                    <IconButton
-                                      size="small"
-                                      color="inherit"
-                                      onClick={() =>
-                                        updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
-                                      }
-                                      disabled={disabledRow}
+                                          <IconButton
+                                            size="small"
+                                            color="inherit"
+                                            onClick={() =>
+                                              updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
+                                            }
+                                            disabled={disabledRow}
+                                            sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                            aria-label={`Decrease ${ingredient.name}`}
+                                          >
+                                            <RemoveIcon sx={{ fontSize: 18 }} />
+                                          </IconButton>
+                                          <InputBase
+                                            value={displayQuantity}
+                                            type="number"
+                                            onChange={(e) =>
+                                              updateIngredientAmount(
+                                                meal,
+                                                ingredient.id,
+                                                parseFloat(e.target.value) || 0
+                                              )
+                                            }
+                                            inputProps={{
+                                              min: 0,
+                                              step: unitLabel === "g" ? 1 : 0.1,
+                                              style: { textAlign: "center" },
+                                            }}
+                                            disabled={disabledRow}
+                                            sx={{
+                                              width: 60,
+                                              px: 0.5,
+                                              py: 0.25,
+                                              borderRadius: 999,
+                                              bgcolor: "transparent",
+                                            }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{ minWidth: 24 }}
+                                          >
+                                            {unitLabel}
+                                          </Typography>
+                                          <IconButton
+                                            size="small"
+                                            color="inherit"
+                                            onClick={() =>
+                                              updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
+                                            }
+                                            disabled={disabledRow}
+                                            sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                            aria-label={`Increase ${ingredient.name}`}
+                                          >
+                                            <AddIcon sx={{ fontSize: 18 }} />
+                                          </IconButton>
+                                        </Stack>
+                                      </TableCell>
+                                      <TableCell align="center">{totalGrams}g</TableCell>
+                                      <TableCell align="center">{roundVal(nutrition.calories)}</TableCell>
+                                      <TableCell align="center">{roundVal(nutrition.protein)}</TableCell>
+                                      <TableCell align="center">{roundVal(nutrition.carbs)}</TableCell>
+                                      <TableCell align="center">{roundVal(nutrition.fat)}</TableCell>
+                                      <TableCell align="center">
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={() => removeIngredient(meal, ingredient.id)}
+                                          disabled={disabledRow}
+                                          sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                          aria-label={`Remove ${ingredient.name}`}
                                         >
-                                          <Plus size={18} />
+                                          <CloseIcon sx={{ fontSize: 16 }} />
                                         </IconButton>
-                                      </Stack>
-                                    </TableCell>
-                                    <TableCell align="center">{totalGrams}g</TableCell>
-                                    <TableCell align="center">{roundVal(nutrition.calories)}</TableCell>
-                                    <TableCell align="center">{roundVal(nutrition.protein)}</TableCell>
-                                    <TableCell align="center">{roundVal(nutrition.carbs)}</TableCell>
-                                    <TableCell align="center">{roundVal(nutrition.fat)}</TableCell>
-                                    <TableCell align="center">
-                                      <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={() => removeIngredient(meal, ingredient.id)}
-                                        disabled={disabledRow}
-                                      >
-                                        <X size={16} />
-                                      </IconButton>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                              <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
-                                <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
-                                <TableCell align="center">—</TableCell>
-                                <TableCell align="center">—</TableCell>
-                                <TableCell align="center">
-                                  {currentMealTotals.calories}
-                                </TableCell>
-                                <TableCell align="center">
-                                  {currentMealTotals.protein}
-                                </TableCell>
-                                <TableCell align="center">
-                                  {currentMealTotals.carbs}
-                                </TableCell>
-                                <TableCell align="center">
-                                  {currentMealTotals.fat}
-                                </TableCell>
-                                <TableCell align="center">-</TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                                <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
+                                  <TableCell></TableCell>
+                                  <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
+                                  <TableCell align="center">?</TableCell>
+                                  <TableCell align="center">?</TableCell>
+                                  <TableCell align="center">?</TableCell>
+                                  <TableCell align="center">
+                                    {currentMealTotals.calories}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    {currentMealTotals.protein}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    {currentMealTotals.carbs}
+                                  </TableCell>
+                                  <TableCell align="center">
+                                    {currentMealTotals.fat}
+                                  </TableCell>
+                                  <TableCell align="center">-</TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </Box>
                         ) : (
                           <Stack spacing={1}>
                             {list.map((ingredient) => {
@@ -2046,24 +2193,28 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
                               return (
                                 <Paper key={ingredient.id} variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
-                                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                                    <Box>
-                                      <Typography fontWeight={700} textTransform="capitalize">
-                                        {ingredient.name}
-                                      </Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {roundVal(nutrition.calories)} kcal · {roundVal(nutrition.protein)}g P · {roundVal(nutrition.carbs)}g C · {roundVal(nutrition.fat)}g F
-                                      </Typography>
+                                  <Box>
+                                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                        <Box>
+                                          <Typography fontWeight={700} textTransform="capitalize">
+                                            {ingredient.name}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            {roundVal(nutrition.calories)} kcal ? {roundVal(nutrition.protein)}g P ? {roundVal(nutrition.carbs)}g C ? {roundVal(nutrition.fat)}g F
+                                          </Typography>
+                                        </Box>
+                                        <IconButton
+                                          size="small"
+                                          color="error"
+                                          onClick={() => removeIngredient(meal, ingredient.id)}
+                                          disabled={disabledRow}
+                                          sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                          aria-label={`Remove ${ingredient.name}`}
+                                        >
+                                          <CloseIcon sx={{ fontSize: 16 }} />
+                                        </IconButton>
+                                      </Stack>
                                     </Box>
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => removeIngredient(meal, ingredient.id)}
-                                      disabled={disabledRow}
-                                    >
-                                      <X size={16} />
-                                    </IconButton>
-                                  </Stack>
 
                                   {/* Serving size selector for mobile */}
                                   {mobileServingSizes.length > 1 && (
@@ -2108,8 +2259,10 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                         updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
                                       }
                                       disabled={disabledRow}
+                                      sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                      aria-label={`Decrease ${ingredient.name}`}
                                     >
-                                      <Minus size={16} />
+                                      <RemoveIcon sx={{ fontSize: 16 }} />
                                     </IconButton>
                                     <InputBase
                                       value={displayQuantity}
@@ -2149,8 +2302,10 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                                         updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
                                       }
                                       disabled={disabledRow}
+                                      sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                      aria-label={`Increase ${ingredient.name}`}
                                     >
-                                      <Plus size={16} />
+                                      <AddIcon sx={{ fontSize: 16 }} />
                                     </IconButton>
                                   </Stack>
                                 </Paper>
@@ -2216,7 +2371,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
 
                 <Stack spacing={1.5}>
                   {Object.entries(categorizedShoppingList).map(([category, ingredients]) => {
-                    const colors = getCategoryColors(category);
+                    const colors = getCategoryColors(category, theme.palette.mode === 'dark');
                     return (
                     <Paper key={category} variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
                       <Box
@@ -2249,16 +2404,42 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                           const unit = ingredient.unit || "g";
                           const quantityPerDay = ingredient.quantity || 1;
                           const isGrams = unit === "g";
+                          const isChecked = checkedShoppingItems[ingredient.id] || false;
 
                           return (
                             <Paper
                               key={ingredient.id}
                               variant="outlined"
-                              sx={{ p: 1.25, borderRadius: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                              sx={{ 
+                                p: 1.25, 
+                                borderRadius: 2, 
+                                display: "flex", 
+                                justifyContent: "space-between", 
+                                alignItems: "center",
+                                opacity: isChecked ? 0.6 : 1,
+                                transition: 'opacity 0.2s',
+                              }}
                             >
-                              <Typography fontWeight={600} textTransform="capitalize">
-                                {ingredient.name}
-                              </Typography>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
+                                <Checkbox
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    setCheckedShoppingItems(prev => ({
+                                      ...prev,
+                                      [ingredient.id]: e.target.checked
+                                    }));
+                                  }}
+                                  size="small"
+                                  sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                />
+                                <Typography 
+                                  fontWeight={600} 
+                                  textTransform="capitalize"
+                                  sx={{ textDecoration: isChecked ? 'line-through' : 'none' }}
+                                >
+                                  {ingredient.name}
+                                </Typography>
+                              </Stack>
                               <Box textAlign="right">
                                 {isGrams ? (
                                   <>
@@ -2314,33 +2495,46 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
             }}
           >
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-              <Typography variant="subtitle1" fontWeight={800} mb={1}>
+              <Typography variant="subtitle1" fontWeight={800} mb={2}>
                 Plan summary
               </Typography>
-              <Stack spacing={1}>
-                {[
-                  { label: "Calories", value: `${dailyTotals.calories} / ${calorieTarget}`, delta: dailyTotals.calories - calorieTarget, unit: "kcal" },
-                  { label: "Protein", value: `${dailyTotals.protein} / ${targetMacros.protein}`, delta: dailyTotals.protein - targetMacros.protein, unit: "g" },
-                  { label: "Carbs", value: `${dailyTotals.carbs} / ${targetMacros.carbs}`, delta: dailyTotals.carbs - targetMacros.carbs, unit: "g" },
-                  { label: "Fat", value: `${dailyTotals.fat} / ${targetMacros.fat}`, delta: dailyTotals.fat - targetMacros.fat, unit: "g" },
-                ].map((row) => {
-                  const over = row.delta > 0;
-                  const within = Math.abs(row.delta) <= (row.unit === "kcal" ? 50 : 5);
-                  const color = within ? "success.main" : over ? "error.main" : "warning.main";
-                  return (
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" key={row.label}>
-                      <Typography variant="body2" color="text.secondary">
-                        {row.label}
-                      </Typography>
-                      <Box textAlign="right">
-                        <Typography fontWeight={700}>{row.value}</Typography>
-                        <Typography variant="caption" color={color}>
-                          {roundVal(row.delta) >= 0 ? "+" : ""}{roundVal(row.delta)} {row.unit}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  );
-                })}
+              <Stack spacing={2}>
+                <MacroProgressBar
+                  label="Calories"
+                  actual={dailyTotals.calories}
+                  target={calorieTarget}
+                  unit="kcal"
+                  showPercentage={true}
+                  showDelta={true}
+                  size="small"
+                />
+                <MacroProgressBar
+                  label="Protein"
+                  actual={dailyTotals.protein}
+                  target={targetMacros.protein}
+                  unit="g"
+                  showPercentage={true}
+                  showDelta={true}
+                  size="small"
+                />
+                <MacroProgressBar
+                  label="Carbs"
+                  actual={dailyTotals.carbs}
+                  target={targetMacros.carbs}
+                  unit="g"
+                  showPercentage={true}
+                  showDelta={true}
+                  size="small"
+                />
+                <MacroProgressBar
+                  label="Fat"
+                  actual={dailyTotals.fat}
+                  target={targetMacros.fat}
+                  unit="g"
+                  showPercentage={true}
+                  showDelta={true}
+                  size="small"
+                />
               </Stack>
             </Paper>
 
@@ -2414,6 +2608,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       <Snackbar
         open={showTargetsPrompt && pendingTargets !== null}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        sx={{ mb: { xs: 7, sm: 2 } }}
       >
         <Alert
           severity="info"
@@ -2425,6 +2620,7 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
                 color="inherit"
                 size="small"
                 onClick={dismissPendingTargets}
+                sx={{ minHeight: { xs: 36, sm: 'auto' } }}
               >
                 Dismiss
               </Button>
@@ -2440,7 +2636,14 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
             </Stack>
           }
         >
-          New targets from Calculator: {pendingTargets?.calorieTarget} kcal ({pendingTargets?.targetPercentages?.protein}P / {pendingTargets?.targetPercentages?.carbs}C / {pendingTargets?.targetPercentages?.fat}F)
+          <Stack spacing={0.5}>
+            <Typography variant="body2" fontWeight={600}>
+              Apply calculated targets to your meal plan?
+            </Typography>
+            <Typography variant="caption">
+              {pendingTargets?.calorieTarget} kcal • {pendingTargets?.targetPercentages?.protein}% Protein • {pendingTargets?.targetPercentages?.carbs}% Carbs • {pendingTargets?.targetPercentages?.fat}% Fat
+            </Typography>
+          </Stack>
         </Alert>
       </Snackbar>
 
@@ -2472,6 +2675,6 @@ const MealPrepCalculator = ({ allIngredients, isActive = true, userPreferences =
       />
     </Box>
   );
-};
+}));
 
 export default MealPrepCalculator;

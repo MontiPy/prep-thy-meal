@@ -1,11 +1,22 @@
-import { createWorker } from 'tesseract.js';
-
 /**
  * OCR Service for extracting text from nutrition label images
  * Uses Tesseract.js for offline, privacy-first text recognition
+ *
+ * NOTE: Tesseract.js is dynamically imported to reduce initial bundle size
  */
 
 let worker = null;
+let tesseractModule = null;
+
+/**
+ * Dynamically import Tesseract.js (lazy load on first use)
+ */
+async function loadTesseract() {
+  if (tesseractModule) return tesseractModule;
+
+  tesseractModule = await import('tesseract.js');
+  return tesseractModule;
+}
 
 /**
  * Initialize Tesseract worker (lazy initialization)
@@ -13,13 +24,10 @@ let worker = null;
 async function initializeWorker() {
   if (worker) return worker;
 
-  worker = await createWorker('eng', 1, {
-    logger: (m) => {
-      if (m.status === 'recognizing text') {
-        console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-      }
-    }
-  });
+  // Dynamic import of Tesseract
+  const { createWorker } = await loadTesseract();
+
+  worker = await createWorker('eng', 1);
 
   return worker;
 }

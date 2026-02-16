@@ -14,17 +14,18 @@ const ThemeToggle = () => {
         size="medium"
         aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         sx={(theme) => ({
-          border: `1px solid ${theme.palette.divider}`,
-          backgroundColor: isDark ? 'grey.900' : 'grey.100',
-          color: isDark ? 'warning.light' : 'text.primary',
-          boxShadow: theme.shadows[1],
-          transition: theme.transitions.create(['transform', 'box-shadow'], {
-            duration: theme.transitions.duration.shorter,
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider}`,
+          backgroundColor: isDark ? 'rgba(255,176,32,0.08)' : 'rgba(0,0,0,0.04)',
+          color: isDark ? '#ffb020' : theme.palette.text.primary,
+          transition: theme.transitions.create(['transform', 'box-shadow', 'color'], {
+            duration: 250,
           }),
           '&:hover': {
             transform: 'translateY(-1px)',
-            boxShadow: theme.shadows[4],
-            backgroundColor: isDark ? 'grey.800' : 'grey.200',
+            backgroundColor: isDark ? 'rgba(255,176,32,0.15)' : 'rgba(0,0,0,0.08)',
+            boxShadow: isDark
+              ? '0 0 16px rgba(255,176,32,0.3)'
+              : theme.shadows[4],
           },
         })}
       >

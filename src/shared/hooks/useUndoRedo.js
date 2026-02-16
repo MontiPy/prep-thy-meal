@@ -1,5 +1,5 @@
 // src/shared/hooks/useUndoRedo.js
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 /**
  * Custom hook for undo/redo functionality
@@ -15,13 +15,21 @@ export const useUndoRedo = (initialState, maxHistory = 20) => {
   const [past, setPast] = useState([]);
   const [future, setFuture] = useState([]);
 
+  // Use ref to track current state (fixes stale closure issue)
+  const stateRef = useRef(state);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   const setState = useCallback((newState) => {
-    // If it's a function, call it with current state
-    const resolvedState = typeof newState === 'function' ? newState(state) : newState;
+    // If it's a function, call it with current state from ref
+    const resolvedState = typeof newState === 'function' ? newState(stateRef.current) : newState;
 
     // Add current state to past history
     setPast((prev) => {
-      const newPast = [...prev, state];
+      const newPast = [...prev, stateRef.current];
       // Limit history size
       if (newPast.length > maxHistory) {
         return newPast.slice(-maxHistory);
@@ -34,29 +42,35 @@ export const useUndoRedo = (initialState, maxHistory = 20) => {
 
     // Set new state
     setStateInternal(resolvedState);
-  }, [state, maxHistory]);
+  }, [maxHistory]); // No dependency on state - callback is now stable
 
   const undo = useCallback(() => {
-    if (past.length === 0) return;
+    setPast((prevPast) => {
+      if (prevPast.length === 0) return prevPast;
 
-    const previous = past[past.length - 1];
-    const newPast = past.slice(0, -1);
+      const previous = prevPast[prevPast.length - 1];
+      const newPast = prevPast.slice(0, -1);
 
-    setPast(newPast);
-    setFuture((prev) => [state, ...prev]);
-    setStateInternal(previous);
-  }, [past, state]);
+      setFuture((prev) => [stateRef.current, ...prev]);
+      setStateInternal(previous);
+
+      return newPast;
+    });
+  }, []); // Stable - no dependencies
 
   const redo = useCallback(() => {
-    if (future.length === 0) return;
+    setFuture((prevFuture) => {
+      if (prevFuture.length === 0) return prevFuture;
 
-    const next = future[0];
-    const newFuture = future.slice(1);
+      const next = prevFuture[0];
+      const newFuture = prevFuture.slice(1);
 
-    setPast((prev) => [...prev, state]);
-    setFuture(newFuture);
-    setStateInternal(next);
-  }, [future, state]);
+      setPast((prev) => [...prev, stateRef.current]);
+      setStateInternal(next);
+
+      return newFuture;
+    });
+  }, []); // Stable - no dependencies
 
   const clearHistory = useCallback(() => {
     setPast([]);

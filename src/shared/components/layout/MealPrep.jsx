@@ -1,5 +1,5 @@
 // src/shared/components/layout/MealPrep.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef, Profiler, Suspense, lazy } from "react";
 import toast from "react-hot-toast";
 import { loadUserPreferences } from "../../../shared/services/userPreferences";
 import AccountCircleIcon from "@mui/icons-material/AccountCircleRounded";
@@ -15,6 +15,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Container,
   Paper,
   Stack,
@@ -26,11 +27,14 @@ import {
   useScrollTrigger,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+// Eager load: Default tab (critical for first paint)
 import MealPrepCalculator from "../../../features/meal-planner/MealPrepCalculator";
-import MealPrepInstructions from "../../../features/instructions/MealPrepInstructions";
-import IngredientManager from "../../../features/ingredients/IngredientManager";
-import CalorieCalculator from "../../../features/calorie-calculator/CalorieCalculator";
-import AccountPage from "../../../features/account/AccountPage";
+// Lazy load: Non-default tabs (loaded on demand)
+const CalorieCalculator = lazy(() => import("../../../features/calorie-calculator/CalorieCalculator"));
+const MealPrepInstructions = lazy(() => import("../../../features/instructions/MealPrepInstructions"));
+const IngredientManager = lazy(() => import("../../../features/ingredients/IngredientManager"));
+const AccountPage = lazy(() => import("../../../features/account/AccountPage"));
+// Non-tab components (always loaded)
 import Login from "../../../features/auth/Login";
 import ErrorBoundary from "../ui/ErrorBoundary";
 import { getAllBaseIngredients } from "../../../features/ingredients/nutritionHelpers";
@@ -40,7 +44,7 @@ import ThemeToggle from "./ThemeToggle";
 
 const TABS = {
   CALCULATOR: "calculator",
-  CALORIE_CALC: "calorie-calc", 
+  CALORIE_CALC: "calorie-calc",
   INSTRUCTIONS: "instructions",
   INGREDIENTS: "ingredients",
   ACCOUNT: "account",
@@ -55,8 +59,30 @@ const TAB_CONFIG = [
 ];
 
 const MealPrep = () => {
-  const { user, isGuest, logout } = useUser();
-  const [activeTab, setActiveTab] = useState(TABS.CALCULATOR);
+  const { user, logout } = useUser();
+  // Initialize tab from URL query param (deep linking support)
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === 'undefined') return TABS.CALCULATOR;
+
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+
+    // Map tab param to TABS constant
+    const tabMap = {
+      'planner': TABS.CALCULATOR,
+      'calories': TABS.CALORIE_CALC,
+      'guide': TABS.INSTRUCTIONS,
+      'ingredients': TABS.INGREDIENTS,
+      'account': TABS.ACCOUNT
+    };
+
+    return tabMap[tabParam] || TABS.CALCULATOR;
+  });
+  // Track which tabs have been mounted (for state preservation)
+  const [mountedTabs, setMountedTabs] = useState(new Set([TABS.CALCULATOR]));
+  const [perfSamples, setPerfSamples] = useState([]);
+  const perfStartRef = useRef(null);
+  const perfFromRef = useRef(null);
   const [allIngredients, setAllIngredients] = useState(getAllBaseIngredients());
   const [lastSync, setLastSync] = useState(null);
   const [isOffline, setIsOffline] = useState(
@@ -64,9 +90,45 @@ const MealPrep = () => {
   );
   const [userPreferences, setUserPreferences] = useState({ showRecentIngredients: true });
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const plannerRef = useRef(null);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const isNarrowMobile = useMediaQuery('(max-width:375px)');
   const trigger = useScrollTrigger({ threshold: 8 });
+
+  const perfEnabled = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("perf")) return true;
+    try {
+      return window.localStorage?.getItem("ptm_perf") === "1";
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handleProfilerRender = useCallback(
+    (id, phase, actualDuration, baseDuration) => {
+      if (!perfEnabled || typeof console === "undefined") return;
+      const actual = actualDuration.toFixed(1);
+      const base = baseDuration.toFixed(1);
+      if (import.meta.env.DEV) console.info(`[perf] ${id} ${phase} actual:${actual}ms base:${base}ms`);
+    },
+    [perfEnabled]
+  );
+
+  const withProfiler = useCallback(
+    (id, node) => {
+      if (!perfEnabled) return node;
+      return (
+        <Profiler id={id} onRender={handleProfilerRender}>
+          {node}
+        </Profiler>
+      );
+    },
+    [perfEnabled, handleProfilerRender]
+  );
+  const isDark = theme.palette.mode === "dark";
 
   const handleIngredientChange = (list) => {
     setAllIngredients(list);
@@ -81,21 +143,53 @@ const MealPrep = () => {
     }
   }, [logout]);
 
-  // Refresh ingredients when switching tabs to pick up any changes
-  useEffect(() => {
-    if (activeTab === TABS.CALCULATOR || activeTab === TABS.INGREDIENTS) {
-      setAllIngredients(getAllBaseIngredients());
-    }
-  }, [activeTab]);
+  const handleTabChange = useCallback(
+    (_, value) => {
+      if (value === activeTab) return;
+      if (perfEnabled && typeof performance !== "undefined") {
+        perfStartRef.current = performance.now();
+        perfFromRef.current = activeTab;
+        try {
+          performance.mark(`tab:${activeTab}->${value}:start`);
+        } catch {
+          // Ignore unsupported environments.
+        }
+      }
+      setActiveTab(value);
+      // Mark tab as mounted for state preservation
+      setMountedTabs((prev) => new Set(prev).add(value));
+
+      // Update URL with tab param for deep linking
+      if (typeof window !== 'undefined') {
+        const tabParamMap = {
+          [TABS.CALCULATOR]: 'planner',
+          [TABS.CALORIE_CALC]: 'calories',
+          [TABS.INSTRUCTIONS]: 'guide',
+          [TABS.INGREDIENTS]: 'ingredients',
+          [TABS.ACCOUNT]: 'account'
+        };
+
+        const tabParam = tabParamMap[value];
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tabParam);
+        window.history.pushState({}, '', url);
+      }
+      if (value === TABS.CALCULATOR) {
+        plannerRef.current?.onTabActive?.();
+      }
+    },
+    [activeTab, perfEnabled]
+  );
+
+  // Ingredients are refreshed via sync and IngredientManager updates.
 
   useEffect(() => {
     if (user) {
-      // Sync ingredients and preferences
       Promise.all([
         syncFromRemote(user.uid),
         loadUserPreferences(user.uid)
       ])
-        .then(([_, prefs]) => {
+        .then(([, prefs]) => {
           setAllIngredients(getAllBaseIngredients());
           setUserPreferences(prefs);
           setLastSync(new Date());
@@ -111,6 +205,36 @@ const MealPrep = () => {
       setLastSync(new Date());
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!perfEnabled || perfStartRef.current == null || typeof performance === "undefined") return;
+    const start = perfStartRef.current;
+    const from = perfFromRef.current || "unknown";
+    const to = activeTab;
+    perfStartRef.current = null;
+
+    const finalize = () => {
+      const end = performance.now();
+      const duration = Math.round(end - start);
+      setPerfSamples((prev) => [
+        { from, to, duration, ts: new Date().toLocaleTimeString() },
+        ...prev,
+      ].slice(0, 5));
+      try {
+        performance.mark(`tab:${from}->${to}:end`);
+        performance.measure(`tab:${from}->${to}`, `tab:${from}->${to}:start`, `tab:${from}->${to}:end`);
+      } catch {
+        // Ignore unsupported environments.
+      }
+      if (import.meta.env.DEV) console.info(`[perf] tab ${from} -> ${to}: ${duration}ms`);
+    };
+
+    if (typeof window !== "undefined" && window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(finalize));
+    } else {
+      setTimeout(finalize, 0);
+    }
+  }, [activeTab, perfEnabled]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -130,13 +254,13 @@ const MealPrep = () => {
         pb: isDesktop ? 4 : 10,
         background: isDesktop
           ? `radial-gradient(circle at 20% 20%, ${
-              theme.palette.mode === "dark"
-                ? "rgba(148, 163, 184, 0.12)"
-                : "rgba(148, 163, 184, 0.2)"
+              isDark
+                ? "rgba(255,45,120,0.06)"
+                : "rgba(214,36,94,0.04)"
             }, transparent 40%), radial-gradient(circle at 80% 0%, ${
-              theme.palette.mode === "dark"
-                ? "rgba(59, 130, 246, 0.12)"
-                : "rgba(59, 130, 246, 0.18)"
+              isDark
+                ? "rgba(0,229,255,0.06)"
+                : "rgba(0,184,212,0.04)"
             }, transparent 35%), ${theme.palette.background.default}`
           : theme.palette.background.default,
         transition: theme.transitions.create("background-color"),
@@ -152,64 +276,75 @@ const MealPrep = () => {
           minHeight: 72,
           display: "flex",
           justifyContent: "center",
-          backdropFilter: "blur(12px)",
-          backgroundColor:
-            theme.palette.mode === "dark"
-              ? "rgba(15,23,42,0.92)"
-              : "rgba(255,255,255,0.96)",
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          transition: theme.transitions.create(["box-shadow"], {
-            duration: theme.transitions.duration.shorter,
-          }),
         }}
       >
         <Toolbar disableGutters sx={{ gap: { xs: 1, md: 2 }, alignItems: "center" }}>
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 200 }}>
+            {/* PTM Logo with neon glow */}
             <Box
               sx={{
                 width: 44,
                 height: 44,
                 borderRadius: 2,
-                background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                background: isDark
+                  ? "linear-gradient(135deg, #ff2d78 0%, #a855f7 100%)"
+                  : "linear-gradient(135deg, #d6245e 0%, #8b3fd4 100%)",
                 color: "#fff",
                 display: "grid",
                 placeItems: "center",
+                fontFamily: '"Orbitron", sans-serif',
                 fontWeight: 700,
-                letterSpacing: 0.5,
-                boxShadow: "0 12px 30px rgba(99, 102, 241, 0.45)",
+                fontSize: "0.75rem",
+                letterSpacing: 1,
+                boxShadow: isDark
+                  ? "0 0 20px rgba(255,45,120,0.4), 0 0 60px rgba(255,45,120,0.15)"
+                  : "0 4px 16px rgba(214,36,94,0.3)",
+                animation: isDark ? "neonPulse 3s ease-in-out infinite" : "none",
               }}
             >
               PTM
             </Box>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>
-                Prep Thy Meal
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="caption" color="text.secondary">
-                  {user?.displayName?.split(" ")[0] || "Welcome"}
+            {!isNarrowMobile && (
+              <Box>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  Prep Thy Meal
                 </Typography>
-                <Chip
-                  label="beta"
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                  sx={{ height: 22, fontWeight: 700 }}
-                />
-              </Stack>
-            </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="caption" color="text.secondary">
+                    {user?.displayName?.split(" ")[0] || "Welcome"}
+                  </Typography>
+                  <Chip
+                    label="beta"
+                    size="small"
+                    sx={{
+                      height: 22,
+                      fontWeight: 700,
+                      fontSize: "0.65rem",
+                      borderColor: isDark ? "rgba(255,45,120,0.4)" : "primary.main",
+                      color: "primary.main",
+                      border: "1px solid",
+                    }}
+                  />
+                </Stack>
+              </Box>
+            )}
           </Stack>
 
           {isDesktop && (
             <Tabs
               value={activeTab}
-              onChange={(_, value) => setActiveTab(value)}
+              onChange={handleTabChange}
               textColor="primary"
               indicatorColor="primary"
               sx={{
                 ml: 2,
                 minHeight: 52,
-                "& .MuiTab-root": { minHeight: 52 },
+                "& .MuiTab-root": {
+                  minHeight: 52,
+                  fontFamily: '"Urbanist", sans-serif',
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                },
               }}
             >
               {TAB_CONFIG.map(({ key, label, icon }) => (
@@ -237,33 +372,43 @@ const MealPrep = () => {
           )}
 
           <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: "auto" }}>
-            <Stack
-              direction="row"
-              spacing={0.75}
-              alignItems="center"
-              sx={{
-                px: 1.25,
-                py: 0.5,
-                borderRadius: 9999,
-                border: "1px solid",
-                borderColor: isOffline ? "warning.main" : "success.main",
-                backgroundColor: isOffline ? "warning.light" : "success.light",
-                color: isOffline ? "warning.dark" : "success.dark",
-              }}
-            >
-              <Box
-                component="span"
+            {/* Status indicator with neon pulse - hide on narrow mobile */}
+            {!isNarrowMobile && (
+              <Stack
+                direction="row"
+                spacing={0.75}
+                alignItems="center"
                 sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  bgcolor: isOffline ? "warning.main" : "success.main",
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 9999,
+                  border: "1px solid",
+                  borderColor: isOffline
+                    ? isDark ? "rgba(255,176,32,0.4)" : "warning.main"
+                    : isDark ? "rgba(57,255,127,0.4)" : "success.main",
+                  backgroundColor: isOffline
+                    ? isDark ? "rgba(255,176,32,0.08)" : "warning.light"
+                    : isDark ? "rgba(57,255,127,0.08)" : "success.light",
+                  color: isOffline
+                    ? isDark ? "#ffb020" : "warning.dark"
+                    : isDark ? "#39ff7f" : "success.dark",
                 }}
-              />
-              <Typography variant="caption" fontWeight={700}>
-                {isOffline ? "Offline" : "Online"}
-              </Typography>
-            </Stack>
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: isOffline ? "warning.main" : "success.main",
+                    animation: !isOffline ? "statusPulse 2s ease-in-out infinite" : "none",
+                  }}
+                />
+                <Typography variant="caption" fontWeight={700}>
+                  {isOffline ? "Offline" : "Online"}
+                </Typography>
+              </Stack>
+            )}
             {lastSync && isDesktop && (
               <Typography variant="caption" color="text.secondary">
                 Synced {lastSync.toLocaleTimeString()}
@@ -276,7 +421,14 @@ const MealPrep = () => {
                   <Avatar
                     src={user?.photoURL || ""}
                     alt={user?.displayName || "Profile"}
-                    sx={{ width: 38, height: 38, bgcolor: "primary.main", fontWeight: 700 }}
+                    sx={{
+                      width: 38,
+                      height: 38,
+                      bgcolor: "primary.main",
+                      fontWeight: 700,
+                      border: isDark ? "2px solid rgba(255,45,120,0.4)" : "2px solid",
+                      borderColor: isDark ? undefined : "primary.light",
+                    }}
                   >
                     {(user?.displayName || "User").charAt(0).toUpperCase()}
                   </Avatar>
@@ -295,9 +447,11 @@ const MealPrep = () => {
                   <Chip
                     label="Guest Mode"
                     size="small"
-                    color="default"
                     variant="outlined"
-                    sx={{ fontWeight: 600 }}
+                    sx={{
+                      fontWeight: 600,
+                      borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                    }}
                   />
                   <Button
                     onClick={() => setShowLoginModal(true)}
@@ -323,13 +477,24 @@ const MealPrep = () => {
             left: 0,
             right: 0,
             zIndex: (t) => t.zIndex.appBar,
-            backdropFilter: "blur(10px)",
+            borderTop: isDark
+              ? "1px solid rgba(255,255,255,0.04)"
+              : "1px solid rgba(0,0,0,0.06)",
+            "&::before": isDark ? {
+              content: '""',
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "1px",
+              background: "linear-gradient(90deg, transparent, rgba(255,45,120,0.3), rgba(0,229,255,0.3), transparent)",
+            } : {},
           }}
         >
           <BottomNavigation
             showLabels
             value={activeTab}
-            onChange={(_, value) => setActiveTab(value)}
+            onChange={handleTabChange}
             component="nav"
             aria-label="Main navigation"
           >
@@ -347,71 +512,157 @@ const MealPrep = () => {
       )}
 
       <Container
-        maxWidth="xl"
+        maxWidth={false}
         component="main"
         sx={{
           pt: 3,
+          px: { xs: 1.5, sm: 2.5, md: 4 },
           pb: isDesktop ? 0 : 10,
         }}
       >
-        {/* Keep MealPrepCalculator mounted to preserve state */}
+        {/* Planner Tab - Always mounted (eager loaded) */}
         <Box
           role="tabpanel"
           id="tabpanel-calculator"
           aria-labelledby="tab-calculator"
           hidden={activeTab !== TABS.CALCULATOR}
+          className={`tab-panel ${activeTab === TABS.CALCULATOR ? "tab-panel-active" : ""}`}
           sx={{ display: activeTab === TABS.CALCULATOR ? "block" : "none" }}
         >
           <ErrorBoundary message="An error occurred in the Meal Planner. Try switching tabs or refreshing.">
-            <MealPrepCalculator
-              allIngredients={allIngredients}
-              isActive={activeTab === TABS.CALCULATOR}
-              userPreferences={userPreferences}
-            />
+            {withProfiler(
+              "PlannerTab",
+              <MealPrepCalculator
+                ref={plannerRef}
+                allIngredients={allIngredients}
+                userPreferences={userPreferences}
+              />
+            )}
           </ErrorBoundary>
         </Box>
 
-        {/* Other tabs can mount/unmount as they don't have complex state */}
-        {activeTab === TABS.CALORIE_CALC && (
-          <Box role="tabpanel" id="tabpanel-calorie-calc" aria-labelledby="tab-calorie-calc">
+        {/* Calorie Calculator Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.CALORIE_CALC) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-calorie-calc"
+            aria-labelledby="tab-calorie-calc"
+            hidden={activeTab !== TABS.CALORIE_CALC}
+            className={`tab-panel ${activeTab === TABS.CALORIE_CALC ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.CALORIE_CALC ? "block" : "none" }}
+          >
             <ErrorBoundary message="An error occurred in the Calorie Calculator. Try switching tabs or refreshing.">
-              <CalorieCalculator />
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("CaloriesTab", <CalorieCalculator />)}
+              </Suspense>
             </ErrorBoundary>
           </Box>
         )}
-        {activeTab === TABS.INSTRUCTIONS && (
-          <Box role="tabpanel" id="tabpanel-instructions" aria-labelledby="tab-instructions">
+
+        {/* Instructions Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.INSTRUCTIONS) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-instructions"
+            aria-labelledby="tab-instructions"
+            hidden={activeTab !== TABS.INSTRUCTIONS}
+            className={`tab-panel ${activeTab === TABS.INSTRUCTIONS ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.INSTRUCTIONS ? "block" : "none" }}
+          >
             <ErrorBoundary message="An error occurred loading the instructions. Try switching tabs or refreshing.">
-              <MealPrepInstructions />
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("GuideTab", <MealPrepInstructions />)}
+              </Suspense>
             </ErrorBoundary>
           </Box>
         )}
-        {activeTab === TABS.INGREDIENTS && (
-          <Box role="tabpanel" id="tabpanel-ingredients" aria-labelledby="tab-ingredients">
+
+        {/* Ingredients Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.INGREDIENTS) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-ingredients"
+            aria-labelledby="tab-ingredients"
+            hidden={activeTab !== TABS.INGREDIENTS}
+            className={`tab-panel ${activeTab === TABS.INGREDIENTS ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.INGREDIENTS ? "block" : "none" }}
+          >
             <ErrorBoundary message="An error occurred in the Ingredient Manager. Try switching tabs or refreshing.">
-              <IngredientManager onChange={handleIngredientChange} />
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("IngredientsTab", <IngredientManager onChange={handleIngredientChange} />)}
+              </Suspense>
             </ErrorBoundary>
           </Box>
         )}
-        {activeTab === TABS.ACCOUNT && (
-          <Box role="tabpanel" id="tabpanel-account" aria-labelledby="tab-account">
+
+        {/* Account Tab - Lazy loaded */}
+        {mountedTabs.has(TABS.ACCOUNT) && (
+          <Box
+            role="tabpanel"
+            id="tabpanel-account"
+            aria-labelledby="tab-account"
+            hidden={activeTab !== TABS.ACCOUNT}
+            className={`tab-panel ${activeTab === TABS.ACCOUNT ? "tab-panel-active" : ""}`}
+            sx={{ display: activeTab === TABS.ACCOUNT ? "block" : "none" }}
+          >
             <ErrorBoundary message="An error occurred in the Account page. Try switching tabs or refreshing.">
-              <AccountPage />
+              <Suspense fallback={<Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}><CircularProgress /></Box>}>
+                {withProfiler("AccountTab", <AccountPage />)}
+              </Suspense>
             </ErrorBoundary>
           </Box>
         )}
       </Container>
 
-      {/* Login Modal for Guest Users */}
       <Login
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onSuccess={(user) => {
           setShowLoginModal(false);
-          // Sync will happen automatically via useEffect on user change
           toast.success(`Welcome, ${user.displayName}!`);
         }}
       />
+
+      {perfEnabled && (
+        <Paper
+          elevation={10}
+          sx={{
+            position: "fixed",
+            bottom: 16,
+            right: 16,
+            p: 1.5,
+            borderRadius: 2,
+            bgcolor: "rgba(10,10,18,0.88)",
+            color: "#e2e8f0",
+            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(12px)",
+            fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: 12,
+            zIndex: (t) => t.zIndex.tooltip + 1,
+            minWidth: 220,
+          }}
+        >
+          <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "#94a3b8" }}>
+            Tab Switch Latency
+          </Typography>
+          <Stack spacing={0.5}>
+            {perfSamples.length === 0 ? (
+              <Typography variant="caption">Switch tabs to record timings.</Typography>
+            ) : (
+              perfSamples.map((sample, idx) => (
+                <Box key={`${sample.ts}-${idx}`} sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="caption" sx={{ color: "#cbd5f5" }}>
+                    {sample.from} → {sample.to}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#38bdf8" }}>
+                    {sample.duration}ms
+                  </Typography>
+                </Box>
+              ))
+            )}
+          </Stack>
+        </Paper>
+      )}
     </Box>
   );
 };

@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
@@ -23,7 +26,9 @@
       "Bash(if [ -d \"C:\\Users\\Michael\\OneDrive\\Documents\\FITNESS\\prep-thy-meal\\src\\shared\\components\\onboarding\" ])",
       "Bash(then ls \"C:\\Users\\Michael\\OneDrive\\Documents\\FITNESS\\prep-thy-meal\\src\\shared\\components\\onboarding\")",
       "Bash(else echo \"onboarding directory not found\")",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -27,6 +27,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import AddIcon from "@mui/icons-material/AddRounded";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadIcon from "@mui/icons-material/DownloadRounded";
@@ -51,6 +52,8 @@ import { searchOpenFoodFacts, getProductByBarcode } from '../../shared/services/
 import ServingSizePreviewModal from './ServingSizePreviewModal';
 import { SearchResultSkeleton } from "../../shared/components/ui/SkeletonLoader";
 import EmptyState from "../../shared/components/ui/EmptyState";
+import NeonPlate from "../../shared/components/ui/illustrations/NeonPlate";
+import NeonCart from "../../shared/components/ui/illustrations/NeonCart";
 import HighlightedText from "../../shared/components/ui/HighlightedText";
 import { parseNutritionText } from "../../shared/utils/smartParser";
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
@@ -88,6 +91,31 @@ const IngredientManager = ({ onChange }) => {
   const { user } = useUser();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+  const tone = useMemo(() => {
+    const softAlpha = theme.palette.mode === "dark" ? 0.2 : 0.12;
+    return {
+      surface: theme.palette.background.paper,
+      surfaceMuted: theme.palette.background.default,
+      border: theme.palette.divider,
+      text: theme.palette.text.primary,
+      textMuted: theme.palette.text.secondary,
+      hover: theme.palette.action.hover,
+      successBg: alpha(theme.palette.success.main, softAlpha),
+      successBorder: alpha(theme.palette.success.main, 0.35),
+      successText: theme.palette.success.dark,
+      warningBg: alpha(theme.palette.warning.main, softAlpha),
+      warningBorder: alpha(theme.palette.warning.main, 0.35),
+      warningText: theme.palette.warning.dark,
+      infoBg: alpha(theme.palette.info.main, softAlpha),
+      infoBorder: alpha(theme.palette.info.main, 0.35),
+      infoText: theme.palette.info.dark,
+      primaryBg: alpha(theme.palette.primary.main, softAlpha),
+      primaryBorder: alpha(theme.palette.primary.main, 0.35),
+      errorBg: alpha(theme.palette.error.main, softAlpha),
+      errorBorder: alpha(theme.palette.error.main, 0.35),
+      errorText: theme.palette.error.dark,
+    };
+  }, [theme]);
 
   // State
   const [ingredients, setIngredients] = useState(getAllBaseIngredients());
@@ -97,6 +125,7 @@ const IngredientManager = ({ onChange }) => {
   const [ingredientToDelete, setIngredientToDelete] = useState(null);
   const jsonImportRef = useRef(null);
   const lastEditingIdRef = useRef(null); // Track last editingId to prevent duplicate syncs
+  const highlightTimeoutRef = useRef(null);
 
   // Search/filter state
   const [query, setQuery] = useState("");
@@ -120,6 +149,13 @@ const IngredientManager = ({ onChange }) => {
   const [ocrProgress, setOcrProgress] = useState({ stage: '', progress: 0 });
   const [highlightedFields, setHighlightedFields] = useState([]);
   const [fieldConfidence, setFieldConfidence] = useState({});
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, []);
 
   // Sync form when editingId changes (only on initial edit, not on every ingredient refresh)
   useEffect(() => {
@@ -165,7 +201,6 @@ const IngredientManager = ({ onChange }) => {
       fat: itemToEdit.fat || 0,
       notes: itemToEdit.notes || "",
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId, ingredients]); // Re-run when editingId changes, but ref prevents duplicate syncs
 
   // Filtered and sorted ingredients
@@ -379,9 +414,9 @@ const IngredientManager = ({ onChange }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]); // Only run when user changes, not when refresh changes
 
-  // Make cleanup function available globally for emergency use
+  // Make cleanup function available globally for emergency use (dev mode only)
   useEffect(() => {
-    if (user) {
+    if (import.meta.env.DEV && user) {
       window.cleanupDuplicates = async () => {
         try {
           await cleanupDuplicateIngredients(user.uid);
@@ -410,8 +445,10 @@ const IngredientManager = ({ onChange }) => {
       };
     }
     return () => {
-      delete window.cleanupDuplicates;
-      delete window.debugIngredients;
+      if (import.meta.env.DEV) {
+        delete window.cleanupDuplicates;
+        delete window.debugIngredients;
+      }
     };
   }, [user, refresh]);
 
@@ -665,7 +702,8 @@ const IngredientManager = ({ onChange }) => {
       setHighlightedFields(fieldsToHighlight);
 
       // Clear highlights after 3 seconds
-      setTimeout(() => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(() => {
         setHighlightedFields([]);
       }, 3000);
 
@@ -757,8 +795,8 @@ const IngredientManager = ({ onChange }) => {
         fontSize: "0.75rem",
         borderRadius: "9999px",
         ...(active
-          ? { bgcolor: "#1e293b", color: "#fff", "&:hover": { bgcolor: "#334155" } }
-          : { bgcolor: "#fff", color: "#475569", border: "1px solid #e2e8f0", "&:hover": { bgcolor: "#f8fafc" } }),
+          ? { bgcolor: "primary.main", color: "primary.contrastText", "&:hover": { bgcolor: "primary.dark" } }
+          : { bgcolor: "background.paper", color: "text.secondary", border: "1px solid", borderColor: "divider", "&:hover": { bgcolor: "action.hover" } }),
       }}
     />
   );
@@ -782,8 +820,8 @@ const IngredientManager = ({ onChange }) => {
               <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
                 <Box>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    <KitchenIcon sx={{ color: "#475569", fontSize: 20 }} />
-                    <Typography variant="h6" fontWeight={700} sx={{ color: "#0f172a" }}>
+                    <KitchenIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                    <Typography variant="h6" fontWeight={700} sx={{ color: "text.primary" }}>
                       Ingredients
                     </Typography>
                   </Stack>
@@ -795,7 +833,7 @@ const IngredientManager = ({ onChange }) => {
                   <Chip
                     label="Editing"
                     size="small"
-                    sx={{ bgcolor: "#f1f5f9", color: "#475569", fontWeight: 600, fontSize: "0.7rem" }}
+                    sx={{ bgcolor: "action.hover", color: "text.secondary", fontWeight: 600, fontSize: "0.7rem" }}
                   />
                 )}
               </Stack>
@@ -815,9 +853,9 @@ const IngredientManager = ({ onChange }) => {
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 2,
                       ...(highlightedFields.includes('name') && {
-                        borderColor: "#10b981",
+                        borderColor: "success.main",
                         borderWidth: 2,
-                        bgcolor: "#f0fdf4",
+                        bgcolor: tone.successBg,
                         transition: "all 0.3s ease"
                       })
                     }
@@ -848,11 +886,11 @@ const IngredientManager = ({ onChange }) => {
                 sx={{
                   p: 2,
                   borderRadius: 2,
-                  bgcolor: "#f0fdf4",
-                  borderColor: "#bbf7d0",
+                  bgcolor: tone.successBg,
+                  borderColor: tone.successBorder,
                 }}
               >
-                <Typography variant="body2" fontWeight={600} sx={{ color: "#166534", mb: 1.5 }}>
+                <Typography variant="body2" fontWeight={600} sx={{ color: tone.successText, mb: 1.5 }}>
                   Serving Size
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
@@ -871,7 +909,7 @@ const IngredientManager = ({ onChange }) => {
                       value={form.servingSize}
                       onChange={(e) => setForm((f) => ({ ...f, servingSize: e.target.value }))}
                       placeholder="100"
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper" } }}
                     />
                   </Grid>
                   <Grid size={4}>
@@ -882,7 +920,7 @@ const IngredientManager = ({ onChange }) => {
                       <Select
                         value={form.servingUnit}
                         onChange={(e) => setForm((f) => ({ ...f, servingUnit: e.target.value }))}
-                        sx={{ borderRadius: 2, bgcolor: "#fff" }}
+                        sx={{ borderRadius: 2, bgcolor: "background.paper" }}
                       >
                         <MenuItem value="g">grams (g)</MenuItem>
                         <MenuItem value="ml">milliliters (ml)</MenuItem>
@@ -900,16 +938,16 @@ const IngredientManager = ({ onChange }) => {
                       value={form.servingLabel}
                       onChange={(e) => setForm((f) => ({ ...f, servingLabel: e.target.value }))}
                       placeholder="e.g., 1 egg"
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }}
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper" } }}
                     />
                   </Grid>
                 </Grid>
 
                 {/* Optional weight per serving for unit-based items */}
                 {form.servingUnit === "unit" && (
-                  <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "#fef3c7", borderRadius: 1.5 }}>
+                  <Box sx={{ mt: 1.5, p: 1.5, bgcolor: tone.warningBg, borderRadius: 1.5 }}>
                     <Stack direction="row" alignItems="center" spacing={1.5}>
-                      <Typography variant="caption" color="#92400e" fontWeight={500}>
+                      <Typography variant="caption" color={tone.warningText} fontWeight={500}>
                         Weight per unit (optional):
                       </Typography>
                       <TextField
@@ -923,11 +961,11 @@ const IngredientManager = ({ onChange }) => {
                         }}
                         sx={{
                           width: 120,
-                          "& .MuiOutlinedInput-root": { borderRadius: 1.5, bgcolor: "#fff" },
+                          "& .MuiOutlinedInput-root": { borderRadius: 1.5, bgcolor: "background.paper" },
                         }}
                       />
                     </Stack>
-                    <Typography variant="caption" color="#92400e" sx={{ display: "block", mt: 0.5 }}>
+                    <Typography variant="caption" color={tone.warningText} sx={{ display: "block", mt: 0.5 }}>
                       Used for display only. Nutrition scales by unit quantity.
                     </Typography>
                   </Box>
@@ -940,11 +978,11 @@ const IngredientManager = ({ onChange }) => {
                 sx={{
                   p: 2,
                   borderRadius: 2,
-                  bgcolor: "#f8fafc",
-                  borderColor: "#e2e8f0",
+                  bgcolor: tone.surfaceMuted,
+                  borderColor: "divider",
                 }}
               >
-                <Typography variant="body2" fontWeight={600} sx={{ color: "#0f172a", mb: 1.5 }}>
+                <Typography variant="body2" fontWeight={600} sx={{ color: "text.primary", mb: 1.5 }}>
                   Nutrition per {form.servingUnit === "unit" ? (form.servingLabel || "1 unit") : `${form.servingSize}${form.servingUnit}`}
                 </Typography>
                 <Grid container spacing={1.5}>
@@ -961,11 +999,11 @@ const IngredientManager = ({ onChange }) => {
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 2,
-                          bgcolor: "#fff",
+                          bgcolor: "background.paper",
                           ...(highlightedFields.includes('calories') && {
-                            borderColor: "#10b981",
+                            borderColor: "success.main",
                             borderWidth: 2,
-                            bgcolor: "#f0fdf4",
+                            bgcolor: tone.successBg,
                             transition: "all 0.3s ease"
                           })
                         }
@@ -976,6 +1014,7 @@ const IngredientManager = ({ onChange }) => {
                             <Tooltip title="Calculate from macros (4-4-9 rule)">
                               <IconButton
                                 size="small"
+                                aria-label="Calculate calories from macros"
                                 onClick={() => {
                                   const p = Number(form.protein) || 0;
                                   const c = Number(form.carbs) || 0;
@@ -1006,11 +1045,11 @@ const IngredientManager = ({ onChange }) => {
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 2,
-                          bgcolor: "#fff",
+                          bgcolor: "background.paper",
                           ...(highlightedFields.includes('protein') && {
-                            borderColor: "#10b981",
+                            borderColor: "success.main",
                             borderWidth: 2,
-                            bgcolor: "#f0fdf4",
+                            bgcolor: tone.successBg,
                             transition: "all 0.3s ease"
                           })
                         }
@@ -1036,11 +1075,11 @@ const IngredientManager = ({ onChange }) => {
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 2,
-                          bgcolor: "#fff",
+                          bgcolor: "background.paper",
                           ...(highlightedFields.includes('carbs') && {
-                            borderColor: "#10b981",
+                            borderColor: "success.main",
                             borderWidth: 2,
-                            bgcolor: "#f0fdf4",
+                            bgcolor: tone.successBg,
                             transition: "all 0.3s ease"
                           })
                         }
@@ -1066,11 +1105,11 @@ const IngredientManager = ({ onChange }) => {
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 2,
-                          bgcolor: "#fff",
+                          bgcolor: "background.paper",
                           ...(highlightedFields.includes('fat') && {
-                            borderColor: "#10b981",
+                            borderColor: "success.main",
                             borderWidth: 2,
-                            bgcolor: "#f0fdf4",
+                            bgcolor: tone.successBg,
                             transition: "all 0.3s ease"
                           })
                         }
@@ -1110,12 +1149,12 @@ const IngredientManager = ({ onChange }) => {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={saveIngredient}
-                  sx={{
-                    bgcolor: "#1e293b",
-                    "&:hover": { bgcolor: "#334155" },
-                    textTransform: "none",
-                    fontWeight: 600,
-                    borderRadius: 2,
+                sx={{
+                  bgcolor: "primary.main",
+                  "&:hover": { bgcolor: "primary.dark" },
+                  textTransform: "none",
+                  fontWeight: 600,
+                  borderRadius: 2,
                     py: 1.25,
                   }}
                 >
@@ -1127,11 +1166,11 @@ const IngredientManager = ({ onChange }) => {
                   sx={{
                     textTransform: "none",
                     fontWeight: 600,
-                    color: "#475569",
-                    borderColor: "#e2e8f0",
+                    color: "text.secondary",
+                    borderColor: "divider",
                     borderRadius: 2,
                     px: 3,
-                    "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                    "&:hover": { borderColor: "divider", bgcolor: "action.hover" },
                   }}
                 >
                   Clear
@@ -1139,7 +1178,7 @@ const IngredientManager = ({ onChange }) => {
               </Stack>
 
               {/* Image Upload for OCR */}
-              <Box sx={{ mt: 2, mb: 2, pt: 2, borderTop: "1px solid", borderColor: "#f1f5f9" }}>
+              <Box sx={{ mt: 2, mb: 2, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
                 <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ display: "block", mb: 2 }}>
                   Quick import
                 </Typography>
@@ -1161,12 +1200,12 @@ const IngredientManager = ({ onChange }) => {
                   sx={{
                     textTransform: "none",
                     fontWeight: 600,
-                    color: "#10b981",
-                    borderColor: "#d1fae5",
+                    color: "success.main",
+                    borderColor: "success.main",
                     borderRadius: 2,
                     mt: 2,
-                    bgcolor: "#f0fdf4",
-                    "&:hover": { borderColor: "#6ee7b7", bgcolor: "#d1fae5" },
+                    bgcolor: tone.successBg,
+                    "&:hover": { borderColor: "success.dark", bgcolor: tone.successBg },
                   }}
                 >
                   Paste Image from Clipboard
@@ -1222,19 +1261,19 @@ const IngredientManager = ({ onChange }) => {
                 sx={{
                   textTransform: "none",
                   fontWeight: 600,
-                  color: "#4f46e5",
-                  borderColor: "#c7d2fe",
+                  color: "info.main",
+                  borderColor: "info.main",
                   borderRadius: 2,
                   mt: 1,
-                  bgcolor: "#eef2ff",
-                  "&:hover": { borderColor: "#818cf8", bgcolor: "#e0e7ff" },
+                  bgcolor: tone.infoBg,
+                  "&:hover": { borderColor: "info.dark", bgcolor: tone.infoBg },
                 }}
               >
                 Smart Paste from Clipboard
               </Button>
 
               {/* Library Actions */}
-              <Box sx={{ pt: 1, borderTop: "1px solid", borderColor: "#f1f5f9" }}>
+              <Box sx={{ pt: 1, borderTop: "1px solid", borderColor: "divider" }}>
                 <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ display: "block", mb: 1 }}>
                   Library actions
                 </Typography>
@@ -1247,10 +1286,10 @@ const IngredientManager = ({ onChange }) => {
                     sx={{
                       textTransform: "none",
                       fontWeight: 600,
-                      color: "#475569",
-                      borderColor: "#e2e8f0",
+                      color: "text.secondary",
+                      borderColor: "divider",
                       borderRadius: 2,
-                      "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                      "&:hover": { borderColor: "divider", bgcolor: "action.hover" },
                     }}
                   >
                     Import JSON
@@ -1263,10 +1302,10 @@ const IngredientManager = ({ onChange }) => {
                     sx={{
                       textTransform: "none",
                       fontWeight: 600,
-                      color: "#475569",
-                      borderColor: "#e2e8f0",
+                      color: "text.secondary",
+                      borderColor: "divider",
                       borderRadius: 2,
-                      "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+                      "&:hover": { borderColor: "divider", bgcolor: "action.hover" },
                     }}
                   >
                     Export JSON
@@ -1309,7 +1348,7 @@ const IngredientManager = ({ onChange }) => {
                 spacing={2}
               >
                 <Box sx={{ minWidth: 180 }}>
-                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#0f172a" }}>
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: "text.primary" }}>
                     Browse ingredients
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -1335,30 +1374,32 @@ const IngredientManager = ({ onChange }) => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <SearchIcon fontSize="small" sx={{ color: "#94a3b8" }} />
+                          <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
                         </InputAdornment>
                       ),
                     }}
                   />
                   <Tooltip title="Search USDA food database">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={apiLoading ? <CircularProgress size={16} /> : <CloudSearchIcon />}
-                      onClick={() => searchUSDAAPI(query)}
-                      disabled={query.length < 2 || apiLoading}
-                      sx={{
-                        textTransform: "none",
-                        fontWeight: 600,
-                        color: "#475569",
-                        borderColor: "#e2e8f0",
-                        borderRadius: 2,
-                        height: 40,
-                        "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
-                      }}
-                    >
-                      {apiLoading ? "Searching..." : "Lookup"}
-                    </Button>
+                    <span>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={apiLoading ? <CircularProgress size={16} /> : <CloudSearchIcon />}
+                        onClick={() => searchUSDAAPI(query)}
+                        disabled={query.length < 2 || apiLoading}
+                        sx={{
+                          textTransform: "none",
+                          fontWeight: 600,
+                          color: "text.secondary",
+                          borderColor: "divider",
+                          borderRadius: 2,
+                          height: 40,
+                          "&:hover": { borderColor: "divider", bgcolor: "action.hover" },
+                        }}
+                      >
+                        {apiLoading ? "Searching..." : "Lookup"}
+                      </Button>
+                    </span>
                   </Tooltip>
                   <Box>
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
@@ -1419,14 +1460,14 @@ const IngredientManager = ({ onChange }) => {
                 sx={{
                   p: 2.5,
                   border: "1px solid",
-                  borderColor: "#a5b4fc",
+                  borderColor: "info.main",
                   borderRadius: 3,
-                  bgcolor: "#eef2ff",
+                  bgcolor: tone.infoBg,
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                  <CloudSearchIcon sx={{ color: "#4f46e5", fontSize: 20 }} />
-                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#1e1b4b" }}>
+                  <CloudSearchIcon sx={{ color: "info.main", fontSize: 20 }} />
+                  <Typography variant="subtitle1" fontWeight={700} sx={{ color: "text.primary" }}>
                     Database Results
                   </Typography>
                   {apiLoading && <CircularProgress size={18} sx={{ ml: 1 }} />}
@@ -1434,7 +1475,7 @@ const IngredientManager = ({ onChange }) => {
                     <Chip
                       label={`${apiResults.length} found`}
                       size="small"
-                      sx={{ bgcolor: "#c7d2fe", color: "#3730a3", fontWeight: 600, fontSize: "0.7rem" }}
+                      sx={{ bgcolor: tone.infoBg, color: tone.infoText, fontWeight: 600, fontSize: "0.7rem" }}
                     />
                   )}
                 </Stack>
@@ -1460,8 +1501,8 @@ const IngredientManager = ({ onChange }) => {
                         sx={{
                           p: 1.5,
                           borderRadius: 2,
-                          bgcolor: "#fff",
-                          borderColor: item.source === 'OpenFoodFacts' ? '#fed7aa' : '#c7d2fe',
+                          bgcolor: "background.paper",
+                          borderColor: item.source === 'OpenFoodFacts' ? tone.warningBorder : tone.infoBorder,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
@@ -1484,7 +1525,7 @@ const IngredientManager = ({ onChange }) => {
                                 text={item.name} 
                                 highlight={query}
                                 variant="body2"
-                                sx={{ fontWeight: 600, color: "#0f172a", textTransform: "capitalize" }} 
+                                sx={{ fontWeight: 600, color: "text.primary", textTransform: "capitalize" }} 
                               />
                               <Chip 
                                 label={item.source === 'OpenFoodFacts' ? 'OFF' : 'USDA'} 
@@ -1492,10 +1533,10 @@ const IngredientManager = ({ onChange }) => {
                                 sx={{ 
                                   height: 16, 
                                   fontSize: '0.6rem', 
-                                  bgcolor: item.source === 'OpenFoodFacts' ? '#fff7ed' : '#eff6ff',
-                                  color: item.source === 'OpenFoodFacts' ? '#c2410c' : '#1e40af',
+                                  bgcolor: item.source === 'OpenFoodFacts' ? tone.warningBg : tone.infoBg,
+                                  color: item.source === 'OpenFoodFacts' ? tone.warningText : tone.infoText,
                                   border: '1px solid',
-                                  borderColor: item.source === 'OpenFoodFacts' ? '#fdba74' : '#bfdbfe'
+                                  borderColor: item.source === 'OpenFoodFacts' ? theme.palette.warning.main : theme.palette.info.main
                                 }} 
                               />
                             </Stack>
@@ -1508,22 +1549,22 @@ const IngredientManager = ({ onChange }) => {
                           <Chip
                             label={`${item.calories} kcal`}
                             size="small"
-                            sx={{ bgcolor: "#fef3c7", color: "#92400e", fontWeight: 600, fontSize: "0.7rem" }}
+                            sx={{ bgcolor: tone.warningBg, color: tone.warningText, fontWeight: 600, fontSize: "0.7rem" }}
                           />
                           <Chip
                             label={`${item.protein}g P`}
                             size="small"
-                            sx={{ bgcolor: "#dbeafe", color: "#1e40af", fontWeight: 600, fontSize: "0.7rem" }}
+                            sx={{ bgcolor: tone.infoBg, color: tone.infoText, fontWeight: 600, fontSize: "0.7rem" }}
                           />
                           <Chip
                             label={`${item.carbs}g C`}
                             size="small"
-                            sx={{ bgcolor: "#dcfce7", color: "#166534", fontWeight: 600, fontSize: "0.7rem" }}
+                            sx={{ bgcolor: tone.successBg, color: tone.successText, fontWeight: 600, fontSize: "0.7rem" }}
                           />
                           <Chip
                             label={`${item.fat}g F`}
                             size="small"
-                            sx={{ bgcolor: "#ffe4e6", color: "#9f1239", fontWeight: 600, fontSize: "0.7rem" }}
+                            sx={{ bgcolor: tone.errorBg, color: tone.errorText, fontWeight: 600, fontSize: "0.7rem" }}
                           />
                         </Stack>
                         <Button
@@ -1532,8 +1573,8 @@ const IngredientManager = ({ onChange }) => {
                           startIcon={<AddIcon />}
                           onClick={() => openServingPreview(item)}
                           sx={{
-                            bgcolor: "#4f46e5",
-                            "&:hover": { bgcolor: "#4338ca" },
+                            bgcolor: "primary.main",
+                            "&:hover": { bgcolor: "primary.dark" },
                             textTransform: "none",
                             fontWeight: 600,
                             borderRadius: 2,
@@ -1567,14 +1608,14 @@ const IngredientManager = ({ onChange }) => {
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
-                      <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                        <TableCell sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>Ingredient</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>Category</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>Source</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>kcal</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>P</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>C</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600, color: "#475569", py: 1.5 }}>F</TableCell>
+                      <TableRow sx={{ bgcolor: "action.hover" }}>
+                        <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Ingredient</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Source</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>kcal</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>P</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>C</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>F</TableCell>
                         <TableCell sx={{ width: 80 }} />
                       </TableRow>
                     </TableHead>
@@ -1585,18 +1626,19 @@ const IngredientManager = ({ onChange }) => {
                             <EmptyState
                               title="No ingredients found"
                               description={`No ingredients match "${query}". Try adjusting your search or filters, or look up a new food.`}
+                              illustration={query ? <NeonCart size={96} /> : <NeonPlate size={96} />}
                             />
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filtered.map((it) => (
-                          <TableRow key={it.id} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
-                            <TableCell sx={{ py: 1.5 }}>
+                        filtered.map((it, idx) => (
+                            <TableRow key={`${it.id ?? "ingredient"}-${it.name ?? "item"}-${idx}`} hover sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                              <TableCell sx={{ py: 1.5 }}>
                                                           <HighlightedText 
                                                             text={it.name} 
                                                             highlight={query}
                                                             variant="body2" 
-                                                            sx={{ fontWeight: 600, color: "#0f172a", display: "block" }} 
+                                                            sx={{ fontWeight: 600, color: "text.primary", display: "block" }} 
                                                           />                              {it.notes && (
                                 <Typography variant="caption" color="text.secondary">
                                   {it.notes}
@@ -1618,8 +1660,8 @@ const IngredientManager = ({ onChange }) => {
                                   height: 24,
                                   borderRadius: 1,
                                   ...(it.id < 1000
-                                    ? { bgcolor: "#d1fae5", color: "#065f46", border: "1px solid #a7f3d0" }
-                                    : { bgcolor: "#dbeafe", color: "#1e40af", border: "1px solid #bfdbfe" }),
+                                    ? { bgcolor: tone.successBg, color: tone.successText, border: "1px solid", borderColor: theme.palette.success.main }
+                                    : { bgcolor: tone.infoBg, color: tone.infoText, border: "1px solid", borderColor: theme.palette.info.main }),
                                 }}
                               />
                             </TableCell>
@@ -1650,7 +1692,8 @@ const IngredientManager = ({ onChange }) => {
                                     <IconButton
                                       size="small"
                                       onClick={() => setEditingId(it.id)}
-                                      sx={{ color: "#94a3b8", "&:hover": { color: "#64748b" } }}
+                                      sx={{ color: "text.secondary", "&:hover": { color: "text.primary" } }}
+                                      aria-label={`Edit ${it.name}`}
                                     >
                                       <EditIcon sx={{ fontSize: 18 }} />
                                     </IconButton>
@@ -1659,7 +1702,8 @@ const IngredientManager = ({ onChange }) => {
                                     <IconButton
                                       size="small"
                                       onClick={() => handleRemove(it.id)}
-                                      sx={{ color: "#94a3b8", "&:hover": { color: "#64748b" } }}
+                                      sx={{ color: "text.secondary", "&:hover": { color: "text.primary" } }}
+                                      aria-label={`Delete ${it.name}`}
                                     >
                                       <DeleteIcon sx={{ fontSize: 18 }} />
                                     </IconButton>
@@ -1680,6 +1724,7 @@ const IngredientManager = ({ onChange }) => {
                     <EmptyState
                       title="No ingredients found"
                       description={`No ingredients match "${query}".`}
+                      illustration={query ? <NeonCart size={96} /> : <NeonPlate size={96} />}
                       sx={{ py: 6 }}
                     />
                   ) : (
@@ -1699,10 +1744,10 @@ const IngredientManager = ({ onChange }) => {
                           </Box>
                         </Stack>
                         <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
-                          <Chip label={`${it.calories} kcal`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
-                          <Chip label={`${it.protein}g P`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
-                          <Chip label={`${it.carbs}g C`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
-                          <Chip label={`${it.fat}g F`} size="small" sx={{ bgcolor: "#f1f5f9", fontWeight: 600 }} />
+                          <Chip label={`${it.calories} kcal`} size="small" sx={{ bgcolor: "action.hover", fontWeight: 600 }} />
+                          <Chip label={`${it.protein}g P`} size="small" sx={{ bgcolor: "action.hover", fontWeight: 600 }} />
+                          <Chip label={`${it.carbs}g C`} size="small" sx={{ bgcolor: "action.hover", fontWeight: 600 }} />
+                          <Chip label={`${it.fat}g F`} size="small" sx={{ bgcolor: "action.hover", fontWeight: 600 }} />
                         </Stack>
                         {it.id >= 1000 && (
                           <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
@@ -1711,7 +1756,7 @@ const IngredientManager = ({ onChange }) => {
                               variant="outlined"
                               startIcon={<EditIcon />}
                               onClick={() => setEditingId(it.id)}
-                              sx={{ textTransform: "none", fontWeight: 600, color: "#475569", borderColor: "#e2e8f0" }}
+                              sx={{ textTransform: "none", fontWeight: 600, color: "text.secondary", borderColor: "divider" }}
                             >
                               Edit
                             </Button>

@@ -129,7 +129,7 @@ const AccountPage = () => {
                   <CardHeader title={<Typography variant="h6" fontWeight={800}>Your Guest Data</Typography>} />
                   <CardContent>
                     <Grid container spacing={2}>
-                      <Grid item xs={6} md={3}>
+                      <Grid size={{ xs: 6, md: 3 }}>
                         <Card variant="outlined" sx={{ borderRadius: 2, textAlign: 'center' }}>
                           <CardContent>
                             <Typography variant="h4" fontWeight={800} color="primary">
@@ -141,7 +141,7 @@ const AccountPage = () => {
                           </CardContent>
                         </Card>
                       </Grid>
-                      <Grid item xs={6} md={3}>
+                      <Grid size={{ xs: 6, md: 3 }}>
                         <Card variant="outlined" sx={{ borderRadius: 2, textAlign: 'center' }}>
                           <CardContent>
                             <Typography variant="h4" fontWeight={800} color="primary">
@@ -153,7 +153,7 @@ const AccountPage = () => {
                           </CardContent>
                         </Card>
                       </Grid>
-                      <Grid item xs={12} md={6}>
+                      <Grid size={{ xs: 12, md: 6 }}>
                         <Card variant="outlined" sx={{ borderRadius: 2 }}>
                           <CardContent>
                             <Typography fontWeight={700} gutterBottom>Storage Location</Typography>
@@ -174,8 +174,8 @@ const AccountPage = () => {
                     borderRadius: 3,
                     background: (theme) =>
                       theme.palette.mode === 'dark'
-                        ? 'linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(99,102,241,0.1) 100%)'
-                        : 'linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(99,102,241,0.05) 100%)',
+                        ? 'linear-gradient(135deg, rgba(255,45,120,0.06) 0%, rgba(168,85,247,0.06) 100%)'
+                        : 'linear-gradient(135deg, rgba(214,36,94,0.04) 0%, rgba(139,63,212,0.04) 100%)',
                     borderColor: 'primary.main',
                   }}
                 >
@@ -193,7 +193,7 @@ const AccountPage = () => {
                         { icon: '💾', title: 'Auto-Save', desc: 'Automatic cloud backup' },
                         { icon: '🎯', title: 'Keep Your Data', desc: 'All guest data migrates automatically!' },
                       ].map((feature) => (
-                        <Grid item xs={12} sm={6} md={4} key={feature.title}>
+                        <Grid key={feature.title} size={{ xs: 12, sm: 6, md: 4 }}>
                           <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                             <CardContent>
                               <Stack spacing={0.5}>
@@ -281,7 +281,7 @@ const AccountPage = () => {
           <CardContent>
             <Grid container spacing={2}>
               {/* Profile */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
                   <CardHeader
                     title={<Typography variant="h6" fontWeight={800}>Profile Information</Typography>}
@@ -332,7 +332,7 @@ const AccountPage = () => {
               </Grid>
 
               {/* Features */}
-              <Grid item xs={12} md={6}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <Card variant="outlined" sx={{ borderRadius: 3, height: '100%' }}>
                   <CardHeader title={<Typography variant="h6" fontWeight={800}>App Features</Typography>} />
                   <CardContent>
@@ -395,8 +395,9 @@ const AccountPage = () => {
                 borderRadius: 3,
                 mt: 2,
                 backgroundColor: (theme) =>
-                  theme.palette.mode === 'dark' ? 'rgba(248,113,113,0.08)' : 'rgba(254,226,226,0.7)',
-                borderColor: 'error.light',
+                  theme.palette.mode === 'dark' ? 'rgba(255,71,87,0.06)' : 'rgba(224,62,78,0.04)',
+                borderColor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,71,87,0.2)' : 'error.light',
               }}
             >
               <CardHeader title={<Typography variant="h6" fontWeight={800}>Account Actions</Typography>} />

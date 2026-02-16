@@ -22,17 +22,19 @@ const LoadingSpinner = ({ message = 'Loading...', size = 'medium' }) => {
         style={{
           width: spinnerSize,
           height: spinnerSize,
-          border: '3px solid #f3f3f3',
-          borderTop: '3px solid #3498db',
+          border: '3px solid rgba(255,255,255,0.06)',
+          borderTop: '3px solid #ff2d78',
           borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
+          animation: 'spin 1s linear infinite',
+          boxShadow: '0 0 16px rgba(255,45,120,0.3)',
         }}
       />
       {message && (
         <p style={{
           fontSize,
-          color: '#666',
-          margin: 0
+          color: '#7a78a0',
+          margin: 0,
+          fontFamily: '"Urbanist", sans-serif',
         }}>
           {message}
         </p>

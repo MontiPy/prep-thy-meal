@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert, AlertTitle, Button, Box, Collapse } from '@mui/material';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -22,59 +23,54 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      // Custom fallback UI
+      // MUI theme-aware fallback UI
       return (
-        <div className="error-boundary-fallback" style={{
-          padding: '2rem',
-          margin: '2rem auto',
-          maxWidth: '600px',
-          backgroundColor: '#fff3cd',
-          border: '1px solid #ffc107',
-          borderRadius: '8px',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#856404', marginBottom: '1rem' }}>
-            Something went wrong
-          </h2>
-          <p style={{ color: '#856404', marginBottom: '1.5rem' }}>
+        <Box
+          sx={{
+            p: 4,
+            m: '2rem auto',
+            maxWidth: 600,
+          }}
+        >
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <AlertTitle>Something went wrong</AlertTitle>
             {this.props.message || 'An unexpected error occurred. Please try refreshing the page.'}
-          </p>
-          {import.meta.env?.DEV &&
-            this.state.error && (
-            <details style={{ textAlign: 'left', marginTop: '1rem' }}>
-              <summary style={{ cursor: 'pointer', marginBottom: '0.5rem' }}>
-                Error Details (Development Only)
-              </summary>
-              <pre style={{
-                backgroundColor: '#f8f9fa',
-                padding: '1rem',
-                borderRadius: '4px',
-                overflow: 'auto',
-                fontSize: '0.875rem'
-              }}>
-                {this.state.error && this.state.error.toString()}
-                {'\n\n'}
-                {this.state.errorInfo && this.state.errorInfo.componentStack}
-              </pre>
-            </details>
+          </Alert>
+
+          {import.meta.env?.DEV && this.state.error && (
+            <Collapse in={Boolean(this.state.error)}>
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <AlertTitle>Error Details (Development Only)</AlertTitle>
+                <Box
+                  component="pre"
+                  sx={{
+                    mt: 1,
+                    p: 2,
+                    bgcolor: 'background.paper',
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    fontSize: '0.875rem',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {this.state.error && this.state.error.toString()}
+                  {'\n\n'}
+                  {this.state.errorInfo && this.state.errorInfo.componentStack}
+                </Box>
+              </Alert>
+            </Collapse>
           )}
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem 1.5rem',
-              backgroundColor: '#ffc107',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              fontWeight: 'bold',
-              color: '#000'
-            }}
-          >
-            Refresh Page
-          </button>
-        </div>
+
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => window.location.reload()}
+            >
+              Refresh Page
+            </Button>
+          </Box>
+        </Box>
       );
     }
 

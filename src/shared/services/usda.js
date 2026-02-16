@@ -69,13 +69,11 @@ export const searchFoods = async (query) => {
     }
 
     const data = await res.json();
-    console.log('[USDA] Search response:', data);
 
-    const foods = data?.foods;
-    if (!foods || foods.length === 0) {
-      console.log('[USDA] No results found');
+    if (!data?.foods?.length) {
       return [];
     }
+    const foods = data.foods;
 
     // Transform to our format
     const results = foods
@@ -102,7 +100,6 @@ export const searchFoods = async (query) => {
         };
       });
 
-    console.log('[USDA] Processed', results.length, 'results');
     return results;
   } catch (err) {
     console.error('[USDA] searchFoods error:', err);
@@ -187,7 +184,6 @@ export const getFoodDetails = async (fdcId) => {
     }
 
     const food = await res.json();
-    console.log('[USDA] Food details response:', food);
 
     if (!food || !food.fdcId) {
       return null;

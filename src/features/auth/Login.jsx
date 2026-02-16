@@ -10,19 +10,16 @@ import {
   Stack,
   Typography
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../../shared/services/firebase.js';
 import { migrateGuestData } from '../../shared/services/guestMigration.js';
 
-/**
- * Login component - Supports both modal and inline display
- * @param {boolean} isOpen - Whether modal is open (modal mode only)
- * @param {function} onClose - Callback to close modal (modal mode only)
- * @param {function} onSuccess - Callback after successful login
- */
 const Login = ({ isOpen = true, onClose, onSuccess }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   const handleGoogleLogin = async () => {
     setError('');
@@ -32,7 +29,6 @@ const Login = ({ isOpen = true, onClose, onSuccess }) => {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      // Migrate guest data if any exists
       try {
         const migrationResult = await migrateGuestData(user.uid);
 
@@ -50,10 +46,7 @@ const Login = ({ isOpen = true, onClose, onSuccess }) => {
         toast.error('Signed in successfully, but some data may not have migrated. Your local data is safe.');
       }
 
-      // Call success callback
       if (onSuccess) onSuccess(user);
-
-      // Close modal if in modal mode
       if (onClose) onClose();
     } catch (loginError) {
       console.error('Login failed:', loginError);
@@ -64,9 +57,17 @@ const Login = ({ isOpen = true, onClose, onSuccess }) => {
     }
   };
 
-  // Card content (used in both modal and inline modes)
   const content = (
-    <Card sx={{ maxWidth: 400, width: '100%', borderRadius: 3 }} variant="outlined">
+    <Card
+      sx={{
+        maxWidth: 400,
+        width: '100%',
+        borderRadius: 3,
+        border: isDark ? '1px solid rgba(255,45,120,0.15)' : '1px solid',
+        borderColor: isDark ? undefined : 'divider',
+      }}
+      variant="outlined"
+    >
       <CardContent>
         <Stack spacing={2.5} alignItems="center">
           <Typography variant="h5" fontWeight={800} textAlign="center">
@@ -93,7 +94,6 @@ const Login = ({ isOpen = true, onClose, onSuccess }) => {
             {isLoading ? 'Signing in...' : 'Sign in with Google'}
           </Button>
 
-          {/* Show "Continue as Guest" button when in modal mode */}
           {onClose && (
             <Button
               fullWidth
@@ -110,7 +110,6 @@ const Login = ({ isOpen = true, onClose, onSuccess }) => {
     </Card>
   );
 
-  // Modal mode: wrap content in Dialog
   if (onClose) {
     return (
       <Dialog
@@ -126,7 +125,6 @@ const Login = ({ isOpen = true, onClose, onSuccess }) => {
     );
   }
 
-  // Inline mode: center content on page
   return (
     <Box
       sx={{

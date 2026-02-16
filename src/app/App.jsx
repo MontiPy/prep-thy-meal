@@ -4,25 +4,25 @@ import { Box } from '@mui/material';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import MealPrep from '../shared/components/layout/MealPrep';
-import { UserProvider, useUser } from '../features/auth/UserContext';
+import { UserProvider } from '../features/auth/UserContext';
 import { ThemeProvider } from '../shared/context/ThemeContext';
+import { MacroTargetsProvider } from '../shared/context/MacroTargetsContext';
 import ErrorBoundary from '../shared/components/ui/ErrorBoundary';
 import OfflineBanner from '../shared/components/layout/OfflineBanner';
 import OnboardingModal from '../shared/components/onboarding/OnboardingModal';
 import { hasCompletedOnboarding, completeOnboarding } from '../shared/services/onboarding';
 
 const AppContent = () => {
-  const { user } = useUser();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Show onboarding for authenticated users who haven't completed it
+  // Show onboarding for all users (guest or authenticated) who haven't completed it
   useEffect(() => {
-    if (user && !hasCompletedOnboarding()) {
+    if (!hasCompletedOnboarding()) {
       // Small delay to let the UI load first
       const timer = setTimeout(() => setShowOnboarding(true), 500);
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, []); // No dependencies - run once on mount
 
   return (
     <Box
@@ -56,31 +56,32 @@ const App = () => (
   <ErrorBoundary message="A critical error occurred. Please refresh the page to continue.">
     <ThemeProvider>
       <UserProvider>
-        <AppContent />
-        <Toaster
+        <MacroTargetsProvider>
+          <AppContent />
+          <Toaster
           position="top-center"
           toastOptions={{
             duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
+            className: 'toast-neon',
             success: {
               duration: 3000,
+              className: 'toast-neon toast-neon-success',
               iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
+                primary: '#39ff7f',
+                secondary: '#12121e',
               },
             },
             error: {
               duration: 5000,
+              className: 'toast-neon toast-neon-error',
               iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+                primary: '#ff4757',
+                secondary: '#12121e',
               },
             },
           }}
         />
+        </MacroTargetsProvider>
       </UserProvider>
     </ThemeProvider>
   </ErrorBoundary>
