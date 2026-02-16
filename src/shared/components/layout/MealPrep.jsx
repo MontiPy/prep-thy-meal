@@ -93,7 +93,7 @@ const MealPrep = () => {
   const plannerRef = useRef(null);
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
-  const isNarrowMobile = useMediaQuery('(max-width:375px)');
+
   const trigger = useScrollTrigger({ threshold: 8 });
 
   const perfEnabled = useMemo(() => {
@@ -251,7 +251,7 @@ const MealPrep = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        pb: isDesktop ? 4 : 10,
+        pb: isDesktop ? 4 : 8,
         background: isDesktop
           ? `radial-gradient(circle at 20% 20%, ${
               isDark
@@ -271,20 +271,20 @@ const MealPrep = () => {
         color="transparent"
         elevation={trigger ? 4 : 0}
         sx={{
-          px: { xs: 1.5, md: 2 },
-          py: 1,
-          minHeight: 72,
+          px: { xs: 1, md: 2 },
+          py: { xs: 0.5, md: 1 },
+          minHeight: { xs: 56, md: 72 },
           display: "flex",
           justifyContent: "center",
         }}
       >
         <Toolbar disableGutters sx={{ gap: { xs: 1, md: 2 }, alignItems: "center" }}>
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 200 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
             {/* PTM Logo with neon glow */}
             <Box
               sx={{
-                width: 44,
-                height: 44,
+                width: { xs: 36, md: 44 },
+                height: { xs: 36, md: 44 },
                 borderRadius: 2,
                 background: isDark
                   ? "linear-gradient(135deg, #ff2d78 0%, #a855f7 100%)"
@@ -304,7 +304,7 @@ const MealPrep = () => {
             >
               PTM
             </Box>
-            {!isNarrowMobile && (
+            {isDesktop && (
               <Box>
                 <Typography variant="subtitle1" fontWeight={700}>
                   Prep Thy Meal
@@ -372,8 +372,8 @@ const MealPrep = () => {
           )}
 
           <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: "auto" }}>
-            {/* Status indicator with neon pulse - hide on narrow mobile */}
-            {!isNarrowMobile && (
+            {/* Status indicator with neon pulse - hide on mobile */}
+            {isDesktop && (
               <Stack
                 direction="row"
                 spacing={0.75}
@@ -444,22 +444,25 @@ const MealPrep = () => {
                 </>
               ) : (
                 <>
-                  <Chip
-                    label="Guest Mode"
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      fontWeight: 600,
-                      borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
-                    }}
-                  />
+                  {isDesktop && (
+                    <Chip
+                      label="Guest Mode"
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 600,
+                        borderColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
+                      }}
+                    />
+                  )}
                   <Button
                     onClick={() => setShowLoginModal(true)}
                     variant="contained"
                     color="primary"
                     size="small"
+                    sx={{ px: { xs: 1.5, md: 2 }, fontSize: { xs: '0.75rem', md: '0.8125rem' } }}
                   >
-                    Login / Sign Up
+                    {isDesktop ? "Login / Sign Up" : "Login"}
                   </Button>
                 </>
               )}
@@ -502,9 +505,10 @@ const MealPrep = () => {
               <BottomNavigationAction
                 key={key}
                 value={key}
-                label={label}
+                label={key === TABS.INGREDIENTS ? "Foods" : label}
                 icon={icon}
                 aria-controls={`tabpanel-${key}`}
+                sx={{ minWidth: 0, px: 0.5 }}
               />
             ))}
           </BottomNavigation>
@@ -515,9 +519,9 @@ const MealPrep = () => {
         maxWidth={false}
         component="main"
         sx={{
-          pt: 3,
-          px: { xs: 1.5, sm: 2.5, md: 4 },
-          pb: isDesktop ? 0 : 10,
+          pt: { xs: 2, md: 3 },
+          px: { xs: 1, sm: 2.5, md: 4 },
+          pb: isDesktop ? 0 : 8,
         }}
       >
         {/* Planner Tab - Always mounted (eager loaded) */}
