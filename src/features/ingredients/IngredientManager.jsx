@@ -1520,22 +1520,22 @@ const IngredientManager = ({ onChange }) => {
                           flexWrap: "wrap",
                         }}
                       >
-                        <Box sx={{ minWidth: 150, flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
                           {item.image ? (
-                            <Box 
-                              component="img" 
-                              src={item.image} 
+                            <Box
+                              component="img"
+                              src={item.image}
                               alt={item.name}
-                              sx={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 1 }}
+                              sx={{ width: 40, height: 40, flexShrink: 0, objectFit: 'contain', borderRadius: 1 }}
                             />
                           ) : null}
-                          <Box>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <HighlightedText 
-                                text={item.name} 
+                          <Box sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                              <HighlightedText
+                                text={item.name}
                                 highlight={query}
                                 variant="body2"
-                                sx={{ fontWeight: 600, color: "text.primary", textTransform: "capitalize" }} 
+                                sx={{ fontWeight: 600, color: "text.primary", textTransform: "capitalize", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                               />
                               <Chip 
                                 label={item.source === 'OpenFoodFacts' ? 'OFF' : 'USDA'} 

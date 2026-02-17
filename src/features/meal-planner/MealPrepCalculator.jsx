@@ -2421,7 +2421,7 @@ const MealPrepCalculator = memo(
                                 transition: 'opacity 0.2s',
                               }}
                             >
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
                                 <Checkbox
                                   checked={isChecked}
                                   onChange={(e) => {
@@ -2431,12 +2431,17 @@ const MealPrepCalculator = memo(
                                     }));
                                   }}
                                   size="small"
-                                  sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                  sx={{ flexShrink: 0, minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
                                 />
-                                <Typography 
-                                  fontWeight={600} 
+                                <Typography
+                                  fontWeight={600}
                                   textTransform="capitalize"
-                                  sx={{ textDecoration: isChecked ? 'line-through' : 'none' }}
+                                  sx={{
+                                    textDecoration: isChecked ? 'line-through' : 'none',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
                                 >
                                   {ingredient.name}
                                 </Typography>

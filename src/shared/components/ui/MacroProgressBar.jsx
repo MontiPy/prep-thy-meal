@@ -43,16 +43,16 @@ const MacroProgressBar = ({
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, flexWrap: 'wrap', gap: 0.5 }}>
         <Typography variant={size === 'small' ? 'caption' : 'body2'} color="text.secondary">
           {label}
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
           <Typography
             variant={size === 'small' ? 'caption' : 'body2'}
             fontWeight={700}
             color={color === 'success' ? 'success.main' : color === 'warning' ? 'warning.main' : 'error.main'}
-            sx={{ transition: 'color 0.3s ease' }}
+            sx={{ transition: 'color 0.3s ease', whiteSpace: 'nowrap' }}
           >
             {actual.toFixed(unit === 'kcal' ? 0 : 1)} / {target.toFixed(unit === 'kcal' ? 0 : 1)} {unit}
           </Typography>
@@ -61,20 +61,20 @@ const MacroProgressBar = ({
               variant="caption"
               color={color === 'success' ? 'success.main' : color === 'warning' ? 'warning.main' : 'error.main'}
               fontWeight={600}
-              sx={{ transition: 'color 0.3s ease' }}
+              sx={{ transition: 'color 0.3s ease', whiteSpace: 'nowrap' }}
             >
               {delta >= 0 ? '+' : ''}{delta.toFixed(unit === 'kcal' ? 0 : 1)}
             </Typography>
           )}
           {showPercentage && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
               ({percentage.toFixed(0)}%)
             </Typography>
           )}
         </Box>
       </Box>
       <Tooltip title={`${actual.toFixed(1)} ${unit} of ${target.toFixed(1)} ${unit} target`}>
-        <Box sx={{ position: 'relative' }}>
+        <Box sx={{ position: 'relative', overflow: 'hidden' }}>
           <LinearProgress
             variant="determinate"
             value={displayPercentage}
