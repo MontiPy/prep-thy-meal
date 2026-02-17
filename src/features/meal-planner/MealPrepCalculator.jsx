@@ -1829,8 +1829,8 @@ const MealPrepCalculator = memo(
                   <Accordion key={meal} defaultExpanded={idx === 1} disableGutters>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                       <Stack spacing={0.5} sx={{ width: "100%" }}>
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                          <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={0.5}>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={0.5}>
                             <Typography variant="subtitle1" fontWeight={800} textTransform="capitalize">
                               {meal}
                             </Typography>
@@ -2201,7 +2201,7 @@ const MealPrepCalculator = memo(
                                             {ingredient.name}
                                           </Typography>
                                           <Typography variant="caption" color="text.secondary">
-                                            {roundVal(nutrition.calories)} kcal ? {roundVal(nutrition.protein)}g P ? {roundVal(nutrition.carbs)}g C ? {roundVal(nutrition.fat)}g F
+                                            {roundVal(nutrition.calories)} kcal · {roundVal(nutrition.protein)}g P · {roundVal(nutrition.carbs)}g C · {roundVal(nutrition.fat)}g F
                                           </Typography>
                                         </Box>
                                         <IconButton
