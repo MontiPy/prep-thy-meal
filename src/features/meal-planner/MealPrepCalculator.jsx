@@ -1423,7 +1423,7 @@ const MealPrepCalculator = memo(
   if (isLoadingData) {
     return (
       <Box
-        sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}
+        sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1, md: 3 }, pb: { xs: 6, md: 4 } }}
       >
         <PageSkeleton />
       </Box>
@@ -1435,7 +1435,7 @@ const MealPrepCalculator = memo(
 
   return (
     <Box
-      sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1.5, md: 3 }, pb: { xs: 8, md: 4 } }}
+      sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1, md: 3 }, pb: { xs: 6, md: 4 } }}
     >
       {(showConfetti || goalConfetti) && (
         <div className="confetti" data-stagger-skip>
@@ -1461,7 +1461,7 @@ const MealPrepCalculator = memo(
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} flexWrap="wrap" useFlexGap>
             {/* Saved Plans Dropdown */}
-            <FormControl size="small" sx={{ minWidth: 180 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: 'unset' } }}>
               <InputLabel id="header-plan-select">Saved plans</InputLabel>
               <Select
                 labelId="header-plan-select"
@@ -1514,7 +1514,7 @@ const MealPrepCalculator = memo(
               value={planName}
               onChange={(e) => setPlanName(e.target.value)}
               placeholder="Enter plan name..."
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: 'unset' } }}
             />
             {hasUnsavedChanges && (
               <Chip size="small" color="warning" label="Unsaved" sx={{ fontWeight: 600 }} />
@@ -1561,9 +1561,9 @@ const MealPrepCalculator = memo(
               color="inherit"
               onClick={handleOpenActionsMenu}
               endIcon={<ExpandMoreIcon />}
-              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
+              sx={{ minHeight: { xs: 44, sm: 'auto' }, px: { xs: 1, sm: 2 } }}
             >
-              Plan actions
+              {isDesktop ? "Plan actions" : "Actions"}
             </Button>
             <Menu
               anchorEl={actionsAnchor}
@@ -1661,7 +1661,7 @@ const MealPrepCalculator = memo(
             <Paper
               variant="outlined"
               sx={{
-                p: 2,
+                p: { xs: 1.5, sm: 2 },
                 borderRadius: 2,
                 backgroundColor: (theme) =>
                   theme.palette.mode === "dark" ? "rgba(37,99,235,0.08)" : "rgba(226,235,255,0.6)",
@@ -1704,7 +1704,7 @@ const MealPrepCalculator = memo(
                   </Stack>
                 ) : (
                   <Stack spacing={0.5}>
-                    <Typography variant="h6" fontWeight={800} color="primary.main">
+                    <Typography variant="h6" fontWeight={800} color="primary.main" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                       {calorieTarget} kcal
                     </Typography>
                     <Stack
@@ -1731,11 +1731,11 @@ const MealPrepCalculator = memo(
             </Paper>
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+            <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
                 Planned so far
               </Typography>
-              <Typography variant="h6" fontWeight={800} mt={0.5}>
+              <Typography variant="h6" fontWeight={800} mt={0.5} sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                 {dailyTotals.calories} kcal
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -1747,7 +1747,7 @@ const MealPrepCalculator = memo(
             <Paper
               variant="outlined"
               sx={{
-                p: 2,
+                p: { xs: 1.5, sm: 2 },
                 borderRadius: 2,
                 borderColor:
                   (calorieDelta > 0 || dailyTotals.fat - targetMacros.fat > 0)
@@ -1777,6 +1777,7 @@ const MealPrepCalculator = memo(
                 fontWeight={800}
                 color={calorieDelta > 0 ? "error.main" : "success.main"}
                 mt={0.5}
+                sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
               >
                 {calorieDelta >= 0 ? "+" : ""}
                 {calorieDelta} kcal
@@ -1815,9 +1816,9 @@ const MealPrepCalculator = memo(
         </Alert>
       )}
 
-      <Grid container spacing={2.5}>
+      <Grid container spacing={{ xs: 2, md: 2.5 }}>
         <Grid size={{ xs: 12, md: 8 }}>
-          <Stack spacing={2.5}>
+          <Stack spacing={{ xs: 2, md: 2.5 }}>
             {/* Meal sections */}
             <Stack spacing={1.5}>
               {MEALS.map((meal, idx) => {
@@ -1828,8 +1829,8 @@ const MealPrepCalculator = memo(
                   <Accordion key={meal} defaultExpanded={idx === 1} disableGutters>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                       <Stack spacing={0.5} sx={{ width: "100%" }}>
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                          <Stack direction="row" spacing={1} alignItems="center">
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={0.5}>
+                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={0.5}>
                             <Typography variant="subtitle1" fontWeight={800} textTransform="capitalize">
                               {meal}
                             </Typography>
@@ -2200,7 +2201,7 @@ const MealPrepCalculator = memo(
                                             {ingredient.name}
                                           </Typography>
                                           <Typography variant="caption" color="text.secondary">
-                                            {roundVal(nutrition.calories)} kcal ? {roundVal(nutrition.protein)}g P ? {roundVal(nutrition.carbs)}g C ? {roundVal(nutrition.fat)}g F
+                                            {roundVal(nutrition.calories)} kcal · {roundVal(nutrition.protein)}g P · {roundVal(nutrition.carbs)}g C · {roundVal(nutrition.fat)}g F
                                           </Typography>
                                         </Box>
                                         <IconButton
@@ -2335,7 +2336,7 @@ const MealPrepCalculator = memo(
                       size="small"
                       value={prepDays}
                       onChange={(e) => setPrepDays(Number(e.target.value))}
-                      sx={{ minWidth: 140 }}
+                      sx={{ minWidth: { xs: 90, sm: 140 } }}
                     >
                       {[3, 5, 6, 7, 10, 14, 21, 30].map((day) => (
                         <MenuItem key={day} value={day}>
@@ -2343,13 +2344,13 @@ const MealPrepCalculator = memo(
                         </MenuItem>
                       ))}
                     </Select>
-                    <Button size="small" variant="contained" onClick={handleExportPDF}>
+                    <Button size="small" variant="contained" onClick={handleExportPDF} sx={{ fontSize: { xs: '0.7rem', sm: '0.8125rem' }, px: { xs: 1, sm: 2 } }}>
                       Export PDF
                     </Button>
-                    <Button size="small" variant="contained" color="success" onClick={handleShareToReminders}>
+                    <Button size="small" variant="contained" color="success" onClick={handleShareToReminders} sx={{ fontSize: { xs: '0.7rem', sm: '0.8125rem' }, px: { xs: 1, sm: 2 } }}>
                       Share List
                     </Button>
-                    <Button size="small" variant="outlined" onClick={handleCopyToClipboard}>
+                    <Button size="small" variant="outlined" onClick={handleCopyToClipboard} sx={{ fontSize: { xs: '0.7rem', sm: '0.8125rem' }, px: { xs: 1, sm: 2 } }}>
                       Copy
                     </Button>
                   </Stack>
@@ -2420,7 +2421,7 @@ const MealPrepCalculator = memo(
                                 transition: 'opacity 0.2s',
                               }}
                             >
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
+                              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
                                 <Checkbox
                                   checked={isChecked}
                                   onChange={(e) => {
@@ -2430,12 +2431,17 @@ const MealPrepCalculator = memo(
                                     }));
                                   }}
                                   size="small"
-                                  sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
+                                  sx={{ flexShrink: 0, minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
                                 />
-                                <Typography 
-                                  fontWeight={600} 
+                                <Typography
+                                  fontWeight={600}
                                   textTransform="capitalize"
-                                  sx={{ textDecoration: isChecked ? 'line-through' : 'none' }}
+                                  sx={{
+                                    textDecoration: isChecked ? 'line-through' : 'none',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
                                 >
                                   {ingredient.name}
                                 </Typography>

@@ -898,7 +898,7 @@ const IngredientManager = ({ onChange }) => {
                 </Typography>
 
                 <Grid container spacing={1.5}>
-                  <Grid size={4}>
+                  <Grid size={{ xs: 6, sm: 4 }}>
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Amount
                     </Typography>
@@ -912,7 +912,7 @@ const IngredientManager = ({ onChange }) => {
                       sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper" } }}
                     />
                   </Grid>
-                  <Grid size={4}>
+                  <Grid size={{ xs: 6, sm: 4 }}>
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Unit
                     </Typography>
@@ -928,7 +928,7 @@ const IngredientManager = ({ onChange }) => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid size={4}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
                     <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       Label (optional)
                     </Typography>
@@ -1437,7 +1437,17 @@ const IngredientManager = ({ onChange }) => {
               </Stack>
 
               {/* Category Pills */}
-              <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap" useFlexGap alignItems="center">
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                className="overflow-x-auto"
+                sx={{
+                  mt: 2,
+                  flexWrap: { xs: 'nowrap', md: 'wrap' },
+                  pb: 0.5,
+                }}
+              >
                 <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
                   Category:
                 </Typography>
@@ -1510,22 +1520,22 @@ const IngredientManager = ({ onChange }) => {
                           flexWrap: "wrap",
                         }}
                       >
-                        <Box sx={{ minWidth: 150, flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
+                        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', gap: 2, alignItems: 'center' }}>
                           {item.image ? (
-                            <Box 
-                              component="img" 
-                              src={item.image} 
+                            <Box
+                              component="img"
+                              src={item.image}
                               alt={item.name}
-                              sx={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 1 }}
+                              sx={{ width: 40, height: 40, flexShrink: 0, objectFit: 'contain', borderRadius: 1 }}
                             />
                           ) : null}
-                          <Box>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <HighlightedText 
-                                text={item.name} 
+                          <Box sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                              <HighlightedText
+                                text={item.name}
                                 highlight={query}
                                 variant="body2"
-                                sx={{ fontWeight: 600, color: "text.primary", textTransform: "capitalize" }} 
+                                sx={{ fontWeight: 600, color: "text.primary", textTransform: "capitalize", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                               />
                               <Chip 
                                 label={item.source === 'OpenFoodFacts' ? 'OFF' : 'USDA'} 

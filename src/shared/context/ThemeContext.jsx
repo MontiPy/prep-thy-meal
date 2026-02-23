@@ -238,12 +238,18 @@ export const ThemeProvider = ({ children }) => {
           },
           MuiCardContent: {
             styleOverrides: {
-              root: {
-                padding: '20px 20px 16px',
-                '&:last-child': {
-                  paddingBottom: 20,
+              root: ({ theme: t }) => ({
+                padding: '16px 16px 12px',
+                [t.breakpoints.up('sm')]: {
+                  padding: '20px 20px 16px',
                 },
-              },
+                '&:last-child': {
+                  paddingBottom: 16,
+                  [t.breakpoints.up('sm')]: {
+                    paddingBottom: 20,
+                  },
+                },
+              }),
             },
           },
           MuiAppBar: {

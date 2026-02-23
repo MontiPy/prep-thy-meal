@@ -193,7 +193,7 @@ const AccountPage = () => {
                         { icon: '💾', title: 'Auto-Save', desc: 'Automatic cloud backup' },
                         { icon: '🎯', title: 'Keep Your Data', desc: 'All guest data migrates automatically!' },
                       ].map((feature) => (
-                        <Grid key={feature.title} size={{ xs: 12, sm: 6, md: 4 }}>
+                        <Grid key={feature.title} size={{ xs: 6, sm: 6, md: 4 }}>
                           <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
                             <CardContent>
                               <Stack spacing={0.5}>
