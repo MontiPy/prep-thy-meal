@@ -21,14 +21,6 @@ import {
 } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 
-// Tokyo Nights macro color mapping for nutrition chips
-const CHIP_COLORS = {
-  calories: '#ffb020',
-  protein: '#00e5ff',
-  carbs: '#ff2d78',
-  fat: '#a855f7',
-};
-
 export default function ServingSizePreviewModal({
   open,
   onClose,
@@ -40,6 +32,12 @@ export default function ServingSizePreviewModal({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const chipAlpha = isDark ? 0.15 : 0.1;
+  const macroColors = theme.custom?.macroColors ?? {
+    calories: theme.palette.warning.main,
+    protein: theme.palette.info.main,
+    carbs: theme.palette.primary.main,
+    fat: theme.palette.secondary.main,
+  };
   const [selectedDefault, setSelectedDefault] = useState('100g');
 
   const handleConfirm = () => {
@@ -58,22 +56,22 @@ export default function ServingSizePreviewModal({
       <Chip
         size="small"
         label={`${cal} kcal`}
-        sx={{ bgcolor: alpha(CHIP_COLORS.calories, chipAlpha), color: CHIP_COLORS.calories }}
+        sx={{ bgcolor: alpha(macroColors.calories, chipAlpha), color: macroColors.calories }}
       />
       <Chip
         size="small"
         label={`P: ${p}g`}
-        sx={{ bgcolor: alpha(CHIP_COLORS.protein, chipAlpha), color: CHIP_COLORS.protein }}
+        sx={{ bgcolor: alpha(macroColors.protein, chipAlpha), color: macroColors.protein }}
       />
       <Chip
         size="small"
         label={`C: ${c}g`}
-        sx={{ bgcolor: alpha(CHIP_COLORS.carbs, chipAlpha), color: CHIP_COLORS.carbs }}
+        sx={{ bgcolor: alpha(macroColors.carbs, chipAlpha), color: macroColors.carbs }}
       />
       <Chip
         size="small"
         label={`F: ${f}g`}
-        sx={{ bgcolor: alpha(CHIP_COLORS.fat, chipAlpha), color: CHIP_COLORS.fat }}
+        sx={{ bgcolor: alpha(macroColors.fat, chipAlpha), color: macroColors.fat }}
       />
     </Stack>
   );

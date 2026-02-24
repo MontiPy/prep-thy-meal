@@ -15,16 +15,16 @@ const ThemeToggle = () => {
         aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         sx={(theme) => ({
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider}`,
-          backgroundColor: isDark ? 'rgba(255,176,32,0.08)' : 'rgba(0,0,0,0.04)',
-          color: isDark ? '#ffb020' : theme.palette.text.primary,
+          backgroundColor: isDark ? `${theme.palette.warning.main}14` : 'rgba(0,0,0,0.04)',
+          color: isDark ? theme.palette.warning.main : theme.palette.text.primary,
           transition: theme.transitions.create(['transform', 'box-shadow', 'color'], {
             duration: 250,
           }),
           '&:hover': {
             transform: 'translateY(-1px)',
-            backgroundColor: isDark ? 'rgba(255,176,32,0.15)' : 'rgba(0,0,0,0.08)',
+            backgroundColor: isDark ? `${theme.palette.warning.main}26` : 'rgba(0,0,0,0.08)',
             boxShadow: isDark
-              ? '0 0 16px rgba(255,176,32,0.3)'
+              ? `0 0 16px ${theme.palette.warning.main}4D`
               : theme.shadows[4],
           },
         })}

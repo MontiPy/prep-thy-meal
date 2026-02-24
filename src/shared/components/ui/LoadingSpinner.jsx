@@ -1,51 +1,37 @@
 import React from 'react';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 const LoadingSpinner = ({ message = 'Loading...', size = 'medium' }) => {
-  const sizeClasses = {
-    small: { spinner: '16px', fontSize: '0.875rem' },
-    medium: { spinner: '32px', fontSize: '1rem' },
-    large: { spinner: '48px', fontSize: '1.25rem' }
+  const sizeMap = {
+    small: 16,
+    medium: 32,
+    large: 48,
   };
 
-  const { spinner: spinnerSize, fontSize } = sizeClasses[size] || sizeClasses.medium;
-
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '1rem',
-      padding: '2rem'
-    }}>
-      <div
-        style={{
-          width: spinnerSize,
-          height: spinnerSize,
-          border: '3px solid rgba(255,255,255,0.06)',
-          borderTop: '3px solid #ff2d78',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          boxShadow: '0 0 16px rgba(255,45,120,0.3)',
-        }}
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+        p: 4,
+      }}
+    >
+      <CircularProgress
+        size={sizeMap[size] || sizeMap.medium}
+        color="primary"
       />
       {message && (
-        <p style={{
-          fontSize,
-          color: '#7a78a0',
-          margin: 0,
-          fontFamily: '"Urbanist", sans-serif',
-        }}>
+        <Typography
+          variant={size === 'small' ? 'caption' : 'body2'}
+          color="text.secondary"
+        >
           {message}
-        </p>
+        </Typography>
       )}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+    </Box>
   );
 };
 

@@ -13,12 +13,11 @@ import {
 import { alpha, useTheme } from '@mui/material/styles';
 import { calculateNutrition } from '../ingredients/nutritionHelpers';
 
-// Tokyo Nights macro color mapping
-const MACRO_COLORS = {
-  calories: { main: '#ffb020', label: 'Cal' },   // warm amber
-  protein:  { main: '#00e5ff', label: 'P' },      // cyan
-  carbs:    { main: '#ff2d78', label: 'C' },      // hot pink
-  fat:      { main: '#a855f7', label: 'F' },      // purple
+const MACRO_LABELS = {
+  calories: 'Cal',
+  protein: 'P',
+  carbs: 'C',
+  fat: 'F',
 };
 
 const IngredientCard = ({
@@ -30,6 +29,12 @@ const IngredientCard = ({
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const macroColors = theme.custom?.macroColors ?? {
+    calories: theme.palette.warning.main,
+    protein: theme.palette.info.main,
+    carbs: theme.palette.primary.main,
+    fat: theme.palette.secondary.main,
+  };
   const totalGrams = ingredient.grams || ingredient.gramsPerUnit || 100;
   const quantity = ingredient.quantity || 1;
   const nutrition = calculateNutrition(ingredient);
@@ -63,7 +68,7 @@ const IngredientCard = ({
         borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)',
         transition: 'all 250ms ease-out',
         '&:hover': {
-          borderColor: isDark ? 'rgba(255,45,120,0.15)' : 'rgba(214,36,94,0.1)',
+          borderColor: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.1),
         },
       }}
     >
@@ -96,11 +101,11 @@ const IngredientCard = ({
             onClick={() => onDecrease(ingredient.id)}
             size="medium"
             sx={{
-              bgcolor: isDark ? 'rgba(0,229,255,0.12)' : 'rgba(0,184,212,0.1)',
-              color: isDark ? '#00e5ff' : '#00b8d4',
+              bgcolor: alpha(theme.palette.secondary.main, isDark ? 0.12 : 0.1),
+              color: theme.palette.secondary.main,
               '&:hover': {
-                bgcolor: isDark ? 'rgba(0,229,255,0.2)' : 'rgba(0,184,212,0.18)',
-                boxShadow: isDark ? '0 0 12px rgba(0,229,255,0.2)' : 'none',
+                bgcolor: alpha(theme.palette.secondary.main, isDark ? 0.2 : 0.18),
+                boxShadow: isDark ? `0 0 12px ${alpha(theme.palette.secondary.main, 0.2)}` : 'none',
               },
               width: 44,
               height: 44,
@@ -122,11 +127,11 @@ const IngredientCard = ({
             onClick={() => onIncrease(ingredient.id)}
             size="medium"
             sx={{
-              bgcolor: isDark ? 'rgba(57,255,127,0.12)' : 'rgba(46,204,113,0.1)',
-              color: isDark ? '#39ff7f' : '#2ecc71',
+              bgcolor: alpha(theme.palette.success.main, isDark ? 0.12 : 0.1),
+              color: theme.palette.success.main,
               '&:hover': {
-                bgcolor: isDark ? 'rgba(57,255,127,0.2)' : 'rgba(46,204,113,0.18)',
-                boxShadow: isDark ? '0 0 12px rgba(57,255,127,0.2)' : 'none',
+                bgcolor: alpha(theme.palette.success.main, isDark ? 0.2 : 0.18),
+                boxShadow: isDark ? `0 0 12px ${alpha(theme.palette.success.main, 0.2)}` : 'none',
               },
               width: 44,
               height: 44,
@@ -148,24 +153,24 @@ const IngredientCard = ({
         }}
       >
         <NutritionBox
-          label={MACRO_COLORS.calories.label}
+          label={MACRO_LABELS.calories}
           value={Math.round(nutrition.calories)}
-          color={MACRO_COLORS.calories.main}
+          color={macroColors.calories}
         />
         <NutritionBox
-          label={MACRO_COLORS.protein.label}
+          label={MACRO_LABELS.protein}
           value={`${Math.round(nutrition.protein)}g`}
-          color={MACRO_COLORS.protein.main}
+          color={macroColors.protein}
         />
         <NutritionBox
-          label={MACRO_COLORS.carbs.label}
+          label={MACRO_LABELS.carbs}
           value={`${Math.round(nutrition.carbs)}g`}
-          color={MACRO_COLORS.carbs.main}
+          color={macroColors.carbs}
         />
         <NutritionBox
-          label={MACRO_COLORS.fat.label}
+          label={MACRO_LABELS.fat}
           value={`${Math.round(nutrition.fat)}g`}
-          color={MACRO_COLORS.fat.main}
+          color={macroColors.fat}
         />
       </Box>
     </Paper>

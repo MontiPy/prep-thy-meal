@@ -1,11 +1,12 @@
 // src/app/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box } from '@mui/material';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import MealPrep from '../shared/components/layout/MealPrep';
 import { UserProvider } from '../features/auth/UserContext';
 import { ThemeProvider } from '../shared/context/ThemeContext';
+import { useAppTheme } from '../shared/context/ThemeContext';
 import { MacroTargetsProvider } from '../shared/context/MacroTargetsContext';
 import ErrorBoundary from '../shared/components/ui/ErrorBoundary';
 import OfflineBanner from '../shared/components/layout/OfflineBanner';
@@ -14,6 +15,31 @@ import { hasCompletedOnboarding, completeOnboarding } from '../shared/services/o
 
 const AppContent = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const { muiTheme } = useAppTheme();
+
+  const toastOptions = useMemo(() => {
+    const toastConfig = muiTheme.custom?.toast ?? {};
+    return {
+      duration: 4000,
+      className: toastConfig.className || '',
+      success: {
+        duration: 3000,
+        className: toastConfig.success?.className || toastConfig.className || '',
+        iconTheme: toastConfig.success?.iconTheme ?? {
+          primary: toastConfig.success?.primary ?? muiTheme.palette.success.main,
+          secondary: toastConfig.success?.secondary ?? muiTheme.palette.background.default,
+        },
+      },
+      error: {
+        duration: 5000,
+        className: toastConfig.error?.className || toastConfig.className || '',
+        iconTheme: toastConfig.error?.iconTheme ?? {
+          primary: toastConfig.error?.primary ?? muiTheme.palette.error.main,
+          secondary: toastConfig.error?.secondary ?? muiTheme.palette.background.default,
+        },
+      },
+    };
+  }, [muiTheme]);
 
   // Show onboarding for all users (guest or authenticated) who haven't completed it
   useEffect(() => {
@@ -48,6 +74,10 @@ const AppContent = () => {
           toast.success("Welcome! Let's start planning your meals.");
         }}
       />
+      <Toaster
+        position="top-center"
+        toastOptions={toastOptions}
+      />
     </Box>
   );
 };
@@ -58,29 +88,6 @@ const App = () => (
       <UserProvider>
         <MacroTargetsProvider>
           <AppContent />
-          <Toaster
-          position="top-center"
-          toastOptions={{
-            duration: 4000,
-            className: 'toast-neon',
-            success: {
-              duration: 3000,
-              className: 'toast-neon toast-neon-success',
-              iconTheme: {
-                primary: '#39ff7f',
-                secondary: '#12121e',
-              },
-            },
-            error: {
-              duration: 5000,
-              className: 'toast-neon toast-neon-error',
-              iconTheme: {
-                primary: '#ff4757',
-                secondary: '#12121e',
-              },
-            },
-          }}
-        />
         </MacroTargetsProvider>
       </UserProvider>
     </ThemeProvider>

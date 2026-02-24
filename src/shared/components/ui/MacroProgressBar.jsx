@@ -2,14 +2,6 @@ import React from 'react';
 import { Box, LinearProgress, Typography, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
-// Tokyo Nights macro colors
-const MACRO_THEME_COLORS = {
-  calories: '#ffb020',
-  protein: '#00e5ff',
-  carbs: '#ff2d78',
-  fat: '#a855f7',
-};
-
 const MacroProgressBar = ({
   label,
   actual,
