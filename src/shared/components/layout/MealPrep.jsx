@@ -26,7 +26,7 @@ import {
   useMediaQuery,
   useScrollTrigger,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 // Eager load: Default tab (critical for first paint)
 import MealPrepCalculator from "../../../features/meal-planner/MealPrepCalculator";
 // Lazy load: Non-default tabs (loaded on demand)
@@ -254,13 +254,9 @@ const MealPrep = () => {
         pb: isDesktop ? 4 : 8,
         background: isDesktop
           ? `radial-gradient(circle at 20% 20%, ${
-              isDark
-                ? "rgba(255,45,120,0.06)"
-                : "rgba(214,36,94,0.04)"
+              alpha(theme.palette.primary.main, isDark ? 0.06 : 0.04)
             }, transparent 40%), radial-gradient(circle at 80% 0%, ${
-              isDark
-                ? "rgba(0,229,255,0.06)"
-                : "rgba(0,184,212,0.04)"
+              alpha(theme.palette.secondary.main, isDark ? 0.06 : 0.04)
             }, transparent 35%), ${theme.palette.background.default}`
           : theme.palette.background.default,
         transition: theme.transitions.create("background-color"),
@@ -280,15 +276,13 @@ const MealPrep = () => {
       >
         <Toolbar disableGutters sx={{ gap: { xs: 1, md: 2 }, alignItems: "center" }}>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-            {/* PTM Logo with neon glow */}
+            {/* PTM Logo */}
             <Box
               sx={{
                 width: { xs: 36, md: 44 },
                 height: { xs: 36, md: 44 },
                 borderRadius: 2,
-                background: isDark
-                  ? "linear-gradient(135deg, #ff2d78 0%, #a855f7 100%)"
-                  : "linear-gradient(135deg, #d6245e 0%, #8b3fd4 100%)",
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                 color: "#fff",
                 display: "grid",
                 placeItems: "center",
@@ -297,8 +291,8 @@ const MealPrep = () => {
                 fontSize: "0.75rem",
                 letterSpacing: 1,
                 boxShadow: isDark
-                  ? "0 0 20px rgba(255,45,120,0.4), 0 0 60px rgba(255,45,120,0.15)"
-                  : "0 4px 16px rgba(214,36,94,0.3)",
+                  ? `0 0 20px ${alpha(theme.palette.primary.main, 0.4)}, 0 0 60px ${alpha(theme.palette.primary.main, 0.15)}`
+                  : `0 4px 16px ${alpha(theme.palette.primary.main, 0.3)}`,
                 animation: isDark ? "neonPulse 3s ease-in-out infinite" : "none",
               }}
             >
@@ -320,7 +314,7 @@ const MealPrep = () => {
                       height: 22,
                       fontWeight: 700,
                       fontSize: "0.65rem",
-                      borderColor: isDark ? "rgba(255,45,120,0.4)" : "primary.main",
+                      borderColor: isDark ? alpha(theme.palette.primary.main, 0.4) : "primary.main",
                       color: "primary.main",
                       border: "1px solid",
                     }}
@@ -372,7 +366,7 @@ const MealPrep = () => {
           )}
 
           <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: "auto" }}>
-            {/* Status indicator with neon pulse - hide on mobile */}
+            {/* Status indicator - hide on mobile */}
             {isDesktop && (
               <Stack
                 direction="row"
@@ -384,14 +378,14 @@ const MealPrep = () => {
                   borderRadius: 9999,
                   border: "1px solid",
                   borderColor: isOffline
-                    ? isDark ? "rgba(255,176,32,0.4)" : "warning.main"
-                    : isDark ? "rgba(57,255,127,0.4)" : "success.main",
+                    ? isDark ? alpha(theme.palette.warning.main, 0.4) : "warning.main"
+                    : isDark ? alpha(theme.palette.success.main, 0.4) : "success.main",
                   backgroundColor: isOffline
-                    ? isDark ? "rgba(255,176,32,0.08)" : "warning.light"
-                    : isDark ? "rgba(57,255,127,0.08)" : "success.light",
+                    ? isDark ? alpha(theme.palette.warning.main, 0.08) : "warning.light"
+                    : isDark ? alpha(theme.palette.success.main, 0.08) : "success.light",
                   color: isOffline
-                    ? isDark ? "#ffb020" : "warning.dark"
-                    : isDark ? "#39ff7f" : "success.dark",
+                    ? isDark ? theme.palette.warning.main : "warning.dark"
+                    : isDark ? theme.palette.success.main : "success.dark",
                 }}
               >
                 <Box
@@ -426,8 +420,8 @@ const MealPrep = () => {
                       height: 38,
                       bgcolor: "primary.main",
                       fontWeight: 700,
-                      border: isDark ? "2px solid rgba(255,45,120,0.4)" : "2px solid",
-                      borderColor: isDark ? undefined : "primary.light",
+                      border: "2px solid",
+                      borderColor: isDark ? alpha(theme.palette.primary.main, 0.4) : "primary.light",
                     }}
                   >
                     {(user?.displayName || "User").charAt(0).toUpperCase()}
@@ -490,7 +484,7 @@ const MealPrep = () => {
               left: 0,
               right: 0,
               height: "1px",
-              background: "linear-gradient(90deg, transparent, rgba(255,45,120,0.3), rgba(0,229,255,0.3), transparent)",
+              background: `linear-gradient(90deg, transparent, ${alpha(theme.palette.primary.main, 0.3)}, ${alpha(theme.palette.secondary.main, 0.3)}, transparent)`,
             } : {},
           }}
         >

@@ -1,6 +1,7 @@
 // Performance overlay for development mode
 import React, { useState, useEffect } from 'react';
 import { Box, Paper, Typography, IconButton, Collapse } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { getTabSwitchStats } from '../../utils/performance';
@@ -16,6 +17,7 @@ import { getTabSwitchStats } from '../../utils/performance';
  * Only shown when performance tracking is enabled (?perf or localStorage ptm_perf=1)
  */
 export const PerformanceOverlay = ({ samples = [] }) => {
+  const theme = useTheme();
   const [visible, setVisible] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const [stats, setStats] = useState({ p50: 0, p75: 0, p95: 0, avg: 0, count: 0 });
@@ -50,7 +52,7 @@ export const PerformanceOverlay = ({ samples = [] }) => {
         width: 280,
         bgcolor: 'rgba(10, 10, 18, 0.95)',
         color: '#e8e6f0',
-        border: '1px solid rgba(255, 45, 120, 0.3)',
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
         borderRadius: 2,
         zIndex: 9999,
         backdropFilter: 'blur(10px)',
@@ -62,10 +64,10 @@ export const PerformanceOverlay = ({ samples = [] }) => {
           alignItems: 'center',
           justifyContent: 'space-between',
           p: 1.5,
-          borderBottom: expanded ? '1px solid rgba(255, 45, 120, 0.2)' : 'none',
+          borderBottom: expanded ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
         }}
       >
-        <Typography variant="caption" fontWeight={700} sx={{ color: '#ff2d78' }}>
+        <Typography variant="caption" fontWeight={700} sx={{ color: theme.palette.primary.main }}>
           ⚡ PERFORMANCE
         </Typography>
         <Box>
@@ -95,7 +97,7 @@ export const PerformanceOverlay = ({ samples = [] }) => {
         <Box sx={{ p: 1.5 }}>
           {/* Summary Stats */}
           {stats.count > 0 && (
-            <Box sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid rgba(255, 45, 120, 0.2)' }}>
+            <Box sx={{ mb: 1.5, pb: 1.5, borderBottom: `1px solid ${alpha(theme.palette.primary.main, 0.2)}` }}>
               <Typography variant="caption" display="block" sx={{ color: '#a8a6b0', mb: 0.5 }}>
                 Tab Switch Stats ({stats.count} samples)
               </Typography>
@@ -152,7 +154,7 @@ export const PerformanceOverlay = ({ samples = [] }) => {
           )}
 
           {/* Thresholds Guide */}
-          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px solid rgba(255, 45, 120, 0.2)' }}>
+          <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${alpha(theme.palette.primary.main, 0.2)}` }}>
             <Typography variant="caption" display="block" sx={{ color: '#a8a6b0', mb: 0.5 }}>
               Thresholds
             </Typography>

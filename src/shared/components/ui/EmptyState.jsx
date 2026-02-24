@@ -1,9 +1,9 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
 
-const NeonPlateIcon = ({ size = 48, color = '#ff2d78' }) => (
+const NeonPlateIcon = ({ size = 48, color }) => (
   <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
     <ellipse cx="24" cy="28" rx="18" ry="8" stroke={color} strokeWidth="1.5" opacity="0.6" />
     <ellipse cx="24" cy="26" rx="14" ry="6" stroke={color} strokeWidth="1.5" opacity="0.4" />
@@ -45,7 +45,7 @@ const EmptyState = ({
         borderRadius: 2,
         border: '1px dashed',
         borderColor: isDark
-          ? 'rgba(255,45,120,0.15)'
+          ? alpha(theme.palette.primary.main, 0.15)
           : 'divider',
         ...sx
       }}
@@ -54,7 +54,7 @@ const EmptyState = ({
         {illustration ? (
           <Box
             sx={{
-              bgcolor: isDark ? 'rgba(255,45,120,0.08)' : 'rgba(214,36,94,0.05)',
+              bgcolor: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05),
               p: 2,
               borderRadius: '50%',
               '& svg': {
@@ -66,18 +66,14 @@ const EmptyState = ({
             {illustration}
           </Box>
         ) : icon === SearchOffIcon ? (
-          <NeonPlateIcon size={48} color={isDark ? '#ff2d78' : '#d6245e'} />
+          <NeonPlateIcon size={48} color={theme.palette.primary.main} />
         ) : (
           <Box
             sx={{
-              bgcolor: isDark
-                ? 'rgba(255,45,120,0.08)'
-                : 'rgba(214,36,94,0.05)',
+              bgcolor: alpha(theme.palette.primary.main, isDark ? 0.08 : 0.05),
               p: 2,
               borderRadius: '50%',
-              color: isDark
-                ? '#ff2d78'
-                : '#d6245e',
+              color: theme.palette.primary.main,
             }}
           >
             <Icon sx={{ fontSize: 40, opacity: 0.7 }} />

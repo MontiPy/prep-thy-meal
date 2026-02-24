@@ -1,12 +1,12 @@
 /* ============================================================================
-   TOKYO NIGHTS — Base Styles
+   BASE STYLES — Theme-agnostic defaults (overridden by MUI CssBaseline)
    ============================================================================ */
 
 body {
   margin: 0;
-  font-family: "Urbanist", system-ui, sans-serif;
-  background-color: #0a0a12;
-  color: #e8e6f0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: #f9fafb;
+  color: #111827;
 }
 
 /* ============================================================================
@@ -44,19 +44,19 @@ a,
 }
 
 /* ============================================================================
-   TYPOGRAPHY — Orbitron headings
+   TYPOGRAPHY — Scoped to Tokyo Nights
    ============================================================================ */
 
-h1,
-h2,
-h3 {
+.theme-tokyo-nights h1,
+.theme-tokyo-nights h2,
+.theme-tokyo-nights h3 {
   font-family: "Orbitron", sans-serif;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
 /* ============================================================================
-   NEON KEYFRAME ANIMATIONS
+   KEYFRAME ANIMATIONS (global — referenced by name)
    ============================================================================ */
 
 @keyframes neonPulse {
@@ -95,32 +95,14 @@ h3 {
   }
 }
 
-/* ============================================================================
-   EXISTING ANIMATIONS (updated)
-   ============================================================================ */
-
 @keyframes wiggle {
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(15deg); }
 }
 
-.wiggle:hover {
-  animation: wiggle 0.5s ease-in-out;
-}
-
 @keyframes confetti {
   0% { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(-50%, -100%); }
-}
-
-.confetti {
-  position: fixed;
-  top: 20%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 3rem;
-  pointer-events: none;
-  animation: confetti 2s forwards;
 }
 
 @keyframes tabPanelIn {
@@ -131,20 +113,6 @@ h3 {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-.tab-panel {
-  will-change: opacity, transform;
-}
-
-.tab-panel.tab-panel-active {
-  animation: tabPanelIn 160ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tab-panel.tab-panel-active {
-    animation: none;
   }
 }
 
@@ -177,49 +145,38 @@ h3 {
   }
 }
 
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]) {
-  opacity: 0;
-  transform: translateY(12px);
-  animation: tabFadeUp 0.45s ease forwards;
-  animation-delay: calc(var(--stagger-index, 0) * 50ms);
+/* ============================================================================
+   GLOBAL ANIMATIONS & CLASSES
+   ============================================================================ */
+
+.wiggle:hover {
+  animation: wiggle 0.5s ease-in-out;
 }
 
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(2) { --stagger-index: 1; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(3) { --stagger-index: 2; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(4) { --stagger-index: 3; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(5) { --stagger-index: 4; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(6) { --stagger-index: 5; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(7) { --stagger-index: 6; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(8) { --stagger-index: 7; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(9) { --stagger-index: 8; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(10) { --stagger-index: 9; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(11) { --stagger-index: 10; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(12) { --stagger-index: 11; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(13) { --stagger-index: 12; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(14) { --stagger-index: 13; }
-.tab-stagger.tab-stagger-active > *:not([data-stagger-skip]):nth-child(15) { --stagger-index: 14; }
-
-@media (prefers-reduced-motion: reduce) {
-  .tab-stagger.tab-stagger-active > *:not([data-stagger-skip]) {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.cheer {
+.confetti {
   position: fixed;
-  top: 1rem;
+  top: 20%;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(255, 176, 32, 0.15);
-  color: #ffb020;
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 176, 32, 0.3);
+  font-size: 3rem;
+  pointer-events: none;
   animation: confetti 2s forwards;
 }
 
+.tab-panel {
+  will-change: opacity, transform;
+}
+
+.tab-panel.tab-panel-active {
+  animation: tabPanelIn 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel.tab-panel-active {
+    animation: none;
+  }
+}
+
 .tab-stagger.tab-stagger-active > *:not([data-stagger-skip]) {
   opacity: 0;
   transform: translateY(12px);
@@ -250,6 +207,7 @@ h3 {
   }
 }
 
+/* Generic cheer badge (light/neutral) */
 .cheer {
   position: fixed;
   top: 1rem;
@@ -262,8 +220,18 @@ h3 {
   animation: confetti 2s forwards;
 }
 
-/* Toast styling */
-.toast-neon {
+/* Tokyo Nights cheer variant (dark amber glow) */
+.theme-tokyo-nights .cheer {
+  background-color: rgba(255, 176, 32, 0.15);
+  color: #ffb020;
+  border: 1px solid rgba(255, 176, 32, 0.3);
+}
+
+/* ============================================================================
+   TOAST STYLING — Scoped to Tokyo Nights
+   ============================================================================ */
+
+.theme-tokyo-nights .toast-neon {
   font-family: "Urbanist", "Inter", system-ui, sans-serif;
   font-size: 0.9rem;
   background: rgba(18, 18, 30, 0.85);
@@ -279,7 +247,7 @@ h3 {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
 
-.toast-neon-success {
+.theme-tokyo-nights .toast-neon-success {
   border-color: rgba(57, 255, 127, 0.25);
   border-left-color: rgba(57, 255, 127, 0.85);
   box-shadow:
@@ -287,7 +255,7 @@ h3 {
     0 0 18px rgba(57, 255, 127, 0.12);
 }
 
-.toast-neon-error {
+.theme-tokyo-nights .toast-neon-error {
   border-color: rgba(255, 71, 87, 0.35);
   border-left-color: rgba(255, 71, 87, 0.9);
   box-shadow:
@@ -295,25 +263,28 @@ h3 {
     0 0 18px rgba(255, 71, 87, 0.12);
 }
 
-.toast-neon svg {
+.theme-tokyo-nights .toast-neon svg {
   filter: drop-shadow(0 0 6px rgba(255, 45, 120, 0.45));
 }
 
-/* Skeleton shimmer */
-.MuiSkeleton-root {
+/* ============================================================================
+   SKELETON SHIMMER — Scoped to Tokyo Nights
+   ============================================================================ */
+
+.theme-tokyo-nights .MuiSkeleton-root {
   background-image: linear-gradient(90deg, #12121e 0%, #1a1a2e 50%, #12121e 100%);
   background-size: 200% 100%;
   animation: skeletonShimmer 1.6s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .MuiSkeleton-root {
+  .theme-tokyo-nights .MuiSkeleton-root {
     animation: none;
   }
 }
 
 /* ============================================================================
-   SCROLLBAR — Dark glass with neon thumb
+   SCROLLBAR — Neutral global defaults + Tokyo Nights neon overrides
    ============================================================================ */
 
 .overflow-x-auto {
@@ -321,47 +292,62 @@ h3 {
   -webkit-overflow-scrolling: touch;
 }
 
-.overflow-x-auto::-webkit-scrollbar {
-  height: 6px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 3px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb {
-  background: rgba(255, 45, 120, 0.4);
-  border-radius: 3px;
-}
-
-.overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 45, 120, 0.6);
-}
-
-/* Global scrollbar */
+/* Global scrollbar (neutral) */
 ::-webkit-scrollbar {
   width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 45, 120, 0.3);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Tokyo Nights scrollbar (neon pink) */
+.theme-tokyo-nights ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.theme-tokyo-nights ::-webkit-scrollbar-thumb {
+  background: rgba(255, 45, 120, 0.3);
+  border-radius: 3px;
+}
+
+.theme-tokyo-nights ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 45, 120, 0.5);
 }
 
+/* Tokyo Nights horizontal scrollbar */
+.theme-tokyo-nights .overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.theme-tokyo-nights .overflow-x-auto::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+}
+
+.theme-tokyo-nights .overflow-x-auto::-webkit-scrollbar-thumb {
+  background: rgba(255, 45, 120, 0.4);
+  border-radius: 3px;
+}
+
+.theme-tokyo-nights .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 45, 120, 0.6);
+}
+
 /* ============================================================================
-   CUSTOM SLIDER — Neon glow thumb
+   CUSTOM SLIDER — Scoped to Tokyo Nights
    ============================================================================ */
 
-input[type="range"]::-webkit-slider-thumb {
+.theme-tokyo-nights input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   height: 20px;
   width: 20px;
@@ -371,7 +357,7 @@ input[type="range"]::-webkit-slider-thumb {
   box-shadow: 0 0 10px rgba(255, 45, 120, 0.5);
 }
 
-input[type="range"]::-moz-range-thumb {
+.theme-tokyo-nights input[type="range"]::-moz-range-thumb {
   height: 20px;
   width: 20px;
   border-radius: 50%;
