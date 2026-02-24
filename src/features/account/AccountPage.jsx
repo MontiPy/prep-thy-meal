@@ -19,6 +19,7 @@ import Login from '../auth/Login';
 import ConfirmDialog from '../../shared/components/ui/ConfirmDialog';
 import { loadUserPreferences, updateUserPreference } from '../../shared/services/userPreferences';
 import { getGuestDataSummary } from '../../shared/services/guestMigration';
+import ThemeSelector from './ThemeSelector';
 
 const FeatureCard = ({ title, description, status }) => (
   <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -243,6 +244,8 @@ const AccountPage = () => {
                     </Typography>
                   </CardContent>
                 </Card>
+
+                <ThemeSelector />
               </Stack>
             </CardContent>
           </Card>
@@ -346,6 +349,8 @@ const AccountPage = () => {
                 </Card>
               </Grid>
             </Grid>
+
+            <ThemeSelector />
 
             {/* Preferences */}
             <Card variant="outlined" sx={{ borderRadius: 3, mt: 2 }}>
