@@ -89,6 +89,7 @@ import { validateAllMacros } from "../../shared/utils/macroValidation.js";
 import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
 import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientSearchAutocomplete";
 import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
+import { buildFullPlanExport } from './buildFullPlanExport';
 
 const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 const roundVal = (n) => Math.round(Number(n) || 0);
@@ -1291,6 +1292,84 @@ const MealPrepCalculator = memo(
   }, [mealTotals]);
   const calorieDelta = dailyTotals.calories - calorieTarget;
 
+  const loadCalorieProfile = async () => {
+    try {
+      let profile = null;
+
+      if (user) {
+        try {
+          const docRef = doc(db, "userProfiles", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists() && docSnap.data().calorieProfile) {
+            profile = docSnap.data().calorieProfile;
+          }
+        } catch (error) {
+          console.error("Error loading profile from cloud:", error);
+        }
+      }
+
+      if (!profile) {
+        const saved = localStorage.getItem("calorieCalculatorProfile");
+        if (saved) {
+          profile = JSON.parse(saved);
+        }
+      }
+
+      return profile;
+    } catch (error) {
+      console.error("Error loading calorie profile:", error);
+      return null;
+    }
+  };
+
+  const handleCopyFullPlan = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before exporting.");
+      return;
+    }
+
+    const profile = await loadCalorieProfile();
+    const exportData = buildFullPlanExport(
+      { planName, calorieTarget, targetPercentages, mealIngredients, mealTotals, dailyTotals },
+      profile,
+    );
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+      toast.success("Full plan copied to clipboard!");
+    } catch (error) {
+      console.error("Error copying full plan:", error);
+      toast.error("Failed to copy. Please try again.");
+    }
+  };
+
+  const handleDownloadFullPlan = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before exporting.");
+      return;
+    }
+
+    const profile = await loadCalorieProfile();
+    const exportData = buildFullPlanExport(
+      { planName, calorieTarget, targetPercentages, mealIngredients, mealTotals, dailyTotals },
+      profile,
+    );
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(planName || 'meal-plan').replace(/\s+/g, '_').toLowerCase()}_full_plan.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Full plan exported!");
+  };
+
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
     MEALS.forEach((meal) => {
@@ -1602,6 +1681,22 @@ const MealPrepCalculator = memo(
                 </MenuItem>
               )}
               <Divider />
+              <MenuItem
+                onClick={() => {
+                  handleCopyFullPlan();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Copy Full Plan
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleDownloadFullPlan();
+                  handleCloseActionsMenu();
+                }}
+              >
+                Download Full Plan
+              </MenuItem>
               <MenuItem
                 onClick={() => {
                   handleExportPDF();
