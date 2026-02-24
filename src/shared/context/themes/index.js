@@ -7,6 +7,7 @@ import { oceanBreezeTheme } from './oceanBreeze';
 import { forestFloorTheme } from './forestFloor';
 import { lavenderHazeTheme } from './lavenderHaze';
 import { midnightEmberTheme } from './midnightEmber';
+import { createCustomTheme } from './customTheme';
 
 export const THEME_REGISTRY = {
   cleanSlate: {
@@ -81,12 +82,25 @@ export const THEME_REGISTRY = {
       bgDark: '#0c0a09',
     },
   },
+  custom: {
+    id: 'custom',
+    label: 'Custom',
+    description: 'Design your own',
+    factory: null, // handled specially
+    preview: null, // computed from user config
+  },
 };
 
 export const DEFAULT_THEME = 'cleanSlate';
 
-export const getThemeFactory = (themeName) =>
-  THEME_REGISTRY[themeName]?.factory ?? THEME_REGISTRY[DEFAULT_THEME].factory;
+export const getThemeFactory = (themeName, customConfig) => {
+  if (themeName === 'custom') {
+    return (isDark) => createCustomTheme(isDark, customConfig);
+  }
+  return THEME_REGISTRY[themeName]?.factory ?? THEME_REGISTRY[DEFAULT_THEME].factory;
+};
 
 export const getThemeList = () =>
   Object.values(THEME_REGISTRY);
+
+export { createCustomTheme, FONT_PAIRS, DEFAULT_CUSTOM_CONFIG } from './customTheme';
