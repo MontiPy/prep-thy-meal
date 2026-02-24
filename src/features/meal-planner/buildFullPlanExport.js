@@ -137,9 +137,10 @@ function computeProfileMetrics(profile) {
  * @param {Object} planState.mealTotals — { breakfast, lunch, dinner, snack } totals
  * @param {Object} planState.dailyTotals — { calories, protein, carbs, fat }
  * @param {Object|null} profile — saved calorie calculator profile, or null
+ * @param {Function} calculateNutritionFn — scaling function (ingredient → { calories, protein, carbs, fat })
  * @returns {Object} enriched export JSON
  */
-export function buildFullPlanExport(planState, profile) {
+export function buildFullPlanExport(planState, profile, calculateNutritionFn) {
   const { planName, calorieTarget, targetPercentages, mealIngredients,
           mealTotals, dailyTotals } = planState;
 
@@ -152,21 +153,24 @@ export function buildFullPlanExport(planState, profile) {
     profileNote = 'No calorie profile configured — set up the Calorie Calculator for full analysis context';
   }
 
-  // Map meal ingredients to export format
+  // Map meal ingredients to export format, using scaled nutrition values
   const meals = {};
   for (const meal of ['breakfast', 'lunch', 'dinner', 'snack']) {
-    meals[meal] = (mealIngredients[meal] || []).map(ing => ({
-      name: ing.name,
-      quantity: ing.quantity || 1,
-      unit: ing.unit || 'g',
-      grams: ing.grams || 0,
-      nutrition: {
-        calories: ing.calories || 0,
-        protein: ing.protein || 0,
-        carbs: ing.carbs || 0,
-        fat: ing.fat || 0,
-      },
-    }));
+    meals[meal] = (mealIngredients[meal] || []).map(ing => {
+      const n = calculateNutritionFn(ing);
+      return {
+        name: ing.name,
+        quantity: ing.quantity || 1,
+        unit: ing.unit || 'g',
+        grams: ing.grams || 0,
+        nutrition: {
+          calories: Math.round(n.calories),
+          protein: Math.round(n.protein),
+          carbs: Math.round(n.carbs),
+          fat: Math.round(n.fat),
+        },
+      };
+    });
   }
 
   // Target comparison using planner targets (not profile targets)

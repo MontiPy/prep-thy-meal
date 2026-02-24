@@ -1333,6 +1333,7 @@ const MealPrepCalculator = memo(
     const exportData = buildFullPlanExport(
       { planName, calorieTarget, targetPercentages, mealIngredients, mealTotals, dailyTotals },
       profile,
+      calculateNutrition,
     );
 
     try {
@@ -1355,6 +1356,7 @@ const MealPrepCalculator = memo(
     const exportData = buildFullPlanExport(
       { planName, calorieTarget, targetPercentages, mealIngredients, mealTotals, dailyTotals },
       profile,
+      calculateNutrition,
     );
 
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -2080,7 +2082,7 @@ const MealPrepCalculator = memo(
                         )}
 
                         {isDesktop ? (
-                          <Box sx={{ mx: 0 }}>
+                          <Box sx={{ mx: 0, overflowX: 'auto' }}>
                             <Table size="small" sx={{ width: "100%" }}>
                               <TableHead>
                                 <TableRow>

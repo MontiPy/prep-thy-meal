@@ -17,6 +17,14 @@ const mockProfile = {
   fatPerLb: 0.3,
 };
 
+// Mock that returns raw ingredient values (simulates quantity=1 / no scaling)
+const mockCalcNutrition = (ing) => ({
+  calories: ing.calories || 0,
+  protein: ing.protein || 0,
+  carbs: ing.carbs || 0,
+  fat: ing.fat || 0,
+});
+
 const mockPlanState = {
   planName: 'Weekday Cut',
   calorieTarget: 2200,
@@ -48,7 +56,7 @@ const mockPlanState = {
 
 describe('buildFullPlanExport', () => {
   it('returns correct top-level structure', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
 
     expect(result.exportType).toBe('full-meal-plan');
     expect(result.version).toBe('1.0');
@@ -60,7 +68,7 @@ describe('buildFullPlanExport', () => {
   });
 
   it('computes profile BMR, TDEE, and calorie target from profile data', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
 
     // Mifflin-St Jeor: 10 * (180*0.453592) + 6.25 * (72*2.54) - 5*30 + 5
     // = 10*81.647 + 6.25*182.88 - 150 + 5
@@ -76,17 +84,17 @@ describe('buildFullPlanExport', () => {
   });
 
   it('includes activity level with label', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
     expect(result.profile.activityLevel).toBe('moderate (3-5 workouts/week)');
   });
 
   it('includes goal description', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
     expect(result.profile.goal).toBe('cut (-1 lb/week)');
   });
 
   it('calculates bodyweight-based macro targets', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
 
     // proteinPerLb=1.0, weight=180 lbs -> 180g protein
     expect(result.profile.macroTargets.protein.grams).toBe(180);
@@ -101,7 +109,7 @@ describe('buildFullPlanExport', () => {
   });
 
   it('maps meal ingredients with nutrition', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
 
     expect(result.plan.meals.breakfast).toHaveLength(1);
     expect(result.plan.meals.breakfast[0]).toEqual({
@@ -114,21 +122,21 @@ describe('buildFullPlanExport', () => {
   });
 
   it('includes per-meal totals', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
     expect(result.plan.mealTotals.breakfast).toEqual({
       calories: 125, protein: 27, carbs: 1, fat: 0,
     });
   });
 
   it('includes daily totals from plan state', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
     expect(result.dailyTotals).toEqual({
       calories: 455, protein: 89, carbs: 1, fat: 7,
     });
   });
 
   it('computes target comparison using planner targets', () => {
-    const result = buildFullPlanExport(mockPlanState, mockProfile);
+    const result = buildFullPlanExport(mockPlanState, mockProfile, mockCalcNutrition);
 
     expect(result.targetComparison.calories).toEqual({
       target: 2200, actual: 455, difference: -1745,
@@ -140,14 +148,14 @@ describe('buildFullPlanExport', () => {
   });
 
   it('sets profile to null with profileNote when no profile provided', () => {
-    const result = buildFullPlanExport(mockPlanState, null);
+    const result = buildFullPlanExport(mockPlanState, null, mockCalcNutrition);
 
     expect(result.profile).toBeNull();
     expect(result.profileNote).toContain('No calorie profile');
   });
 
   it('still computes targetComparison from planner targets when profile is null', () => {
-    const result = buildFullPlanExport(mockPlanState, null);
+    const result = buildFullPlanExport(mockPlanState, null, mockCalcNutrition);
 
     expect(result.targetComparison.calories).toEqual({
       target: 2200, actual: 455, difference: -1745,
@@ -162,7 +170,7 @@ describe('buildFullPlanExport', () => {
       height: 183, // cm
       weeklyChange: -0.45, // kg/week (≈ -1 lb/week)
     };
-    const result = buildFullPlanExport(mockPlanState, metricProfile);
+    const result = buildFullPlanExport(mockPlanState, metricProfile, mockCalcNutrition);
 
     // weight in metric, no conversion needed for BMR
     // BMR = 10*82 + 6.25*183 - 5*30 + 5 = 820 + 1143.75 - 150 + 5 = 1818.75 → 1819
@@ -183,7 +191,7 @@ describe('buildFullPlanExport', () => {
       macroMethod: 'percentage',
       macroSplit: { p: 30, c: 40, f: 30 },
     };
-    const result = buildFullPlanExport(mockPlanState, pctProfile);
+    const result = buildFullPlanExport(mockPlanState, pctProfile, mockCalcNutrition);
 
     // 30% of 2312 = 693.6 cal / 4 = 173g protein
     expect(result.profile.macroTargets.protein.grams).toBe(173);
@@ -191,5 +199,40 @@ describe('buildFullPlanExport', () => {
     expect(result.profile.macroTargets.carbs.grams).toBe(231);
     // 30% of 2312 = 693.6 cal / 9 = 77g fat
     expect(result.profile.macroTargets.fat.grams).toBe(77);
+  });
+
+  it('exports scaled nutrition values from calculateNutritionFn', () => {
+    // Jif Peanut Butter: base 190 cal per 33g serving, user uses 15g (quantity ≈ 0.4545)
+    const scaledPlanState = {
+      ...mockPlanState,
+      mealIngredients: {
+        ...mockPlanState.mealIngredients,
+        breakfast: [
+          {
+            id: 99, name: 'Jif Peanut Butter', grams: 15, quantity: 0.4545, unit: 'g',
+            gramsPerUnit: 33, calories: 190, protein: 7, carbs: 8, fat: 16,
+          },
+        ],
+      },
+    };
+
+    // Mock that simulates the real calculateNutrition scaling
+    const scalingCalcNutrition = (ing) => ({
+      calories: ing.calories * (ing.grams / (ing.gramsPerUnit || 100)),
+      protein: ing.protein * (ing.grams / (ing.gramsPerUnit || 100)),
+      carbs: ing.carbs * (ing.grams / (ing.gramsPerUnit || 100)),
+      fat: ing.fat * (ing.grams / (ing.gramsPerUnit || 100)),
+    });
+
+    const result = buildFullPlanExport(scaledPlanState, mockProfile, scalingCalcNutrition);
+
+    // 190 * (15/33) ≈ 86.36 → 86
+    expect(result.plan.meals.breakfast[0].nutrition.calories).toBe(86);
+    // 7 * (15/33) ≈ 3.18 → 3
+    expect(result.plan.meals.breakfast[0].nutrition.protein).toBe(3);
+    // 8 * (15/33) ≈ 3.64 → 4
+    expect(result.plan.meals.breakfast[0].nutrition.carbs).toBe(4);
+    // 16 * (15/33) ≈ 7.27 → 7
+    expect(result.plan.meals.breakfast[0].nutrition.fat).toBe(7);
   });
 });
