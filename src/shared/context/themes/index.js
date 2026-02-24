@@ -2,6 +2,7 @@
 // Each entry maps a theme ID to its metadata and factory function.
 
 import { cleanSlateTheme } from './cleanSlate';
+import { tokyoNightsTheme } from './tokyoNights';
 
 export const THEME_REGISTRY = {
   cleanSlate: {
@@ -14,6 +15,18 @@ export const THEME_REGISTRY = {
       secondary: '#7c3aed',
       bg: '#f9fafb',
       bgDark: '#111827',
+    },
+  },
+  tokyoNights: {
+    id: 'tokyoNights',
+    label: 'Tokyo Nights',
+    description: 'Cyberpunk neon',
+    factory: tokyoNightsTheme,
+    preview: {
+      primary: '#ff2d78',
+      secondary: '#00e5ff',
+      bg: '#f4f2ee',
+      bgDark: '#0a0a12',
     },
   },
 };
