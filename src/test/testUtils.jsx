@@ -50,14 +50,20 @@ export const mockMealPlan = {
  * @param {Object} options - Render options
  * @param {Object} options.user - Mock user object (null for unauthenticated)
  * @param {string} options.theme - 'light' or 'dark'
+ * @param {string} options.themeName - Theme name (e.g., 'cleanSlate', 'classic')
  * @returns {Object} - Render result from @testing-library/react
  */
 export const renderWithProviders = (ui, options = {}) => {
-  const { user = mockUser, theme = "light", ...renderOptions } = options;
+  const {
+    user = mockUser,
+    theme = "light",
+    themeName = "cleanSlate",
+    ...renderOptions
+  } = options;
 
   // Create a wrapper with all providers
   const Wrapper = ({ children }) => (
-    <ThemeProvider initialTheme={theme}>
+    <ThemeProvider initialTheme={theme} initialThemeName={themeName}>
       <UserProvider initialUser={user}>{children}</UserProvider>
     </ThemeProvider>
   );
