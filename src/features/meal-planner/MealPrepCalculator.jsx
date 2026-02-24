@@ -2247,9 +2247,9 @@ const MealPrepCalculator = memo(
                                 <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
                                   <TableCell></TableCell>
                                   <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
-                                  <TableCell align="center">?</TableCell>
-                                  <TableCell align="center">?</TableCell>
-                                  <TableCell align="center">?</TableCell>
+                                  <TableCell align="center">-</TableCell>
+                                  <TableCell align="center">-</TableCell>
+                                  <TableCell align="center">-</TableCell>
                                   <TableCell align="center">
                                     {currentMealTotals.calories}
                                   </TableCell>
