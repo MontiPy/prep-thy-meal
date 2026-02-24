@@ -3,6 +3,10 @@
 
 import { cleanSlateTheme } from './cleanSlate';
 import { tokyoNightsTheme } from './tokyoNights';
+import { oceanBreezeTheme } from './oceanBreeze';
+import { forestFloorTheme } from './forestFloor';
+import { lavenderHazeTheme } from './lavenderHaze';
+import { midnightEmberTheme } from './midnightEmber';
 
 export const THEME_REGISTRY = {
   cleanSlate: {
@@ -27,6 +31,54 @@ export const THEME_REGISTRY = {
       secondary: '#00e5ff',
       bg: '#f4f2ee',
       bgDark: '#0a0a12',
+    },
+  },
+  oceanBreeze: {
+    id: 'oceanBreeze',
+    label: 'Ocean Breeze',
+    description: 'Calm and coastal',
+    factory: oceanBreezeTheme,
+    preview: {
+      primary: '#0d9488',
+      secondary: '#f97316',
+      bg: '#f0fdfa',
+      bgDark: '#0f172a',
+    },
+  },
+  forestFloor: {
+    id: 'forestFloor',
+    label: 'Forest Floor',
+    description: 'Earthy and natural',
+    factory: forestFloorTheme,
+    preview: {
+      primary: '#558b2f',
+      secondary: '#d4a017',
+      bg: '#faf6f1',
+      bgDark: '#1a1a14',
+    },
+  },
+  lavenderHaze: {
+    id: 'lavenderHaze',
+    label: 'Lavender Haze',
+    description: 'Soft and dreamy',
+    factory: lavenderHazeTheme,
+    preview: {
+      primary: '#7c3aed',
+      secondary: '#e11d48',
+      bg: '#faf5ff',
+      bgDark: '#0f0720',
+    },
+  },
+  midnightEmber: {
+    id: 'midnightEmber',
+    label: 'Midnight Ember',
+    description: 'Bold and industrial',
+    factory: midnightEmberTheme,
+    preview: {
+      primary: '#ea580c',
+      secondary: '#475569',
+      bg: '#f8fafc',
+      bgDark: '#0c0a09',
     },
   },
 };
