@@ -6,7 +6,7 @@ const preferencesRef = (uid) => doc(db, 'userPreferences', uid);
 
 const DEFAULT_PREFERENCES = {
   showRecentIngredients: true,
-  // Add more preferences here in the future
+  themePrefs: null, // { themeName, isDark, customConfig }
 };
 
 /**
