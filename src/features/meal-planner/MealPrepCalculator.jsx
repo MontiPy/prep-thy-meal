@@ -2124,6 +2124,7 @@ const MealPrepCalculator = memo(
 
                                   return (
                                     <TableRow key={ingredient.id} hover>
+                                      <TableCell width="40px"></TableCell>
                                       <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
                                         {ingredient.name}
                                       </TableCell>
