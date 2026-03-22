@@ -1622,6 +1622,8 @@ const MealPrepCalculator = memo(
 
   return (
     <Box
+      component="main"
+      role="main"
       sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1, md: 3 }, pb: { xs: 6, md: 4 } }}
     >
       {(showConfetti || goalConfetti) && (
@@ -1856,7 +1858,14 @@ const MealPrepCalculator = memo(
               overflowY: { md: "auto" },
             }}
           >
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, borderRadius: 3 }}
+              role="region"
+              aria-live="polite"
+              aria-atomic="true"
+              aria-label="Daily meal totals summary"
+            >
               <Typography variant="subtitle1" fontWeight={800} mb={2}>
                 Plan summary
               </Typography>
