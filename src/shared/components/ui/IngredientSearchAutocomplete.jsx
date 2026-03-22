@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Autocomplete, TextField, Box, Typography, Chip } from '@mui/material';
+import StarIcon from '@mui/icons-material/StarRounded';
 import { calculateNutrition } from '../../../features/ingredients/nutritionHelpers';
 
 /**
  * Searchable ingredient selector with filtering, keyboard navigation, and nutrition preview
+ * Supports sorting by favorites and recent ingredients
  */
 const IngredientSearchAutocomplete = ({
   options = [],
@@ -13,6 +15,7 @@ const IngredientSearchAutocomplete = ({
   disabled = false,
   excludeIds = [],
   recentIngredients = [],
+  favoriteIds = [],
   placeholder = 'Search ingredients...',
   size = 'small',
   sx = {},
@@ -32,22 +35,28 @@ const IngredientSearchAutocomplete = ({
       return true;
     });
 
-    // Sort: recent first, then alphabetically
-    if (recentIngredients.length > 0) {
-      const recentIds = recentIngredients.map((r) => r.id);
-      filtered.sort((a, b) => {
-        const aIsRecent = recentIds.includes(a.id);
-        const bIsRecent = recentIds.includes(b.id);
-        if (aIsRecent && !bIsRecent) return -1;
-        if (!aIsRecent && bIsRecent) return 1;
-        return a.name.localeCompare(b.name);
-      });
-    } else {
-      filtered.sort((a, b) => a.name.localeCompare(b.name));
-    }
+    // Sort: favorites first, then recent, then alphabetically
+    const recentIds = recentIngredients.map((r) => r.id);
+    filtered.sort((a, b) => {
+      const aIsFav = favoriteIds.includes(a.id);
+      const bIsFav = favoriteIds.includes(b.id);
+
+      // Favorites come first
+      if (aIsFav && !bIsFav) return -1;
+      if (!aIsFav && bIsFav) return 1;
+
+      // Then recent
+      const aIsRecent = recentIds.includes(a.id);
+      const bIsRecent = recentIds.includes(b.id);
+      if (aIsRecent && !bIsRecent) return -1;
+      if (!aIsRecent && bIsRecent) return 1;
+
+      // Then alphabetically
+      return a.name.localeCompare(b.name);
+    });
 
     return filtered;
-  }, [options, excludeIds, inputValue, recentIngredients]);
+  }, [options, excludeIds, inputValue, recentIngredients, favoriteIds]);
 
   // Get selected ingredient object
   const selectedIngredient = options.find((opt) => opt.id === value) || null;
@@ -95,6 +104,7 @@ const IngredientSearchAutocomplete = ({
           grams: option.gramsPerUnit || option.grams || 100,
         });
         const isRecent = recentIngredients.some((r) => r.id === option.id);
+        const isFavorite = favoriteIds.includes(option.id);
 
         return (
           <Box component="li" {...props} key={option.id}>
@@ -103,6 +113,15 @@ const IngredientSearchAutocomplete = ({
                 <Typography variant="body2" fontWeight={600} noWrap>
                   {option.name}
                 </Typography>
+                {isFavorite && (
+                  <StarIcon
+                    sx={{
+                      fontSize: '0.9rem',
+                      color: 'warning.main',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
                 {isRecent && (
                   <Chip
                     label="Recent"
