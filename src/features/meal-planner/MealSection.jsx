@@ -33,6 +33,7 @@ import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import InfoIcon from "@mui/icons-material/InfoOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopyRounded";
 import ContentPasteIcon from "@mui/icons-material/ContentPasteRounded";
+import RestaurantIcon from "@mui/icons-material/RestaurantRounded";
 
 import { calculateNutrition, getServingSizes, normalizeIngredient } from "../ingredients/nutritionHelpers";
 import { addToRecentIngredients } from "../ingredients/recentIngredients";
@@ -73,6 +74,7 @@ const MealSection = ({
   onCopyMeal,
   onPasteMeal,
   clipboardHasMeal,
+  onShowRecipeManager,
 }) => {
   const theme = useTheme();
 
@@ -213,6 +215,24 @@ const MealSection = ({
                     }}
                   >
                     <ContentPasteIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Add recipe to meal">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShowRecipeManager?.(meal);
+                    }}
+                    disabled={disabled}
+                    sx={{
+                      minWidth: { xs: 44, sm: "auto" },
+                      minHeight: { xs: 44, sm: "auto" },
+                    }}
+                  >
+                    <RestaurantIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                 </span>
               </Tooltip>

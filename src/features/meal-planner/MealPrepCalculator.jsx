@@ -214,6 +214,7 @@ const MealPrepCalculator = memo(
   // Recipes state
   const [recipes, setRecipes] = useState([]);
   const [recipeManagerOpen, setRecipeManagerOpen] = useState(false);
+  const [recipeManagerMeal, setRecipeManagerMeal] = useState(null);
   const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
@@ -640,6 +641,12 @@ const MealPrepCalculator = memo(
       toast.error('Failed to save recipes');
     }
   }, [user?.uid]);
+
+  // Open recipe manager for a specific meal
+  const handleShowRecipeManager = useCallback((meal) => {
+    setRecipeManagerMeal(meal);
+    setRecipeManagerOpen(true);
+  }, []);
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
@@ -1696,6 +1703,7 @@ const MealPrepCalculator = memo(
                     onCopyMeal={handleCopyMeal}
                     onPasteMeal={handlePasteMeal}
                     clipboardHasMeal={mealClipboard !== null}
+                    onShowRecipeManager={handleShowRecipeManager}
                   />
                 );
               })}
@@ -1913,11 +1921,16 @@ const MealPrepCalculator = memo(
       {/* Recipe Manager Modal */}
       <RecipeManager
         open={recipeManagerOpen}
-        onClose={() => setRecipeManagerOpen(false)}
+        onClose={() => {
+          setRecipeManagerOpen(false);
+          setRecipeManagerMeal(null);
+        }}
         recipes={recipes}
         onRecipesChange={handleRecipesChange}
-        selectedMealIngredients={[]} // Can be enhanced to show currently selected meal
+        selectedMealIngredients={recipeManagerMeal ? mealIngredients[recipeManagerMeal] : []}
         onCreateRecipeFromMeal={() => {}}
+        selectedMeal={recipeManagerMeal}
+        onAddRecipeToMeal={handleAddRecipe}
       />
     </Box>
   );

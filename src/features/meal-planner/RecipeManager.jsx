@@ -42,6 +42,8 @@ const RecipeManager = ({
   onRecipesChange,
   selectedMealIngredients,
   onCreateRecipeFromMeal,
+  selectedMeal,
+  onAddRecipeToMeal,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -202,6 +204,21 @@ const RecipeManager = ({
                               variant="outlined"
                             />
                           </Stack>
+                          {selectedMeal && (
+                            <Box sx={{ mt: 1 }}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                onClick={() => {
+                                  onAddRecipeToMeal?.(selectedMeal, recipe.id);
+                                  handleClose();
+                                }}
+                              >
+                                Add to {selectedMeal}
+                              </Button>
+                            </Box>
+                          )}
                         </Box>
                         <IconButton
                           size="small"
