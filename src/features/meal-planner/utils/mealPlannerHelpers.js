@@ -31,9 +31,12 @@ export const calcTotals = (list) =>
         protein: totals.protein + nutrition.protein,
         carbs: totals.carbs + nutrition.carbs,
         fat: totals.fat + nutrition.fat,
+        fiber: totals.fiber + (nutrition.fiber || 0),
+        sugar: totals.sugar + (nutrition.sugar || 0),
+        sodium: totals.sodium + (nutrition.sodium || 0),
       };
     },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 }
   );
 
 /**
@@ -48,6 +51,9 @@ export const calcTotalsRounded = (list) => {
     protein: roundVal(totals.protein),
     carbs: roundVal(totals.carbs),
     fat: roundVal(totals.fat),
+    fiber: roundVal(totals.fiber),
+    sugar: roundVal(totals.sugar),
+    sodium: Math.round(totals.sodium),
   };
 };
 

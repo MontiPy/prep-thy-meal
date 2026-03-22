@@ -38,6 +38,7 @@ import RestaurantIcon from "@mui/icons-material/RestaurantRounded";
 import { calculateNutrition, getServingSizes, normalizeIngredient } from "../ingredients/nutritionHelpers";
 import { addToRecentIngredients } from "../ingredients/recentIngredients";
 import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientSearchAutocomplete";
+import MicronutrientDisplay from "../../shared/components/ui/MicronutrientDisplay";
 import { roundVal } from "./utils/mealPlannerHelpers";
 
 /**
@@ -76,6 +77,7 @@ const MealSection = ({
   clipboardHasMeal,
   onShowRecipeManager,
 }) => {
+  const [micronutrientsExpanded, setMicronutrientsExpanded] = React.useState(false);
   const theme = useTheme();
 
   // Memoize display quantities to avoid recalculation
@@ -469,8 +471,23 @@ const MealSection = ({
                 </TableBody>
               </Table>
             </Box>
-          ) : (
-            // Mobile view (cards)
+          ) : null}
+
+          {/* Micronutrient display */}
+          {ingredients.length > 0 && (
+            <MicronutrientDisplay
+              micronutrients={{
+                fiber: mealTotals.fiber || 0,
+                sugar: mealTotals.sugar || 0,
+                sodium: mealTotals.sodium || 0,
+              }}
+              isExpanded={micronutrientsExpanded}
+              onToggleExpand={setMicronutrientsExpanded}
+            />
+          )}
+
+          {/* Mobile view (cards) */}
+          {!isDesktop ? (
             <Stack spacing={1}>
               {ingredientDisplayData.map((ing) => {
                 const disabledRow = matchDinner && meal === "dinner";
