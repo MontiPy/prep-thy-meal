@@ -52,6 +52,10 @@ const PlanManager = ({
   onDownloadFullPlan,
   onCopyShoppingList,
   onShareToReminders,
+  onExportCSV,
+  onCopyCSV,
+  onExportShoppingListCSV,
+  onExportForMyFitnessPal,
 }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
@@ -265,6 +269,49 @@ const PlanManager = ({
             >
               Download Full Plan
             </MenuItem>
+
+            <Divider sx={{ my: 0.5 }} />
+
+            {/* CSV Export Options */}
+            <MenuItem
+              onClick={() => {
+                onExportCSV?.();
+                handleCloseActionsMenu();
+              }}
+              disabled={!onExportCSV}
+            >
+              Export as CSV
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                onCopyCSV?.();
+                handleCloseActionsMenu();
+              }}
+              disabled={!onCopyCSV}
+            >
+              Copy as CSV
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                onExportShoppingListCSV?.();
+                handleCloseActionsMenu();
+              }}
+              disabled={!onExportShoppingListCSV}
+            >
+              Shopping List (CSV)
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                onExportForMyFitnessPal?.();
+                handleCloseActionsMenu();
+              }}
+              disabled={!onExportForMyFitnessPal}
+            >
+              Export for MyFitnessPal
+            </MenuItem>
+
+            <Divider sx={{ my: 0.5 }} />
+
             <MenuItem
               onClick={() => {
                 importFileRef.current?.click();

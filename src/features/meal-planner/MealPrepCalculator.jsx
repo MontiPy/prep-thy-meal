@@ -108,6 +108,13 @@ import { buildFullPlanExport } from './buildFullPlanExport';
 import RecipeManager from './RecipeManager';
 import { loadRecipes, saveRecipesAll } from '../../shared/services/storage';
 import { expandRecipe } from './utils/recipeHelpers';
+import {
+  exportMealPlanToCSV,
+  exportShoppingListToCSV,
+  exportForMyFitnessPal,
+  downloadCSV,
+  copyCSVToClipboard,
+} from './utils/csvExport';
 
 
 const MealPrepCalculator = memo(
@@ -1391,6 +1398,83 @@ const MealPrepCalculator = memo(
     toast.success("Full plan exported!");
   };
 
+  // Export meal plan as CSV
+  const handleExportCSV = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before exporting.");
+      return;
+    }
+
+    try {
+      const csvContent = exportMealPlanToCSV(mealIngredients, planName);
+      const filename = (planName || 'meal-plan').replace(/\s+/g, '_').toLowerCase();
+      downloadCSV(csvContent, filename);
+      toast.success("Meal plan exported as CSV!");
+    } catch (err) {
+      console.error('Failed to export CSV:', err);
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  // Copy meal plan as CSV to clipboard
+  const handleCopyCSV = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before copying.");
+      return;
+    }
+
+    try {
+      const csvContent = exportMealPlanToCSV(mealIngredients, planName);
+      const success = await copyCSVToClipboard(csvContent);
+      if (success) {
+        toast.success("Meal plan copied as CSV to clipboard!");
+      } else {
+        toast.error("Failed to copy to clipboard");
+      }
+    } catch (err) {
+      console.error('Failed to copy CSV:', err);
+      toast.error("Failed to copy CSV");
+    }
+  };
+
+  // Export shopping list as CSV
+  const handleExportShoppingListCSV = async () => {
+    try {
+      const csvContent = exportShoppingListToCSV(
+        categorizedShoppingList,
+        prepDays,
+        planName
+      );
+      const filename = `${(planName || 'shopping-list').replace(/\s+/g, '_').toLowerCase()}_${prepDays}days`;
+      downloadCSV(csvContent, filename);
+      toast.success(`Shopping list exported as CSV!`);
+    } catch (err) {
+      console.error('Failed to export shopping list CSV:', err);
+      toast.error("Failed to export shopping list");
+    }
+  };
+
+  // Export for MyFitnessPal (simple format)
+  const handleExportForMyFitnessPal = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before exporting.");
+      return;
+    }
+
+    try {
+      const csvContent = exportForMyFitnessPal(mealIngredients);
+      const filename = (planName || 'meal-plan').replace(/\s+/g, '_').toLowerCase() + '_myfitnesspal';
+      downloadCSV(csvContent, filename);
+      toast.success("Exported for MyFitnessPal!");
+    } catch (err) {
+      console.error('Failed to export for MyFitnessPal:', err);
+      toast.error("Failed to export");
+    }
+  };
+
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
     MEALS.forEach((meal) => {
@@ -1559,6 +1643,10 @@ const MealPrepCalculator = memo(
           onDownloadFullPlan={handleDownloadFullPlan}
           onCopyShoppingList={handleCopyToClipboard}
           onShareToReminders={handleShareToReminders}
+          onExportCSV={handleExportCSV}
+          onCopyCSV={handleCopyCSV}
+          onExportShoppingListCSV={handleExportShoppingListCSV}
+          onExportForMyFitnessPal={handleExportForMyFitnessPal}
         />
         <Divider sx={{ my: 2 }} />
 
