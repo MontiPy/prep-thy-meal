@@ -615,8 +615,8 @@ const CalorieCalculator = () => {
                 <InputLabel>
                   Activity Level
                   <Tooltip title="Pick the option that matches your typical week">
-                    <IconButton size="small" sx={{ ml: 0.5, p: 0 }} aria-label="Activity level help">
-                      <InfoIcon sx={{ fontSize: 14 }} />
+                    <IconButton sx={{ ml: 0.5, minHeight: 44, minWidth: 44 }} aria-label="Activity level help">
+                      <InfoIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                   </Tooltip>
                 </InputLabel>
@@ -645,7 +645,6 @@ const CalorieCalculator = () => {
                     <Grid key={key} size={{ xs: 6, sm: 3 }}>
                       <Button
                         fullWidth
-                        size="small"
                         variant={goalPreset === key ? "contained" : "outlined"}
                         color={goalPreset === key ? "primary" : "inherit"}
                         onClick={() => setGoalPreset(key)}
@@ -653,6 +652,7 @@ const CalorieCalculator = () => {
                           textTransform: "none",
                           fontWeight: 600,
                           borderColor: theme.palette.divider,
+                          minHeight: { xs: 44, sm: 'auto' },
                         }}
                       >
                         {label}
@@ -707,27 +707,25 @@ const CalorieCalculator = () => {
                   </Typography>
                   <Stack direction="row" spacing={0.5}>
                     <Button
-                      size="small"
                       variant={macroMethod === "bodyweight" ? "contained" : "outlined"}
                       onClick={() => setMacroMethod("bodyweight")}
                       sx={{
                         textTransform: "none",
                         fontSize: "0.75rem",
                         px: 1.5,
-                        py: 0.5,
+                        minHeight: { xs: 44, sm: 'auto' },
                       }}
                     >
                       Simple
                     </Button>
                     <Button
-                      size="small"
                       variant={macroMethod === "percentage" ? "contained" : "outlined"}
                       onClick={() => setMacroMethod("percentage")}
                       sx={{
                         textTransform: "none",
                         fontSize: "0.75rem",
                         px: 1.5,
-                        py: 0.5,
+                        minHeight: { xs: 44, sm: 'auto' },
                       }}
                     >
                       Advanced
