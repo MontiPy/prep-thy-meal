@@ -1747,6 +1747,20 @@ const MealPrepCalculator = memo(
         </Alert>
       )}
 
+      {/* Show success alert when targets are just applied */}
+      {currentPlanId === null && calorieTarget > 0 && !isLoadingData && (
+        <Alert severity="success" sx={{ mt: 2 }} icon="🎯">
+          <Stack spacing={0.5}>
+            <Typography variant="body2" fontWeight={600}>
+              Targets set! Ready to build your meal plan.
+            </Typography>
+            <Typography variant="caption" color="inherit">
+              {calorieTarget} kcal • {targetPercentages.protein}% Protein • {targetPercentages.carbs}% Carbs • {targetPercentages.fat}% Fat
+            </Typography>
+          </Stack>
+        </Alert>
+      )}
+
       <Grid container spacing={{ xs: 2, md: 2.5 }}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Stack spacing={{ xs: 2, md: 2.5 }}>
