@@ -56,6 +56,7 @@ const PlanManager = ({
   onCopyCSV,
   onExportShoppingListCSV,
   onExportForMyFitnessPal,
+  onSharePlan,
 }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
@@ -339,6 +340,19 @@ const PlanManager = ({
               }}
             >
               Share list
+            </MenuItem>
+
+            <Divider />
+
+            {/* Sharing Actions */}
+            <MenuItem
+              onClick={() => {
+                onSharePlan?.();
+                handleCloseActionsMenu();
+              }}
+              disabled={!onSharePlan}
+            >
+              Share plan link
             </MenuItem>
           </Menu>
 

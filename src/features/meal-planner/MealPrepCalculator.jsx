@@ -106,6 +106,7 @@ import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientS
 import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
 import { buildFullPlanExport } from './buildFullPlanExport';
 import RecipeManager from './RecipeManager';
+import SharePlanDialog from './SharePlanDialog';
 import { loadRecipes, saveRecipesAll } from '../../shared/services/storage';
 import { expandRecipe } from './utils/recipeHelpers';
 import {
@@ -115,6 +116,7 @@ import {
   downloadCSV,
   copyCSVToClipboard,
 } from './utils/csvExport';
+import { parsePlanFromLink } from './utils/planSharing';
 
 
 const MealPrepCalculator = memo(
@@ -222,6 +224,10 @@ const MealPrepCalculator = memo(
   const [recipes, setRecipes] = useState([]);
   const [recipeManagerOpen, setRecipeManagerOpen] = useState(false);
   const [recipeManagerMeal, setRecipeManagerMeal] = useState(null);
+
+  // Share plan state
+  const [sharePlanDialogOpen, setSharePlanDialogOpen] = useState(false);
+
   const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
@@ -654,6 +660,15 @@ const MealPrepCalculator = memo(
     setRecipeManagerMeal(meal);
     setRecipeManagerOpen(true);
   }, []);
+
+  // Open share plan dialog
+  const handleOpenSharePlanDialog = useCallback(() => {
+    if (!currentPlanId) {
+      toast.error("Save your plan before sharing");
+      return;
+    }
+    setSharePlanDialogOpen(true);
+  }, [currentPlanId]);
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
@@ -1647,6 +1662,7 @@ const MealPrepCalculator = memo(
           onCopyCSV={handleCopyCSV}
           onExportShoppingListCSV={handleExportShoppingListCSV}
           onExportForMyFitnessPal={handleExportForMyFitnessPal}
+          onSharePlan={handleOpenSharePlanDialog}
         />
         <Divider sx={{ my: 2 }} />
 
@@ -2033,6 +2049,23 @@ const MealPrepCalculator = memo(
         onCreateRecipeFromMeal={() => {}}
         selectedMeal={recipeManagerMeal}
         onAddRecipeToMeal={handleAddRecipe}
+      />
+
+      {/* Share Plan Dialog */}
+      <SharePlanDialog
+        open={sharePlanDialogOpen}
+        onClose={() => setSharePlanDialogOpen(false)}
+        plan={{
+          name: planName,
+          calorieTarget,
+          targetPercentages,
+          meals: {
+            breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+            lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+            dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+            snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+          },
+        }}
       />
     </Box>
   );
