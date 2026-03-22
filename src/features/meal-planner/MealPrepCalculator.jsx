@@ -193,6 +193,9 @@ const MealPrepCalculator = memo(
 
   const [selectedId, setSelectedId] = useState("");
 
+  // Meal clipboard for copy/paste functionality
+  const [mealClipboard, setMealClipboard] = useState(null);
+
   const [cheer, setCheer] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [goalConfetti, setGoalConfetti] = useState(false);
@@ -550,6 +553,50 @@ const MealPrepCalculator = memo(
     });
     setSelectedId("");
   }, [selectedId, allIngredients, matchDinner, refreshIngredientData, setMealIngredients]);
+
+  // Copy meal ingredients to clipboard
+  const handleCopyMeal = useCallback((meal) => {
+    const ingredients = mealIngredients[meal];
+    if (ingredients.length === 0) {
+      toast.error(`No ingredients to copy from ${meal}`);
+      return;
+    }
+    // Store a deep copy of the ingredients
+    setMealClipboard({
+      ingredients: ingredients.map(ing => ({ ...ing })),
+      sourceMeal: meal,
+      copiedAt: new Date().toLocaleTimeString(),
+    });
+    toast.success(`Copied ${ingredients.length} ingredient(s) from ${meal}`);
+  }, [mealIngredients]);
+
+  // Paste meal from clipboard
+  const handlePasteMeal = useCallback((meal) => {
+    if (!mealClipboard) {
+      toast.error("No meal copied yet");
+      return;
+    }
+
+    const { ingredients } = mealClipboard;
+    setMealIngredients((prev) => {
+      // Deep copy ingredients and refresh their data from source
+      const pastedIngredients = ingredients.map(ing => {
+        const refreshed = refreshIngredientData(ing);
+        return { ...refreshed };
+      });
+
+      const list = [...prev[meal], ...pastedIngredients];
+      const updated = { ...prev, [meal]: list };
+
+      // If pasting to lunch, also update dinner if mirroring
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => refreshIngredientData(i));
+      }
+
+      return updated;
+    });
+    toast.success(`Pasted ${ingredients.length} ingredient(s) to ${meal}`);
+  }, [mealClipboard, matchDinner, refreshIngredientData, setMealIngredients]);
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
@@ -1569,6 +1616,9 @@ const MealPrepCalculator = memo(
                       setTemplateMealType(mealType);
                       setTemplateModalOpen(true);
                     }}
+                    onCopyMeal={handleCopyMeal}
+                    onPasteMeal={handlePasteMeal}
+                    clipboardHasMeal={mealClipboard !== null}
                   />
                 );
               })}

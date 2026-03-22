@@ -31,6 +31,8 @@ import CloseIcon from "@mui/icons-material/CloseRounded";
 import LinkIcon from "@mui/icons-material/LinkRounded";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import InfoIcon from "@mui/icons-material/InfoOutlined";
+import ContentCopyIcon from "@mui/icons-material/ContentCopyRounded";
+import ContentPasteIcon from "@mui/icons-material/ContentPasteRounded";
 
 import { calculateNutrition, getServingSizes, normalizeIngredient } from "../ingredients/nutritionHelpers";
 import { addToRecentIngredients } from "../ingredients/recentIngredients";
@@ -68,6 +70,9 @@ const MealSection = ({
   onUpdateServing,
   onToggleMatchDinner,
   onShowTemplateModal,
+  onCopyMeal,
+  onPasteMeal,
+  clipboardHasMeal,
 }) => {
   const theme = useTheme();
 
@@ -175,6 +180,42 @@ const MealSection = ({
                 <BookmarkBorderIcon sx={{ fontSize: 16 }} />
                 Templates
               </Box>
+
+              {/* Copy/Paste buttons */}
+              <Tooltip title="Copy meal ingredients">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopyMeal(meal);
+                  }}
+                  disabled={disabled || ingredients.length === 0}
+                  sx={{
+                    minWidth: { xs: 44, sm: "auto" },
+                    minHeight: { xs: 44, sm: "auto" },
+                  }}
+                >
+                  <ContentCopyIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={clipboardHasMeal ? "Paste copied meal" : "No meal copied yet"}>
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPasteMeal(meal);
+                    }}
+                    disabled={disabled || !clipboardHasMeal}
+                    sx={{
+                      minWidth: { xs: 44, sm: "auto" },
+                      minHeight: { xs: 44, sm: "auto" },
+                    }}
+                  >
+                    <ContentPasteIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Stack>
             {meal === "dinner" && (
               <FormControlLabel
