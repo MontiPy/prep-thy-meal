@@ -105,6 +105,9 @@ import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
 import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientSearchAutocomplete";
 import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
 import { buildFullPlanExport } from './buildFullPlanExport';
+import RecipeManager from './RecipeManager';
+import { loadRecipes, saveRecipesAll } from '../../shared/services/storage';
+import { expandRecipe } from './utils/recipeHelpers';
 
 
 const MealPrepCalculator = memo(
@@ -207,6 +210,10 @@ const MealPrepCalculator = memo(
   const [currentPlanId, setCurrentPlanId] = useState(null);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Recipes state
+  const [recipes, setRecipes] = useState([]);
+  const [recipeManagerOpen, setRecipeManagerOpen] = useState(false);
   const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
@@ -372,9 +379,12 @@ const MealPrepCalculator = memo(
     const loadData = async () => {
       try {
         const plans = await loadPlans(uid); // Works for both guest (uid=null) and authenticated
+        const userRecipes = await loadRecipes(uid); // Load recipes
+
         // Only proceed if user hasn't changed during async operation
         if (uid !== user?.uid) return;
         setSavedPlans(plans);
+        setRecipes(userRecipes || []);
 
         if (plans.length > 0) {
           const stored =
@@ -597,6 +607,39 @@ const MealPrepCalculator = memo(
     });
     toast.success(`Pasted ${ingredients.length} ingredient(s) to ${meal}`);
   }, [mealClipboard, matchDinner, refreshIngredientData, setMealIngredients]);
+
+  // Add a recipe to a meal (expands into individual ingredients)
+  const handleAddRecipe = useCallback((meal, recipeId) => {
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return;
+
+    // Expand recipe into individual ingredients
+    const expandedIngredients = expandRecipe(recipe, 1);
+
+    setMealIngredients((prev) => {
+      const list = [...prev[meal], ...expandedIngredients];
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => refreshIngredientData(i));
+      }
+      return updated;
+    });
+
+    toast.success(`Added ${recipe.name} (${recipe.ingredients.length} ingredients) to ${meal}`);
+  }, [recipes, matchDinner, refreshIngredientData, setMealIngredients]);
+
+  // Handle recipe updates from RecipeManager
+  const handleRecipesChange = useCallback(async (updatedRecipes) => {
+    setRecipes(updatedRecipes);
+    const uid = user?.uid;
+    try {
+      await saveRecipesAll(uid, updatedRecipes);
+      toast.success('Recipes saved!');
+    } catch (err) {
+      console.error('Failed to save recipes:', err);
+      toast.error('Failed to save recipes');
+    }
+  }, [user?.uid]);
 
   const handleSavePlan = async () => {
     const uid = user?.uid;
@@ -1865,6 +1908,16 @@ const MealPrepCalculator = memo(
           setTemplateMealType(null);
           toast.success(`Template applied to ${templateMealType}!`);
         }}
+      />
+
+      {/* Recipe Manager Modal */}
+      <RecipeManager
+        open={recipeManagerOpen}
+        onClose={() => setRecipeManagerOpen(false)}
+        recipes={recipes}
+        onRecipesChange={handleRecipesChange}
+        selectedMealIngredients={[]} // Can be enhanced to show currently selected meal
+        onCreateRecipeFromMeal={() => {}}
       />
     </Box>
   );
