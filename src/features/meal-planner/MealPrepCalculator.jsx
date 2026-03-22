@@ -107,6 +107,7 @@ import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
 import { buildFullPlanExport } from './buildFullPlanExport';
 import RecipeManager from './RecipeManager';
 import SharePlanDialog from './SharePlanDialog';
+import MealTimingEditor from './MealTimingEditor';
 import { loadRecipes, saveRecipesAll } from '../../shared/services/storage';
 import { expandRecipe } from './utils/recipeHelpers';
 import {
@@ -141,6 +142,15 @@ const MealPrepCalculator = memo(
 
   // Bodyweight for macro validation (optional, can be synced from CalorieCalculator profile)
   const [bodyweightLbs, setBodyweightLbs] = useState(null);
+
+  // Meal timing (intermittent fasting support)
+  const [mealTimes, setMealTimes] = useState({
+    breakfast: '',
+    lunch: '',
+    dinner: '',
+    snack: '',
+  });
+  const [showMealTiming, setShowMealTiming] = useState(false);
 
   // Load bodyweight from CalorieCalculator profile if available
   useEffect(() => {
@@ -1828,6 +1838,42 @@ const MealPrepCalculator = memo(
                 );
               })}
             </Stack>
+
+            {/* Meal Timing Editor - Optional IF/Meal Scheduling */}
+            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 1.5,
+                  bgcolor: 'action.hover',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  '&:hover': {
+                    bgcolor: 'action.selected',
+                  },
+                }}
+                onClick={() => setShowMealTiming(!showMealTiming)}
+              >
+                <Typography variant="subtitle2" fontWeight={700}>
+                  ⏰ Meal Timing (Intermittent Fasting)
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {showMealTiming ? '▲' : '▼'}
+                </Typography>
+              </Box>
+              {typeof showMealTiming !== 'undefined' && (
+                <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+                  {showMealTiming && (
+                    <MealTimingEditor
+                      mealTimes={mealTimes}
+                      onMealTimesChange={setMealTimes}
+                    />
+                  )}
+                </Box>
+              )}
+            </Paper>
 
             {/* Shopping List */}
             <ShoppingList
