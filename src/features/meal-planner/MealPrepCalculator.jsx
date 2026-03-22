@@ -256,7 +256,6 @@ const MealPrepCalculator = memo(
   const importFileRef = useRef(null);
 
   // Targets prompt state (targets come from context)
-  const [showTargetsPrompt, setShowTargetsPrompt] = useState(false);
 
   // Meal template selector state
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -277,9 +276,17 @@ const MealPrepCalculator = memo(
 
   const checkPendingTargets = useCallback(() => {
     if (hasPendingTargets()) {
-      setShowTargetsPrompt(true);
+      // Auto-apply pending targets without second confirmation
+      const targets = consumePendingTargets();
+      if (targets) {
+        setCalorieTarget(targets.calorieTarget);
+        setTempTarget(targets.calorieTarget);
+        setTargetPercentages(targets.targetPercentages);
+        setHasUnsavedChanges(true);
+        toast.success(`Applied ${targets.calorieTarget} kcal target with new macro split!`);
+      }
     }
-  }, [hasPendingTargets]);
+  }, [hasPendingTargets, consumePendingTargets]);
 
   useImperativeHandle(ref, () => ({ onTabActive: checkPendingTargets }), [checkPendingTargets]);
 
@@ -287,25 +294,6 @@ const MealPrepCalculator = memo(
     checkPendingTargets();
   }, [checkPendingTargets]);
 
-  // Apply pending targets from Calorie Calculator
-  const applyPendingTargets = () => {
-    const targets = consumePendingTargets();
-    if (!targets) return;
-
-    setCalorieTarget(targets.calorieTarget);
-    setTempTarget(targets.calorieTarget);
-    setTargetPercentages(targets.targetPercentages);
-    setHasUnsavedChanges(true);
-    setShowTargetsPrompt(false);
-
-    toast.success(`Applied ${targets.calorieTarget} kcal target with new macro split!`);
-  };
-
-  // Dismiss pending targets
-  const dismissPendingTargets = () => {
-    consumePendingTargets(); // Clear from context
-    setShowTargetsPrompt(false);
-  };
 
   const rememberLastPlan = useCallback(
     (planId) => {
@@ -2021,48 +2009,6 @@ const MealPrepCalculator = memo(
         variant="danger"
       />
 
-      {/* Pending targets from Calorie Calculator */}
-      <Snackbar
-        open={showTargetsPrompt && pendingTargets !== null}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        sx={{ mb: { xs: 7, sm: 2 } }}
-      >
-        <Alert
-          severity="info"
-          variant="filled"
-          sx={{ width: "100%", alignItems: "center" }}
-          action={
-            <Stack direction="row" spacing={1}>
-              <Button
-                color="inherit"
-                size="small"
-                onClick={dismissPendingTargets}
-                sx={{ minHeight: { xs: 36, sm: 'auto' } }}
-              >
-                Dismiss
-              </Button>
-              <Button
-                color="inherit"
-                size="small"
-                variant="outlined"
-                onClick={applyPendingTargets}
-                sx={{ fontWeight: 700 }}
-              >
-                Apply
-              </Button>
-            </Stack>
-          }
-        >
-          <Stack spacing={0.5}>
-            <Typography variant="body2" fontWeight={600}>
-              Apply calculated targets to your meal plan?
-            </Typography>
-            <Typography variant="caption">
-              {pendingTargets?.calorieTarget} kcal • {pendingTargets?.targetPercentages?.protein}% Protein • {pendingTargets?.targetPercentages?.carbs}% Carbs • {pendingTargets?.targetPercentages?.fat}% Fat
-            </Typography>
-          </Stack>
-        </Alert>
-      </Snackbar>
 
       {/* Meal Template Selector Modal */}
       <MealTemplateSelector
