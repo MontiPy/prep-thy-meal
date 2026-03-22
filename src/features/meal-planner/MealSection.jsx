@@ -562,7 +562,7 @@ const MealSection = ({
                 );
               })}
             </Stack>
-          )}
+          ) : null}
         </Stack>
       </AccordionDetails>
     </Accordion>
