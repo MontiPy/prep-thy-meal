@@ -74,6 +74,7 @@ import {
 import MacroTargetEditor from './MacroTargetEditor';
 import ShoppingList from './ShoppingList';
 import MealSection from './MealSection';
+import PlanManager from './PlanManager';
 import {
   loadPlans,
   addPlan,
@@ -1406,226 +1407,28 @@ const MealPrepCalculator = memo(
 
       {/* Header */}
       <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ md: "flex-start" }}>
-          <Stack spacing={0.5}>
-            <Typography variant="h5" fontWeight={800}>
-              <span className="wiggle">🥗</span> Prep Thy Meal
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Plan your meals, hit your macros, and generate shopping lists.
-            </Typography>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} flexWrap="wrap" useFlexGap>
-            {/* Saved Plans Dropdown */}
-            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: 'unset' } }}>
-              <InputLabel id="header-plan-select">Saved plans</InputLabel>
-              <Select
-                labelId="header-plan-select"
-                label="Saved plans"
-                value={selectedPlanId}
-                onChange={handlePlanDropdownChange}
-              >
-                <MenuItem value="">
-                  <em>New plan</em>
-                </MenuItem>
-                {savedPlans
-                  .sort((a, b) => {
-                    // Sort by last modified date if available, otherwise by name
-                    const aDate = a.updatedAt || a.createdAt || 0;
-                    const bDate = b.updatedAt || b.createdAt || 0;
-                    if (aDate && bDate) {
-                      return bDate - aDate; // Most recent first
-                    }
-                    return a.name.localeCompare(b.name);
-                  })
-                  .map((plan) => {
-                    const modifiedDate = plan.updatedAt || plan.createdAt;
-                    const dateStr = modifiedDate
-                      ? new Date(modifiedDate.seconds ? modifiedDate.seconds * 1000 : modifiedDate).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })
-                      : null;
-                    return (
-                      <MenuItem key={plan.id} value={plan.id}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            {plan.name}
-                          </Typography>
-                          {dateStr && (
-                            <Typography variant="caption" color="text.secondary">
-                              Modified {dateStr}
-                            </Typography>
-                          )}
-                        </Box>
-                      </MenuItem>
-                    );
-                  })}
-              </Select>
-            </FormControl>
-            {/* Plan Name Input */}
-            <TextField
-              size="small"
-              label="Plan name"
-              value={planName}
-              onChange={(e) => setPlanName(e.target.value)}
-              placeholder="Enter plan name..."
-              sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: 'unset' } }}
-            />
-            {hasUnsavedChanges && (
-              <Chip size="small" color="warning" label="Unsaved" sx={{ fontWeight: 600 }} />
-            )}
-            <Stack direction="row" spacing={0.5}>
-              <Tooltip title="Undo">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={undoMealChange}
-                    disabled={!canUndo}
-                    color="default"
-                    sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                    aria-label="Undo"
-                  >
-                    <UndoIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Redo">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={redoMealChange}
-                    disabled={!canRedo}
-                    color="default"
-                    sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                    aria-label="Redo"
-                  >
-                    <RedoIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Stack>
-            <Button 
-              variant="contained" 
-              onClick={handleSavePlan}
-              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
-            >
-              {currentPlanId ? "Update Plan" : "Save Plan"}
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              onClick={handleOpenActionsMenu}
-              endIcon={<ExpandMoreIcon />}
-              sx={{ minHeight: { xs: 44, sm: 'auto' }, px: { xs: 1, sm: 2 } }}
-            >
-              {isDesktop ? "Plan actions" : "Actions"}
-            </Button>
-            <Menu
-              anchorEl={actionsAnchor}
-              open={actionsMenuOpen}
-              onClose={handleCloseActionsMenu}
-            >
-              {currentPlanId && (
-                <MenuItem
-                  onClick={() => {
-                    handleDuplicatePlan(currentPlanId);
-                    handleCloseActionsMenu();
-                  }}
-                >
-                  Duplicate plan
-                </MenuItem>
-              )}
-              {currentPlanId && (
-                <MenuItem
-                  onClick={() => {
-                    handleSaveAsNew();
-                    handleCloseActionsMenu();
-                  }}
-                >
-                  Save as new
-                </MenuItem>
-              )}
-              {currentPlanId && (
-                <MenuItem
-                  onClick={() => {
-                    handleDeletePlan(currentPlanId);
-                    handleCloseActionsMenu();
-                  }}
-                  sx={{ color: "error.main" }}
-                >
-                  Delete current plan
-                </MenuItem>
-              )}
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  handleCopyFullPlan();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Copy Full Plan
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleDownloadFullPlan();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Download Full Plan
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleExportPDF();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Export PDF
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleExportJSON();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Export JSON
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  importFileRef.current?.click();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Import JSON
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleCopyToClipboard();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Copy shopping list
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleShareToReminders();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Share list
-              </MenuItem>
-            </Menu>
-            <input
-              ref={importFileRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={handleImportJSON}
-              style={{ display: "none" }}
-              aria-label="Import meal plan from JSON file"
-            />
-          </Stack>
-        </Stack>
-
+        <PlanManager
+          savedPlans={savedPlans}
+          currentPlanId={currentPlanId}
+          selectedPlanId={selectedPlanId}
+          planName={planName}
+          hasUnsavedChanges={hasUnsavedChanges}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onPlanSelect={handlePlanDropdownChange}
+          onPlanNameChange={(name) => setPlanName(name)}
+          onSavePlan={handleSavePlan}
+          onDuplicatePlan={handleDuplicatePlan}
+          onSaveAsNew={handleSaveAsNew}
+          onDeletePlan={handleDeletePlan}
+          onImportJSON={handleImportJSON}
+          onUndo={undoMealChange}
+          onRedo={redoMealChange}
+          onCopyFullPlan={handleCopyFullPlan}
+          onDownloadFullPlan={handleDownloadFullPlan}
+          onCopyShoppingList={handleCopyToClipboard}
+          onShareToReminders={handleShareToReminders}
+        />
         <Divider sx={{ my: 2 }} />
 
         <Grid container spacing={2}>
