@@ -1000,16 +1000,50 @@ const MealPrepCalculator = memo(
 
     const doc = new jsPDF();
     const title = planName || "Meal Plan";
+    let yPosition = 10;
 
+    // Title
     doc.setFontSize(16);
-    doc.text(title, 10, 10);
+    doc.text(title, 10, yPosition);
+    yPosition += 12;
+
+    // Calorie Target Header
     doc.setFontSize(12);
-    doc.text(`Calories: ${calorieTarget}`, 10, 20);
-    doc.text(
-      `Protein: ${targetPercentages.protein}%  Carbs: ${targetPercentages.carbs}%  Fat: ${targetPercentages.fat}%`,
-      10,
-      28
-    );
+    doc.text(`Calorie Target: ${calorieTarget} kcal/day`, 10, yPosition);
+    yPosition += 7;
+
+    // Macro breakdown visualization
+    doc.setFontSize(10);
+    doc.text("Macro Distribution:", 10, yPosition);
+    yPosition += 6;
+
+    // Draw macro bars
+    const barWidth = 120;
+    const barHeight = 5;
+    const colors = {
+      protein: [76, 175, 80],   // Green
+      carbs: [33, 150, 243],    // Blue
+      fat: [255, 152, 0],       // Orange
+    };
+
+    const macros = [
+      { label: 'Protein', percent: targetPercentages.protein, color: colors.protein },
+      { label: 'Carbs', percent: targetPercentages.carbs, color: colors.carbs },
+      { label: 'Fat', percent: targetPercentages.fat, color: colors.fat },
+    ];
+
+    macros.forEach((macro) => {
+      const width = (macro.percent / 100) * barWidth;
+      doc.setDrawColor(macro.color[0], macro.color[1], macro.color[2]);
+      doc.setFillColor(macro.color[0], macro.color[1], macro.color[2]);
+      doc.rect(10, yPosition, width, barHeight, 'F');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(9);
+      doc.text(`${macro.label}: ${macro.percent}%`, barWidth + 15, yPosition + 4);
+      yPosition += 6;
+    });
+
+    yPosition += 3;
 
     const rows = MEALS.flatMap((meal) => {
       const list = mealIngredients[meal];
@@ -1050,7 +1084,7 @@ const MealPrepCalculator = memo(
         ],
       ],
       body: rows,
-      startY: 35,
+      startY: yPosition + 5,
     });
     autoTable(doc, {
       head: [["Daily Totals", "Calories", "Protein", "Carbs", "Fat"]],
