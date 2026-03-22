@@ -3,6 +3,17 @@ import { calculateNutrition } from '../../ingredients/nutritionHelpers';
 // Constants
 export const MEALS = ["breakfast", "lunch", "dinner", "snack"];
 
+export const CATEGORY_ORDER = [
+  "Produce - Fruits",
+  "Produce - Vegetables",
+  "Meat & Seafood",
+  "Dairy",
+  "Grains & Bread",
+  "Nuts & Legumes",
+  "Condiments & Spices",
+  "Other",
+];
+
 // Rounding utility
 export const roundVal = (n) => Math.round(Number(n) || 0);
 
