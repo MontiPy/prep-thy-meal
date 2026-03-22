@@ -108,6 +108,7 @@ import { buildFullPlanExport } from './buildFullPlanExport';
 import RecipeManager from './RecipeManager';
 import SharePlanDialog from './SharePlanDialog';
 import MealTimingEditor from './MealTimingEditor';
+import WeeklyPlanView from './WeeklyPlanView';
 import { loadRecipes, saveRecipesAll } from '../../shared/services/storage';
 import { expandRecipe } from './utils/recipeHelpers';
 import {
@@ -151,6 +152,9 @@ const MealPrepCalculator = memo(
     snack: '',
   });
   const [showMealTiming, setShowMealTiming] = useState(false);
+
+  // Weekly plan view
+  const [showWeeklyView, setShowWeeklyView] = useState(false);
 
   // Load bodyweight from CalorieCalculator profile if available
   useEffect(() => {
@@ -1780,6 +1784,42 @@ const MealPrepCalculator = memo(
       <Grid container spacing={{ xs: 2, md: 2.5 }}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Stack spacing={{ xs: 2, md: 2.5 }}>
+            {/* Weekly Plan View - Optional 7-day overview */}
+            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 1.5,
+                  bgcolor: 'action.hover',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  '&:hover': {
+                    bgcolor: 'action.selected',
+                  },
+                }}
+                onClick={() => setShowWeeklyView(!showWeeklyView)}
+              >
+                <Typography variant="subtitle2" fontWeight={700}>
+                  📅 7-Day Overview
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {showWeeklyView ? '▲' : '▼'}
+                </Typography>
+              </Box>
+              {showWeeklyView && (
+                <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+                  <WeeklyPlanView
+                    weeklyMealData={{}}
+                    calorieTarget={calorieTarget}
+                    targetPercentages={targetPercentages}
+                    onSelectDay={() => {}}
+                  />
+                </Box>
+              )}
+            </Paper>
+
             {/* Meal sections */}
             <Stack spacing={1.5}>
               {MEALS.map((meal, idx) => {
