@@ -61,6 +61,17 @@ import {
   getServingSizes,
 } from '../ingredients/nutritionHelpers';
 import {
+  MEALS,
+  roundVal,
+  calcTotals,
+  calcTotalsRounded,
+  categorizeIngredient,
+  getCategoryColors,
+  sanitizeFilename,
+  validatePlanForExport,
+} from './utils/mealPlannerHelpers';
+import MacroTargetEditor from './MacroTargetEditor';
+import {
   loadPlans,
   addPlan,
   removePlan,
@@ -91,133 +102,6 @@ import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientS
 import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
 import { buildFullPlanExport } from './buildFullPlanExport';
 
-const MEALS = ["breakfast", "lunch", "dinner", "snack"];
-const roundVal = (n) => Math.round(Number(n) || 0);
-
-// Moved outside component to avoid recreation on every render
-const calcTotals = (list) =>
-  list.reduce(
-    (totals, ingredient) => {
-      const nutrition = calculateNutrition(ingredient);
-      return {
-        calories: totals.calories + nutrition.calories,
-        protein: totals.protein + nutrition.protein,
-        carbs: totals.carbs + nutrition.carbs,
-        fat: totals.fat + nutrition.fat,
-      };
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-
-const calcTotalsRounded = (list) => {
-  const totals = calcTotals(list);
-  return {
-    calories: roundVal(totals.calories),
-    protein: roundVal(totals.protein),
-    carbs: roundVal(totals.carbs),
-    fat: roundVal(totals.fat),
-  };
-};
-
-// Categorize ingredients by store section (moved outside component)
-const categorizeIngredient = (name) => {
-  const nameL = name.toLowerCase();
-  if (
-    nameL.includes("chicken") ||
-    nameL.includes("beef") ||
-    nameL.includes("pork") ||
-    nameL.includes("turkey") ||
-    nameL.includes("fish") ||
-    nameL.includes("salmon") ||
-    nameL.includes("tuna") ||
-    nameL.includes("meat")
-  ) {
-    return "Meat & Seafood";
-  }
-  if (
-    nameL.includes("milk") ||
-    nameL.includes("cheese") ||
-    nameL.includes("yogurt") ||
-    nameL.includes("butter") ||
-    nameL.includes("cream")
-  ) {
-    return "Dairy";
-  }
-  if (
-    nameL.includes("apple") ||
-    nameL.includes("banana") ||
-    nameL.includes("berry") ||
-    nameL.includes("orange") ||
-    nameL.includes("grape") ||
-    nameL.includes("fruit")
-  ) {
-    return "Produce - Fruits";
-  }
-  if (
-    nameL.includes("broccoli") ||
-    nameL.includes("spinach") ||
-    nameL.includes("carrot") ||
-    nameL.includes("lettuce") ||
-    nameL.includes("tomato") ||
-    nameL.includes("vegetable") ||
-    nameL.includes("kale") ||
-    nameL.includes("pepper")
-  ) {
-    return "Produce - Vegetables";
-  }
-  if (
-    nameL.includes("rice") ||
-    nameL.includes("pasta") ||
-    nameL.includes("bread") ||
-    nameL.includes("oats") ||
-    nameL.includes("quinoa") ||
-    nameL.includes("cereal")
-  ) {
-    return "Grains & Bread";
-  }
-  if (
-    nameL.includes("beans") ||
-    nameL.includes("nuts") ||
-    nameL.includes("peanut") ||
-    nameL.includes("almond") ||
-    nameL.includes("seed")
-  ) {
-    return "Nuts & Legumes";
-  }
-  if (
-    nameL.includes("oil") ||
-    nameL.includes("sauce") ||
-    nameL.includes("spice") ||
-    nameL.includes("salt") ||
-    nameL.includes("pepper") ||
-    nameL.includes("vinegar")
-  ) {
-    return "Condiments & Spices";
-  }
-  return "Other";
-};
-
-// Category colors for shopping list — Tokyo Nights neon tints
-const getCategoryColors = (cat, isDark = true) => {
-  if (isDark) {
-    if (cat.includes("Produce - Fruit")) return { header: "rgba(57,255,127,0.2)", bg: "rgba(57,255,127,0.04)" };
-    if (cat.includes("Produce - Vegetable")) return { header: "rgba(57,255,127,0.25)", bg: "rgba(57,255,127,0.04)" };
-    if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "rgba(255,45,120,0.2)", bg: "rgba(255,45,120,0.04)" };
-    if (cat.includes("Dairy")) return { header: "rgba(0,229,255,0.2)", bg: "rgba(0,229,255,0.04)" };
-    if (cat.includes("Grains") || cat.includes("Bread")) return { header: "rgba(255,176,32,0.2)", bg: "rgba(255,176,32,0.04)" };
-    if (cat.includes("Fats") || cat.includes("Oils")) return { header: "rgba(255,176,32,0.2)", bg: "rgba(255,176,32,0.04)" };
-    if (cat.includes("Beverages")) return { header: "rgba(168,85,247,0.2)", bg: "rgba(168,85,247,0.04)" };
-    return { header: "rgba(255,255,255,0.08)", bg: "rgba(255,255,255,0.02)" };
-  }
-  if (cat.includes("Produce - Fruit")) return { header: "#86efac", bg: "#f0fdf4" };
-  if (cat.includes("Produce - Vegetable")) return { header: "#4ade80", bg: "#f0fdf4" };
-  if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "#fca5a5", bg: "#fef2f2" };
-  if (cat.includes("Dairy")) return { header: "#93c5fd", bg: "#eff6ff" };
-  if (cat.includes("Grains") || cat.includes("Bread")) return { header: "#fcd34d", bg: "#fffbeb" };
-  if (cat.includes("Fats") || cat.includes("Oils")) return { header: "#fbbf24", bg: "#fffbeb" };
-  if (cat.includes("Beverages")) return { header: "#a5b4fc", bg: "#eef2ff" };
-  return { header: "#e5e7eb", bg: "#f9fafb" };
-};
 
 const MealPrepCalculator = memo(
   forwardRef(function MealPrepCalculator({ allIngredients, userPreferences = {} }, ref) {
@@ -1755,77 +1639,21 @@ const MealPrepCalculator = memo(
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: { xs: 1.5, sm: 2 },
-                borderRadius: 2,
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(37,99,235,0.08)" : "rgba(226,235,255,0.6)",
-              }}
-            >
-              <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Macro budget
-                  </Typography>
-                  {!editingTarget && (
-                    <IconButton size="small" onClick={() => setEditingTarget(true)} aria-label="Edit target">
-                      <EditIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  )}
-                </Stack>
-                {editingTarget ? (
-                  <Stack spacing={1}>
-                    <TextField
-                      type="number"
-                      size="small"
-                      value={tempTarget}
-                      onChange={(e) => handleTargetChange(e.target.value)}
-                      inputProps={{ min: 500, max: 10000 }}
-                      label="kcal/day target"
-                    />
-                    {targetWarning && (
-                      <Typography variant="caption" color="warning.main">
-                        {targetWarning}
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={1}>
-                      <Button size="small" variant="contained" color="success" onClick={handleTargetEdit}>
-                        Save
-                      </Button>
-                      <Button size="small" color="inherit" onClick={handleTargetCancel}>
-                        Cancel
-                      </Button>
-                    </Stack>
-                  </Stack>
-                ) : (
-                  <Stack spacing={0.5}>
-                    <Typography variant="h6" fontWeight={800} color="primary.main" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
-                      {calorieTarget} kcal
-                    </Typography>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      justifyContent="space-between"
-                      flexWrap="wrap"
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        {targetMacros.protein}g P · {targetMacros.carbs}g C · {targetMacros.fat}g F
-                      </Typography>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={(e) => setMacroAnchor(e.currentTarget)}
-                      >
-                        Edit macros
-                      </Button>
-                    </Stack>
-                  </Stack>
-                )}
-              </Stack>
-            </Paper>
+            <MacroTargetEditor
+              calorieTarget={calorieTarget}
+              targetPercentages={targetPercentages}
+              editingTarget={editingTarget}
+              tempTarget={tempTarget}
+              targetWarning={targetWarning}
+              macroAnchor={macroAnchor}
+              onStartEdit={() => setEditingTarget(true)}
+              onCancelEdit={handleTargetCancel}
+              onConfirmEdit={handleTargetEdit}
+              onTempTargetChange={handleTargetChange}
+              onMacroAnchorClick={(e) => setMacroAnchor(e.currentTarget)}
+              onMacroAnchorClose={() => setMacroAnchor(null)}
+              onPercentagesChange={setTargetPercentages}
+            />
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2 }}>
@@ -1889,13 +1717,6 @@ const MealPrepCalculator = memo(
           </Grid>
         </Grid>
       </Paper>
-
-      <MacroTargetPopover
-        anchorEl={macroAnchor}
-        onClose={() => setMacroAnchor(null)}
-        targetPercentages={targetPercentages}
-        onPercentagesChange={setTargetPercentages}
-      />
 
       {/* Macro Validation Warnings */}
       {macroValidation && (macroValidation.hasWarnings || macroValidation.hasCritical) && (
