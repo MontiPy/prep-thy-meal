@@ -40,6 +40,11 @@ import { addToRecentIngredients } from "../ingredients/recentIngredients";
 import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientSearchAutocomplete";
 import MicronutrientDisplay from "../../shared/components/ui/MicronutrientDisplay";
 import { roundVal } from "./utils/mealPlannerHelpers";
+import {
+  getDietarySummary,
+  DIETARY_TAGS,
+  ALLERGEN_TAGS,
+} from "../ingredients/dietaryTags";
 
 /**
  * MealSection
@@ -258,6 +263,36 @@ const MealSection = ({
             {mealTotals.calories} kcal · {mealTotals.protein}g P · {mealTotals.carbs}g C ·{" "}
             {mealTotals.fat}g F
           </Typography>
+
+          {/* Dietary tags summary */}
+          {ingredients && ingredients.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+              {(() => {
+                const dietarySummary = getDietarySummary(ingredients);
+                const tagsToShow = Object.keys(dietarySummary.dietaryTags)
+                  .filter(tagId => dietarySummary.dietaryTags[tagId] === ingredients.length) // Only show tags present in ALL ingredients
+                  .slice(0, 4);
+
+                return tagsToShow.map(tagId => {
+                  const tag = Object.values({ ...DIETARY_TAGS, ...ALLERGEN_TAGS }).find(t => t.id === tagId);
+                  return tag ? (
+                    <Chip
+                      key={tagId}
+                      label={`${tag.icon} ${tag.label}`}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: '0.65rem',
+                        bgcolor: tag.color,
+                        color: 'white',
+                        fontWeight: 600,
+                      }}
+                    />
+                  ) : null;
+                });
+              })()}
+            </Box>
+          )}
         </Stack>
       </AccordionSummary>
 
