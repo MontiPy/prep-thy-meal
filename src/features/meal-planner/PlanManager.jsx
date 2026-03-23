@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -20,6 +20,8 @@ import {
 import UndoIcon from "@mui/icons-material/UndoRounded";
 import RedoIcon from "@mui/icons-material/RedoRounded";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ShareIcon from "@mui/icons-material/ShareRounded";
+import ShareableLinkDialog from './ShareableLinkDialog';
 
 /**
  * PlanManager
@@ -33,6 +35,7 @@ const PlanManager = ({
   selectedPlanId,
   planName,
   hasUnsavedChanges,
+  currentPlan, // Full plan data for sharing
 
   // Undo/redo state
   canUndo,
@@ -62,6 +65,7 @@ const PlanManager = ({
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
   const importFileRef = useRef(null);
   const [actionsAnchor, setActionsAnchor] = React.useState(null);
+  const [shareableLinkOpen, setShareableLinkOpen] = useState(false);
 
   const handleOpenActionsMenu = (event) => setActionsAnchor(event.currentTarget);
   const handleCloseActionsMenu = () => setActionsAnchor(null);
@@ -256,6 +260,15 @@ const PlanManager = ({
             {/* Export/Import Actions */}
             <MenuItem
               onClick={() => {
+                setShareableLinkOpen(true);
+                handleCloseActionsMenu();
+              }}
+            >
+              <ShareIcon sx={{ mr: 1, fontSize: 18 }} /> Share with Link
+            </MenuItem>
+
+            <MenuItem
+              onClick={() => {
                 onCopyFullPlan();
                 handleCloseActionsMenu();
               }}
@@ -371,6 +384,15 @@ const PlanManager = ({
           />
         </Stack>
       </Stack>
+
+      {/* Shareable Link Dialog */}
+      {currentPlan && (
+        <ShareableLinkDialog
+          open={shareableLinkOpen}
+          onClose={() => setShareableLinkOpen(false)}
+          plan={currentPlan}
+        />
+      )}
     </>
   );
 };

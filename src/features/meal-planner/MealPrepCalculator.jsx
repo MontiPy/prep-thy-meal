@@ -75,6 +75,7 @@ import MacroTargetEditor from './MacroTargetEditor';
 import ShoppingList from './ShoppingList';
 import MealSection from './MealSection';
 import PlanManager from './PlanManager';
+import { getSharedPlanFromUrl } from '../../shared/utils/planSharing';
 import {
   loadPlans,
   addPlan,
@@ -277,6 +278,34 @@ const MealPrepCalculator = memo(
       if (goalConfettiTimeoutRef.current) clearTimeout(goalConfettiTimeoutRef.current);
     };
   }, []);
+
+  // Load shared plan from URL if present
+  useEffect(() => {
+    const sharedPlan = getSharedPlanFromUrl();
+    if (sharedPlan) {
+      try {
+        // Load the shared plan into the meal planner
+        setPlanName(sharedPlan.name || "Shared Meal Plan");
+        setMealIngredients(sharedPlan.mealIngredients || {});
+        if (sharedPlan.targetCalories) {
+          setCalorieTarget(sharedPlan.targetCalories);
+          setTempTarget(sharedPlan.targetCalories);
+        }
+        if (sharedPlan.targetPercentages) {
+          setTargetPercentages(sharedPlan.targetPercentages);
+        }
+        if (sharedPlan.mealTimes) {
+          setMealTimes(sharedPlan.mealTimes);
+        }
+        toast.success(`Loaded shared meal plan: ${sharedPlan.name}`);
+        // Clear the URL parameter after loading
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (error) {
+        console.error('Error loading shared plan:', error);
+        toast.error('Failed to load shared meal plan');
+      }
+    }
+  }, []); // Run once on mount
 
   const checkPendingTargets = useCallback(() => {
     if (hasPendingTargets()) {
@@ -1647,6 +1676,14 @@ const MealPrepCalculator = memo(
           selectedPlanId={selectedPlanId}
           planName={planName}
           hasUnsavedChanges={hasUnsavedChanges}
+          currentPlan={{
+            name: planName,
+            mealIngredients,
+            mealTotals: dayTotals,
+            targetCalories: calorieTarget,
+            targetPercentages,
+            mealTimes,
+          }}
           canUndo={canUndo}
           canRedo={canRedo}
           onPlanSelect={handlePlanDropdownChange}

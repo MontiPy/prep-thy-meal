@@ -14,6 +14,7 @@ import OnboardingModal from '../shared/components/onboarding/OnboardingModal';
 import { hasCompletedOnboarding, completeOnboarding } from '../shared/services/onboarding';
 import { useUser } from '../features/auth/UserContext';
 import { loadUserPreferences, updateUserPreference } from '../shared/services/userPreferences';
+import { getSharedPlanFromUrl } from '../shared/utils/planSharing';
 
 const ThemeSync = () => {
   const { user } = useUser();
