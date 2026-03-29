@@ -797,11 +797,7 @@ const MealPrepCalculator = memo(
   };
 
   const handleSaveAsNew = async () => {
-    const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to save plans.");
-      return;
-    }
+    const uid = user?.uid ?? null;
     const newName = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
       name: newName,
@@ -865,11 +861,7 @@ const MealPrepCalculator = memo(
   };
 
   const handleDuplicatePlan = async (planId) => {
-    const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to duplicate plans.");
-      return;
-    }
+    const uid = user?.uid ?? null;
     const planToDuplicate = savedPlans.find((p) => p.id === planId);
     if (!planToDuplicate) {
       toast.error("Plan not found");
@@ -912,9 +904,8 @@ const MealPrepCalculator = memo(
   };
 
   const confirmDeletePlan = async () => {
-    const uid = user?.uid;
-    if (!uid || !planToDelete) {
-      toast.error("Not signed in. Cannot delete plan.");
+    const uid = user?.uid ?? null;
+    if (!planToDelete) {
       return;
     }
     try {

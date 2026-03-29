@@ -198,7 +198,7 @@ export function MacroValidationIndicator({ validation }) {
         borderRadius: 1,
         fontSize: '0.75rem',
         fontWeight: 600,
-        bgcolor: `${colors[validation.severity]}`,
+        bgcolor: colors[validation.severity],
         color: 'white',
         ml: 1,
       }}
