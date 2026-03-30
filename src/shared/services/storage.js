@@ -6,8 +6,6 @@ import {
   updatePlan as apiUpdate,
   loadBaseline as apiLoadBaseline,
   saveBaseline as apiSaveBaseline,
-  loadRecipes as apiLoadRecipes,
-  saveRecipes as apiSaveRecipes,
 } from './firestore.js';
 import {
   loadGuestPlans,
@@ -27,8 +25,6 @@ import {
   saveGuestFavorites,
   loadGuestRecents,
   saveGuestRecents,
-  loadGuestRecipes,
-  saveAllGuestRecipes,
 } from './guestStorage.js';
 import {
   loadCustomIngredients as apiLoadIngredients,
@@ -214,23 +210,4 @@ export const loadRecents = async () => {
 export const saveRecents = async (_uid, recents) => {
   saveGuestRecents(recents);
   return recents;
-};
-
-/**
- * Load recipes - routes to guest storage if no uid
- */
-export const loadRecipes = async (uid) => {
-  if (!uid) return loadGuestRecipes();
-  return apiLoadRecipes(uid);
-};
-
-/**
- * Save recipes - routes to guest storage if no uid
- */
-export const saveRecipesAll = async (uid, recipes) => {
-  if (!uid) {
-    saveAllGuestRecipes(recipes);
-    return recipes;
-  }
-  return apiSaveRecipes(uid, recipes);
 };

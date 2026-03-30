@@ -101,12 +101,7 @@ const CustomThemeEditor = () => {
           onChange={(_, val) => {
             if (val !== null) update('glowStyle', val);
           }}
-          sx={{
-            '& .MuiToggleButton-root': {
-              minHeight: { xs: 44, sm: 'auto' },
-              minWidth: { xs: 44, sm: 'auto' },
-            },
-          }}
+          size="small"
         >
           <ToggleButton value="none">None</ToggleButton>
           <ToggleButton value="soft">Soft</ToggleButton>

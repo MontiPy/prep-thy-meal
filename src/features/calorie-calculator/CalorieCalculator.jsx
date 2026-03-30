@@ -91,7 +91,6 @@ const CalorieCalculator = () => {
   const [helpAnchor, setHelpAnchor] = useState(null);
   const [helpContent, setHelpContent] = useState(null);
   const [animateBars, setAnimateBars] = useState(false);
-  const [targetsApplied, setTargetsApplied] = useState(false);
 
   const handleHelpClick = (event, content) => {
     setHelpAnchor(event.currentTarget);
@@ -355,10 +354,7 @@ const CalorieCalculator = () => {
       savedAt: new Date().toISOString(),
     };
     setTargets(plannerTargets);
-    setTargetsApplied(true);
     toast.success("Targets saved! Switch to the Planner tab to apply them.");
-    // Reset the flag after 8 seconds to allow re-triggering
-    setTimeout(() => setTargetsApplied(false), 8000);
   };
 
   const unitLabelW = units === "imperial" ? "lbs" : "kg";
@@ -619,8 +615,8 @@ const CalorieCalculator = () => {
                 <InputLabel>
                   Activity Level
                   <Tooltip title="Pick the option that matches your typical week">
-                    <IconButton sx={{ ml: 0.5, minHeight: 44, minWidth: 44 }} aria-label="Activity level help">
-                      <InfoIcon sx={{ fontSize: 18 }} />
+                    <IconButton size="small" sx={{ ml: 0.5, p: 0 }} aria-label="Activity level help">
+                      <InfoIcon sx={{ fontSize: 14 }} />
                     </IconButton>
                   </Tooltip>
                 </InputLabel>
@@ -649,6 +645,7 @@ const CalorieCalculator = () => {
                     <Grid key={key} size={{ xs: 6, sm: 3 }}>
                       <Button
                         fullWidth
+                        size="small"
                         variant={goalPreset === key ? "contained" : "outlined"}
                         color={goalPreset === key ? "primary" : "inherit"}
                         onClick={() => setGoalPreset(key)}
@@ -656,7 +653,6 @@ const CalorieCalculator = () => {
                           textTransform: "none",
                           fontWeight: 600,
                           borderColor: theme.palette.divider,
-                          minHeight: { xs: 44, sm: 'auto' },
                         }}
                       >
                         {label}
@@ -711,25 +707,27 @@ const CalorieCalculator = () => {
                   </Typography>
                   <Stack direction="row" spacing={0.5}>
                     <Button
+                      size="small"
                       variant={macroMethod === "bodyweight" ? "contained" : "outlined"}
                       onClick={() => setMacroMethod("bodyweight")}
                       sx={{
                         textTransform: "none",
                         fontSize: "0.75rem",
                         px: 1.5,
-                        minHeight: { xs: 44, sm: 'auto' },
+                        py: 0.5,
                       }}
                     >
                       Simple
                     </Button>
                     <Button
+                      size="small"
                       variant={macroMethod === "percentage" ? "contained" : "outlined"}
                       onClick={() => setMacroMethod("percentage")}
                       sx={{
                         textTransform: "none",
                         fontSize: "0.75rem",
                         px: 1.5,
-                        minHeight: { xs: 44, sm: 'auto' },
+                        py: 0.5,
                       }}
                     >
                       Advanced
@@ -1033,29 +1031,6 @@ const CalorieCalculator = () => {
                 </Alert>
               )}
 
-              {/* Handoff Callout */}
-              {targetsApplied && (
-                <Alert
-                  severity="success"
-                  icon={<ArrowForwardIcon sx={{ fontSize: 20 }} />}
-                  sx={{
-                    mt: 2,
-                    mb: 2,
-                    borderRadius: 2,
-                    fontWeight: 600,
-                    backgroundColor: alpha(theme.palette.success.main, 0.1),
-                    borderColor: theme.palette.success.main,
-                  }}
-                >
-                  <Typography fontWeight={700} mb={0.5}>
-                    Targets Applied! Ready for the Next Step
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Switch to the Planner tab to confirm your targets and start building meals. Your calorie and macro targets are now active.
-                  </Typography>
-                </Alert>
-              )}
-
               {/* CTA Button */}
               <Button
                 fullWidth
@@ -1064,11 +1039,11 @@ const CalorieCalculator = () => {
                 color="success"
                 endIcon={<ArrowForwardIcon sx={{ fontSize: 18 }} />}
                 onClick={sendToPlanner}
-                sx={{
-                  mt: 3,
+                sx={{ 
+                  mt: 3, 
                   mb: 1,
-                  textTransform: "none",
-                  fontWeight: 700,
+                  textTransform: "none", 
+                  fontWeight: 700, 
                   borderRadius: 2,
                   py: 1.5,
                   fontSize: '1rem',

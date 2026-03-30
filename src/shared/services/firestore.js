@@ -163,23 +163,3 @@ export const saveCustomIngredients = async (uid, items) => {
     return loadCustomIngredients(uid);
   }, `saveCustomIngredients(${uid})`);
 };
-
-// Recipes
-export const loadRecipes = async (uid) => {
-  return withRetry(async () => {
-    const snap = await getDoc(doc(settingsRef, uid));
-    return snap.exists() ? snap.data().recipes || [] : [];
-  }, `loadRecipes(${uid})`);
-};
-
-export const saveRecipes = async (uid, recipes) => {
-  return withRetry(async () => {
-    const cleanedRecipes = removeUndefined(recipes);
-    await setDoc(
-      doc(settingsRef, uid),
-      { recipes: cleanedRecipes },
-      { merge: true }
-    );
-    return loadRecipes(uid);
-  }, `saveRecipes(${uid})`);
-};

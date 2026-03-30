@@ -201,7 +201,7 @@ export const getServingSizes = (ingredientId) => {
  */
 export const calculateNutrition = (ingredient) => {
   const original = getOriginal(ingredient.id);
-  if (!original) return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 };
+  if (!original) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
 
   const servingSize = original.servingSize || 100;
   const servingUnit = original.servingUnit || "g";
@@ -226,9 +226,6 @@ export const calculateNutrition = (ingredient) => {
     protein: Math.round(original.protein * scale * 10) / 10,
     carbs: Math.round(original.carbs * scale * 10) / 10,
     fat: Math.round(original.fat * scale * 10) / 10,
-    fiber: Math.round((original.fiber || 0) * scale * 10) / 10,
-    sugar: Math.round((original.sugar || 0) * scale * 10) / 10,
-    sodium: Math.round((original.sodium || 0) * scale),
   };
 };
 
