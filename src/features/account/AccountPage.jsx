@@ -17,7 +17,7 @@ import {
 import { useUser } from '../auth/UserContext.jsx';
 import Login from '../auth/Login';
 import ConfirmDialog from '../../shared/components/ui/ConfirmDialog';
-import { loadUserPreferences, updateUserPreference } from '../../shared/services/userPreferences';
+import { loadPreferences, savePreferences } from '../../shared/services/storage';
 import { getGuestDataSummary } from '../../shared/services/guestMigration';
 import ThemeSelector from './ThemeSelector';
 
@@ -46,15 +46,13 @@ const AccountPage = () => {
   // Load user preferences
   useEffect(() => {
     const loadPrefs = async () => {
-      if (user?.uid) {
-        try {
-          const prefs = await loadUserPreferences(user.uid);
-          setPreferences(prefs);
-        } catch (err) {
-          console.error('Failed to load preferences:', err);
-        } finally {
-          setLoadingPrefs(false);
-        }
+      try {
+        const prefs = await loadPreferences(user?.uid ?? null);
+        setPreferences(prefs);
+      } catch (err) {
+        console.error('Failed to load preferences:', err);
+      } finally {
+        setLoadingPrefs(false);
       }
     };
     loadPrefs();
@@ -69,13 +67,11 @@ const AccountPage = () => {
   }, [isGuest]);
 
   const handleTogglePreference = async (key, value) => {
-    if (!user?.uid) return;
-
     const newPreferences = { ...preferences, [key]: value };
     setPreferences(newPreferences);
 
     try {
-      await updateUserPreference(user.uid, key, value);
+      await savePreferences(user?.uid ?? null, newPreferences);
       toast.success('Preference updated!');
     } catch (err) {
       console.error('Failed to save preference:', err);

@@ -61,6 +61,22 @@ import {
   getServingSizes,
 } from '../ingredients/nutritionHelpers';
 import {
+  MEALS,
+  roundVal,
+  calcTotals,
+  calcTotalsRounded,
+  categorizeIngredient,
+  getCategoryColors,
+  sanitizeFilename,
+  validatePlanForExport,
+  CATEGORY_ORDER,
+} from './utils/mealPlannerHelpers';
+import MacroTargetEditor from './MacroTargetEditor';
+import ShoppingList from './ShoppingList';
+import MealSection from './MealSection';
+import PlanManager from './PlanManager';
+import { getSharedPlanFromUrl } from '../../shared/utils/planSharing';
+import {
   loadPlans,
   addPlan,
   removePlan,
@@ -90,134 +106,21 @@ import MacroWarnings from "../../shared/components/ui/MacroWarnings.jsx";
 import IngredientSearchAutocomplete from "../../shared/components/ui/IngredientSearchAutocomplete";
 import MacroProgressBar from "../../shared/components/ui/MacroProgressBar";
 import { buildFullPlanExport } from './buildFullPlanExport';
+import RecipeManager from './RecipeManager';
+import SharePlanDialog from './SharePlanDialog';
+import MealTimingEditor from './MealTimingEditor';
+import WeeklyPlanView from './WeeklyPlanView';
+import { loadRecipes, saveRecipesAll } from '../../shared/services/storage';
+import { expandRecipe } from './utils/recipeHelpers';
+import {
+  exportMealPlanToCSV,
+  exportShoppingListToCSV,
+  exportForMyFitnessPal,
+  downloadCSV,
+  copyCSVToClipboard,
+} from './utils/csvExport';
+import { createWeeklyPlan } from './utils/weeklyPlanHelpers';
 
-const MEALS = ["breakfast", "lunch", "dinner", "snack"];
-const roundVal = (n) => Math.round(Number(n) || 0);
-
-// Moved outside component to avoid recreation on every render
-const calcTotals = (list) =>
-  list.reduce(
-    (totals, ingredient) => {
-      const nutrition = calculateNutrition(ingredient);
-      return {
-        calories: totals.calories + nutrition.calories,
-        protein: totals.protein + nutrition.protein,
-        carbs: totals.carbs + nutrition.carbs,
-        fat: totals.fat + nutrition.fat,
-      };
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-
-const calcTotalsRounded = (list) => {
-  const totals = calcTotals(list);
-  return {
-    calories: roundVal(totals.calories),
-    protein: roundVal(totals.protein),
-    carbs: roundVal(totals.carbs),
-    fat: roundVal(totals.fat),
-  };
-};
-
-// Categorize ingredients by store section (moved outside component)
-const categorizeIngredient = (name) => {
-  const nameL = name.toLowerCase();
-  if (
-    nameL.includes("chicken") ||
-    nameL.includes("beef") ||
-    nameL.includes("pork") ||
-    nameL.includes("turkey") ||
-    nameL.includes("fish") ||
-    nameL.includes("salmon") ||
-    nameL.includes("tuna") ||
-    nameL.includes("meat")
-  ) {
-    return "Meat & Seafood";
-  }
-  if (
-    nameL.includes("milk") ||
-    nameL.includes("cheese") ||
-    nameL.includes("yogurt") ||
-    nameL.includes("butter") ||
-    nameL.includes("cream")
-  ) {
-    return "Dairy";
-  }
-  if (
-    nameL.includes("apple") ||
-    nameL.includes("banana") ||
-    nameL.includes("berry") ||
-    nameL.includes("orange") ||
-    nameL.includes("grape") ||
-    nameL.includes("fruit")
-  ) {
-    return "Produce - Fruits";
-  }
-  if (
-    nameL.includes("broccoli") ||
-    nameL.includes("spinach") ||
-    nameL.includes("carrot") ||
-    nameL.includes("lettuce") ||
-    nameL.includes("tomato") ||
-    nameL.includes("vegetable") ||
-    nameL.includes("kale") ||
-    nameL.includes("pepper")
-  ) {
-    return "Produce - Vegetables";
-  }
-  if (
-    nameL.includes("rice") ||
-    nameL.includes("pasta") ||
-    nameL.includes("bread") ||
-    nameL.includes("oats") ||
-    nameL.includes("quinoa") ||
-    nameL.includes("cereal")
-  ) {
-    return "Grains & Bread";
-  }
-  if (
-    nameL.includes("beans") ||
-    nameL.includes("nuts") ||
-    nameL.includes("peanut") ||
-    nameL.includes("almond") ||
-    nameL.includes("seed")
-  ) {
-    return "Nuts & Legumes";
-  }
-  if (
-    nameL.includes("oil") ||
-    nameL.includes("sauce") ||
-    nameL.includes("spice") ||
-    nameL.includes("salt") ||
-    nameL.includes("pepper") ||
-    nameL.includes("vinegar")
-  ) {
-    return "Condiments & Spices";
-  }
-  return "Other";
-};
-
-// Category colors for shopping list — Tokyo Nights neon tints
-const getCategoryColors = (cat, isDark = true) => {
-  if (isDark) {
-    if (cat.includes("Produce - Fruit")) return { header: "rgba(57,255,127,0.2)", bg: "rgba(57,255,127,0.04)" };
-    if (cat.includes("Produce - Vegetable")) return { header: "rgba(57,255,127,0.25)", bg: "rgba(57,255,127,0.04)" };
-    if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "rgba(255,45,120,0.2)", bg: "rgba(255,45,120,0.04)" };
-    if (cat.includes("Dairy")) return { header: "rgba(0,229,255,0.2)", bg: "rgba(0,229,255,0.04)" };
-    if (cat.includes("Grains") || cat.includes("Bread")) return { header: "rgba(255,176,32,0.2)", bg: "rgba(255,176,32,0.04)" };
-    if (cat.includes("Fats") || cat.includes("Oils")) return { header: "rgba(255,176,32,0.2)", bg: "rgba(255,176,32,0.04)" };
-    if (cat.includes("Beverages")) return { header: "rgba(168,85,247,0.2)", bg: "rgba(168,85,247,0.04)" };
-    return { header: "rgba(255,255,255,0.08)", bg: "rgba(255,255,255,0.02)" };
-  }
-  if (cat.includes("Produce - Fruit")) return { header: "#86efac", bg: "#f0fdf4" };
-  if (cat.includes("Produce - Vegetable")) return { header: "#4ade80", bg: "#f0fdf4" };
-  if (cat.includes("Meat") || cat.includes("Seafood")) return { header: "#fca5a5", bg: "#fef2f2" };
-  if (cat.includes("Dairy")) return { header: "#93c5fd", bg: "#eff6ff" };
-  if (cat.includes("Grains") || cat.includes("Bread")) return { header: "#fcd34d", bg: "#fffbeb" };
-  if (cat.includes("Fats") || cat.includes("Oils")) return { header: "#fbbf24", bg: "#fffbeb" };
-  if (cat.includes("Beverages")) return { header: "#a5b4fc", bg: "#eef2ff" };
-  return { header: "#e5e7eb", bg: "#f9fafb" };
-};
 
 const MealPrepCalculator = memo(
   forwardRef(function MealPrepCalculator({ allIngredients, userPreferences = {} }, ref) {
@@ -241,6 +144,18 @@ const MealPrepCalculator = memo(
 
   // Bodyweight for macro validation (optional, can be synced from CalorieCalculator profile)
   const [bodyweightLbs, setBodyweightLbs] = useState(null);
+
+  // Meal timing (intermittent fasting support)
+  const [mealTimes, setMealTimes] = useState({
+    breakfast: '',
+    lunch: '',
+    dinner: '',
+    snack: '',
+  });
+  const [showMealTiming, setShowMealTiming] = useState(false);
+
+  // Weekly plan view
+  const [showWeeklyView, setShowWeeklyView] = useState(false);
 
   // Load bodyweight from CalorieCalculator profile if available
   useEffect(() => {
@@ -305,6 +220,9 @@ const MealPrepCalculator = memo(
 
   const [selectedId, setSelectedId] = useState("");
 
+  // Meal clipboard for copy/paste functionality
+  const [mealClipboard, setMealClipboard] = useState(null);
+
   const [cheer, setCheer] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [goalConfetti, setGoalConfetti] = useState(false);
@@ -316,6 +234,15 @@ const MealPrepCalculator = memo(
   const [currentPlanId, setCurrentPlanId] = useState(null);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Recipes state
+  const [recipes, setRecipes] = useState([]);
+  const [recipeManagerOpen, setRecipeManagerOpen] = useState(false);
+  const [recipeManagerMeal, setRecipeManagerMeal] = useState(null);
+
+  // Share plan state
+  const [sharePlanDialogOpen, setSharePlanDialogOpen] = useState(false);
+
   const [_lastPlanSavedAt, setLastPlanSavedAt] = useState(null);
   const isHydratingRef = useRef(false);
   const skipUnsavedRef = useRef(false);
@@ -334,7 +261,6 @@ const MealPrepCalculator = memo(
   const importFileRef = useRef(null);
 
   // Targets prompt state (targets come from context)
-  const [showTargetsPrompt, setShowTargetsPrompt] = useState(false);
 
   // Meal template selector state
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -353,11 +279,47 @@ const MealPrepCalculator = memo(
     };
   }, []);
 
+  // Load shared plan from URL if present
+  useEffect(() => {
+    const sharedPlan = getSharedPlanFromUrl();
+    if (sharedPlan) {
+      try {
+        // Load the shared plan into the meal planner
+        setPlanName(sharedPlan.name || "Shared Meal Plan");
+        setMealIngredients(sharedPlan.mealIngredients || {});
+        if (sharedPlan.targetCalories) {
+          setCalorieTarget(sharedPlan.targetCalories);
+          setTempTarget(sharedPlan.targetCalories);
+        }
+        if (sharedPlan.targetPercentages) {
+          setTargetPercentages(sharedPlan.targetPercentages);
+        }
+        if (sharedPlan.mealTimes) {
+          setMealTimes(sharedPlan.mealTimes);
+        }
+        toast.success(`Loaded shared meal plan: ${sharedPlan.name}`);
+        // Clear the URL parameter after loading
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } catch (error) {
+        console.error('Error loading shared plan:', error);
+        toast.error('Failed to load shared meal plan');
+      }
+    }
+  }, []); // Run once on mount
+
   const checkPendingTargets = useCallback(() => {
     if (hasPendingTargets()) {
-      setShowTargetsPrompt(true);
+      // Auto-apply pending targets without second confirmation
+      const targets = consumePendingTargets();
+      if (targets) {
+        setCalorieTarget(targets.calorieTarget);
+        setTempTarget(targets.calorieTarget);
+        setTargetPercentages(targets.targetPercentages);
+        setHasUnsavedChanges(true);
+        toast.success(`Applied ${targets.calorieTarget} kcal target with new macro split!`);
+      }
     }
-  }, [hasPendingTargets]);
+  }, [hasPendingTargets, consumePendingTargets]);
 
   useImperativeHandle(ref, () => ({ onTabActive: checkPendingTargets }), [checkPendingTargets]);
 
@@ -365,25 +327,6 @@ const MealPrepCalculator = memo(
     checkPendingTargets();
   }, [checkPendingTargets]);
 
-  // Apply pending targets from Calorie Calculator
-  const applyPendingTargets = () => {
-    const targets = consumePendingTargets();
-    if (!targets) return;
-
-    setCalorieTarget(targets.calorieTarget);
-    setTempTarget(targets.calorieTarget);
-    setTargetPercentages(targets.targetPercentages);
-    setHasUnsavedChanges(true);
-    setShowTargetsPrompt(false);
-
-    toast.success(`Applied ${targets.calorieTarget} kcal target with new macro split!`);
-  };
-
-  // Dismiss pending targets
-  const dismissPendingTargets = () => {
-    consumePendingTargets(); // Clear from context
-    setShowTargetsPrompt(false);
-  };
 
   const rememberLastPlan = useCallback(
     (planId) => {
@@ -481,9 +424,12 @@ const MealPrepCalculator = memo(
     const loadData = async () => {
       try {
         const plans = await loadPlans(uid); // Works for both guest (uid=null) and authenticated
+        const userRecipes = await loadRecipes(uid); // Load recipes
+
         // Only proceed if user hasn't changed during async operation
         if (uid !== user?.uid) return;
         setSavedPlans(plans);
+        setRecipes(userRecipes || []);
 
         if (plans.length > 0) {
           const stored =
@@ -663,6 +609,98 @@ const MealPrepCalculator = memo(
     setSelectedId("");
   }, [selectedId, allIngredients, matchDinner, refreshIngredientData, setMealIngredients]);
 
+  // Copy meal ingredients to clipboard
+  const handleCopyMeal = useCallback((meal) => {
+    const ingredients = mealIngredients[meal];
+    if (ingredients.length === 0) {
+      toast.error(`No ingredients to copy from ${meal}`);
+      return;
+    }
+    // Store a deep copy of the ingredients
+    setMealClipboard({
+      ingredients: ingredients.map(ing => ({ ...ing })),
+      sourceMeal: meal,
+      copiedAt: new Date().toLocaleTimeString(),
+    });
+    toast.success(`Copied ${ingredients.length} ingredient(s) from ${meal}`);
+  }, [mealIngredients]);
+
+  // Paste meal from clipboard
+  const handlePasteMeal = useCallback((meal) => {
+    if (!mealClipboard) {
+      toast.error("No meal copied yet");
+      return;
+    }
+
+    const { ingredients } = mealClipboard;
+    setMealIngredients((prev) => {
+      // Deep copy ingredients and refresh their data from source
+      const pastedIngredients = ingredients.map(ing => {
+        const refreshed = refreshIngredientData(ing);
+        return { ...refreshed };
+      });
+
+      const list = [...prev[meal], ...pastedIngredients];
+      const updated = { ...prev, [meal]: list };
+
+      // If pasting to lunch, also update dinner if mirroring
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => refreshIngredientData(i));
+      }
+
+      return updated;
+    });
+    toast.success(`Pasted ${ingredients.length} ingredient(s) to ${meal}`);
+  }, [mealClipboard, matchDinner, refreshIngredientData, setMealIngredients]);
+
+  // Add a recipe to a meal (expands into individual ingredients)
+  const handleAddRecipe = useCallback((meal, recipeId) => {
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (!recipe) return;
+
+    // Expand recipe into individual ingredients
+    const expandedIngredients = expandRecipe(recipe, 1);
+
+    setMealIngredients((prev) => {
+      const list = [...prev[meal], ...expandedIngredients];
+      const updated = { ...prev, [meal]: list };
+      if (meal === "lunch" && matchDinner) {
+        updated.dinner = list.map((i) => refreshIngredientData(i));
+      }
+      return updated;
+    });
+
+    toast.success(`Added ${recipe.name} (${recipe.ingredients.length} ingredients) to ${meal}`);
+  }, [recipes, matchDinner, refreshIngredientData, setMealIngredients]);
+
+  // Handle recipe updates from RecipeManager
+  const handleRecipesChange = useCallback(async (updatedRecipes) => {
+    setRecipes(updatedRecipes);
+    const uid = user?.uid;
+    try {
+      await saveRecipesAll(uid, updatedRecipes);
+      toast.success('Recipes saved!');
+    } catch (err) {
+      console.error('Failed to save recipes:', err);
+      toast.error('Failed to save recipes');
+    }
+  }, [user?.uid]);
+
+  // Open recipe manager for a specific meal
+  const handleShowRecipeManager = useCallback((meal) => {
+    setRecipeManagerMeal(meal);
+    setRecipeManagerOpen(true);
+  }, []);
+
+  // Open share plan dialog
+  const handleOpenSharePlanDialog = useCallback(() => {
+    if (!currentPlanId) {
+      toast.error("Save your plan before sharing");
+      return;
+    }
+    setSharePlanDialogOpen(true);
+  }, [currentPlanId]);
+
   const handleSavePlan = async () => {
     const uid = user?.uid;
     const name = planName.trim() || `Plan ${savedPlans.length + 1}`;
@@ -759,11 +797,7 @@ const MealPrepCalculator = memo(
   };
 
   const handleSaveAsNew = async () => {
-    const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to save plans.");
-      return;
-    }
+    const uid = user?.uid ?? null;
     const newName = planName.trim() || `Plan ${savedPlans.length + 1}`;
     const newPlan = {
       name: newName,
@@ -827,11 +861,7 @@ const MealPrepCalculator = memo(
   };
 
   const handleDuplicatePlan = async (planId) => {
-    const uid = user?.uid;
-    if (!uid) {
-      toast.error("Please sign in to duplicate plans.");
-      return;
-    }
+    const uid = user?.uid ?? null;
     const planToDuplicate = savedPlans.find((p) => p.id === planId);
     if (!planToDuplicate) {
       toast.error("Plan not found");
@@ -874,9 +904,8 @@ const MealPrepCalculator = memo(
   };
 
   const confirmDeletePlan = async () => {
-    const uid = user?.uid;
-    if (!uid || !planToDelete) {
-      toast.error("Not signed in. Cannot delete plan.");
+    const uid = user?.uid ?? null;
+    if (!planToDelete) {
       return;
     }
     try {
@@ -1065,16 +1094,50 @@ const MealPrepCalculator = memo(
 
     const doc = new jsPDF();
     const title = planName || "Meal Plan";
+    let yPosition = 10;
 
+    // Title
     doc.setFontSize(16);
-    doc.text(title, 10, 10);
+    doc.text(title, 10, yPosition);
+    yPosition += 12;
+
+    // Calorie Target Header
     doc.setFontSize(12);
-    doc.text(`Calories: ${calorieTarget}`, 10, 20);
-    doc.text(
-      `Protein: ${targetPercentages.protein}%  Carbs: ${targetPercentages.carbs}%  Fat: ${targetPercentages.fat}%`,
-      10,
-      28
-    );
+    doc.text(`Calorie Target: ${calorieTarget} kcal/day`, 10, yPosition);
+    yPosition += 7;
+
+    // Macro breakdown visualization
+    doc.setFontSize(10);
+    doc.text("Macro Distribution:", 10, yPosition);
+    yPosition += 6;
+
+    // Draw macro bars
+    const barWidth = 120;
+    const barHeight = 5;
+    const colors = {
+      protein: [76, 175, 80],   // Green
+      carbs: [33, 150, 243],    // Blue
+      fat: [255, 152, 0],       // Orange
+    };
+
+    const macros = [
+      { label: 'Protein', percent: targetPercentages.protein, color: colors.protein },
+      { label: 'Carbs', percent: targetPercentages.carbs, color: colors.carbs },
+      { label: 'Fat', percent: targetPercentages.fat, color: colors.fat },
+    ];
+
+    macros.forEach((macro) => {
+      const width = (macro.percent / 100) * barWidth;
+      doc.setDrawColor(macro.color[0], macro.color[1], macro.color[2]);
+      doc.setFillColor(macro.color[0], macro.color[1], macro.color[2]);
+      doc.rect(10, yPosition, width, barHeight, 'F');
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(9);
+      doc.text(`${macro.label}: ${macro.percent}%`, barWidth + 15, yPosition + 4);
+      yPosition += 6;
+    });
+
+    yPosition += 3;
 
     const rows = MEALS.flatMap((meal) => {
       const list = mealIngredients[meal];
@@ -1115,7 +1178,7 @@ const MealPrepCalculator = memo(
         ],
       ],
       body: rows,
-      startY: 35,
+      startY: yPosition + 5,
     });
     autoTable(doc, {
       head: [["Daily Totals", "Calories", "Protein", "Carbs", "Fat"]],
@@ -1277,6 +1340,21 @@ const MealPrepCalculator = memo(
     return totals;
   }, [mealIngredients]);
 
+  // Weekly meal data for 7-day overview — today's meals, other days empty
+  const weeklyMealData = useMemo(() => {
+    const data = createWeeklyPlan();
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    if (data[today]) {
+      data[today] = {
+        breakfast: mealIngredients.breakfast || [],
+        lunch: mealIngredients.lunch || [],
+        dinner: mealIngredients.dinner || [],
+        snack: mealIngredients.snack || [],
+      };
+    }
+    return data;
+  }, [mealIngredients]);
+
   // Daily totals across all meals (memoized)
   const dailyTotals = useMemo(() => {
     const totals = MEALS.reduce(
@@ -1372,6 +1450,83 @@ const MealPrepCalculator = memo(
     toast.success("Full plan exported!");
   };
 
+  // Export meal plan as CSV
+  const handleExportCSV = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before exporting.");
+      return;
+    }
+
+    try {
+      const csvContent = exportMealPlanToCSV(mealIngredients, planName);
+      const filename = (planName || 'meal-plan').replace(/\s+/g, '_').toLowerCase();
+      downloadCSV(csvContent, filename);
+      toast.success("Meal plan exported as CSV!");
+    } catch (err) {
+      console.error('Failed to export CSV:', err);
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  // Copy meal plan as CSV to clipboard
+  const handleCopyCSV = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before copying.");
+      return;
+    }
+
+    try {
+      const csvContent = exportMealPlanToCSV(mealIngredients, planName);
+      const success = await copyCSVToClipboard(csvContent);
+      if (success) {
+        toast.success("Meal plan copied as CSV to clipboard!");
+      } else {
+        toast.error("Failed to copy to clipboard");
+      }
+    } catch (err) {
+      console.error('Failed to copy CSV:', err);
+      toast.error("Failed to copy CSV");
+    }
+  };
+
+  // Export shopping list as CSV
+  const handleExportShoppingListCSV = async () => {
+    try {
+      const csvContent = exportShoppingListToCSV(
+        categorizedShoppingList,
+        prepDays,
+        planName
+      );
+      const filename = `${(planName || 'shopping-list').replace(/\s+/g, '_').toLowerCase()}_${prepDays}days`;
+      downloadCSV(csvContent, filename);
+      toast.success(`Shopping list exported as CSV!`);
+    } catch (err) {
+      console.error('Failed to export shopping list CSV:', err);
+      toast.error("Failed to export shopping list");
+    }
+  };
+
+  // Export for MyFitnessPal (simple format)
+  const handleExportForMyFitnessPal = async () => {
+    const hasIngredients = MEALS.some(m => mealIngredients[m].length > 0);
+    if (!hasIngredients) {
+      toast.error("Add ingredients to your plan before exporting.");
+      return;
+    }
+
+    try {
+      const csvContent = exportForMyFitnessPal(mealIngredients);
+      const filename = (planName || 'meal-plan').replace(/\s+/g, '_').toLowerCase() + '_myfitnesspal';
+      downloadCSV(csvContent, filename);
+      toast.success("Exported for MyFitnessPal!");
+    } catch (err) {
+      console.error('Failed to export for MyFitnessPal:', err);
+      toast.error("Failed to export");
+    }
+  };
+
   const aggregatedIngredients = React.useMemo(() => {
     const totals = {};
     MEALS.forEach((meal) => {
@@ -1406,20 +1561,8 @@ const MealPrepCalculator = memo(
       categories[category].push(ingredient);
     });
 
-    // Sort categories in logical shopping order
-    const categoryOrder = [
-      "Produce - Fruits",
-      "Produce - Vegetables",
-      "Meat & Seafood",
-      "Dairy",
-      "Grains & Bread",
-      "Nuts & Legumes",
-      "Condiments & Spices",
-      "Other",
-    ];
-
     const sortedCategories = {};
-    categoryOrder.forEach((cat) => {
+    CATEGORY_ORDER.forEach((cat) => {
       if (categories[cat] && categories[cat].length > 0) {
         sortedCategories[cat] = categories[cat].sort((a, b) =>
           a.name.localeCompare(b.name)
@@ -1516,6 +1659,8 @@ const MealPrepCalculator = memo(
 
   return (
     <Box
+      component="main"
+      role="main"
       sx={{ maxWidth: { xs: "100%", lg: 1400, xl: 1680 }, mx: "auto", p: { xs: 1, md: 3 }, pb: { xs: 6, md: 4 } }}
     >
       {(showConfetti || goalConfetti) && (
@@ -1531,301 +1676,60 @@ const MealPrepCalculator = memo(
 
       {/* Header */}
       <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, mb: 3 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ md: "flex-start" }}>
-          <Stack spacing={0.5}>
-            <Typography variant="h5" fontWeight={800}>
-              <span className="wiggle">🥗</span> Prep Thy Meal
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Plan your meals, hit your macros, and generate shopping lists.
-            </Typography>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }} flexWrap="wrap" useFlexGap>
-            {/* Saved Plans Dropdown */}
-            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: 'unset' } }}>
-              <InputLabel id="header-plan-select">Saved plans</InputLabel>
-              <Select
-                labelId="header-plan-select"
-                label="Saved plans"
-                value={selectedPlanId}
-                onChange={handlePlanDropdownChange}
-              >
-                <MenuItem value="">
-                  <em>New plan</em>
-                </MenuItem>
-                {savedPlans
-                  .sort((a, b) => {
-                    // Sort by last modified date if available, otherwise by name
-                    const aDate = a.updatedAt || a.createdAt || 0;
-                    const bDate = b.updatedAt || b.createdAt || 0;
-                    if (aDate && bDate) {
-                      return bDate - aDate; // Most recent first
-                    }
-                    return a.name.localeCompare(b.name);
-                  })
-                  .map((plan) => {
-                    const modifiedDate = plan.updatedAt || plan.createdAt;
-                    const dateStr = modifiedDate
-                      ? new Date(modifiedDate.seconds ? modifiedDate.seconds * 1000 : modifiedDate).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })
-                      : null;
-                    return (
-                      <MenuItem key={plan.id} value={plan.id}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', width: '100%' }}>
-                          <Typography variant="body2" fontWeight={600}>
-                            {plan.name}
-                          </Typography>
-                          {dateStr && (
-                            <Typography variant="caption" color="text.secondary">
-                              Modified {dateStr}
-                            </Typography>
-                          )}
-                        </Box>
-                      </MenuItem>
-                    );
-                  })}
-              </Select>
-            </FormControl>
-            {/* Plan Name Input */}
-            <TextField
-              size="small"
-              label="Plan name"
-              value={planName}
-              onChange={(e) => setPlanName(e.target.value)}
-              placeholder="Enter plan name..."
-              sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: 'unset' } }}
-            />
-            {hasUnsavedChanges && (
-              <Chip size="small" color="warning" label="Unsaved" sx={{ fontWeight: 600 }} />
-            )}
-            <Stack direction="row" spacing={0.5}>
-              <Tooltip title="Undo">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={undoMealChange}
-                    disabled={!canUndo}
-                    color="default"
-                    sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                    aria-label="Undo"
-                  >
-                    <UndoIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Redo">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={redoMealChange}
-                    disabled={!canRedo}
-                    color="default"
-                    sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                    aria-label="Redo"
-                  >
-                    <RedoIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Stack>
-            <Button 
-              variant="contained" 
-              onClick={handleSavePlan}
-              sx={{ minHeight: { xs: 44, sm: 'auto' } }}
-            >
-              {currentPlanId ? "Update Plan" : "Save Plan"}
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              onClick={handleOpenActionsMenu}
-              endIcon={<ExpandMoreIcon />}
-              sx={{ minHeight: { xs: 44, sm: 'auto' }, px: { xs: 1, sm: 2 } }}
-            >
-              {isDesktop ? "Plan actions" : "Actions"}
-            </Button>
-            <Menu
-              anchorEl={actionsAnchor}
-              open={actionsMenuOpen}
-              onClose={handleCloseActionsMenu}
-            >
-              {currentPlanId && (
-                <MenuItem
-                  onClick={() => {
-                    handleDuplicatePlan(currentPlanId);
-                    handleCloseActionsMenu();
-                  }}
-                >
-                  Duplicate plan
-                </MenuItem>
-              )}
-              {currentPlanId && (
-                <MenuItem
-                  onClick={() => {
-                    handleSaveAsNew();
-                    handleCloseActionsMenu();
-                  }}
-                >
-                  Save as new
-                </MenuItem>
-              )}
-              {currentPlanId && (
-                <MenuItem
-                  onClick={() => {
-                    handleDeletePlan(currentPlanId);
-                    handleCloseActionsMenu();
-                  }}
-                  sx={{ color: "error.main" }}
-                >
-                  Delete current plan
-                </MenuItem>
-              )}
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  handleCopyFullPlan();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Copy Full Plan
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleDownloadFullPlan();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Download Full Plan
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleExportPDF();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Export PDF
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleExportJSON();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Export JSON
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  importFileRef.current?.click();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Import JSON
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleCopyToClipboard();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Copy shopping list
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleShareToReminders();
-                  handleCloseActionsMenu();
-                }}
-              >
-                Share list
-              </MenuItem>
-            </Menu>
-            <input
-              ref={importFileRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={handleImportJSON}
-              style={{ display: "none" }}
-              aria-label="Import meal plan from JSON file"
-            />
-          </Stack>
-        </Stack>
-
+        <PlanManager
+          savedPlans={savedPlans}
+          currentPlanId={currentPlanId}
+          selectedPlanId={selectedPlanId}
+          planName={planName}
+          hasUnsavedChanges={hasUnsavedChanges}
+          currentPlan={{
+            name: planName,
+            mealIngredients,
+            mealTotals: dayTotals,
+            targetCalories: calorieTarget,
+            targetPercentages,
+            mealTimes,
+          }}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onPlanSelect={handlePlanDropdownChange}
+          onPlanNameChange={(name) => setPlanName(name)}
+          onSavePlan={handleSavePlan}
+          onDuplicatePlan={handleDuplicatePlan}
+          onSaveAsNew={handleSaveAsNew}
+          onDeletePlan={handleDeletePlan}
+          onImportJSON={handleImportJSON}
+          onUndo={undoMealChange}
+          onRedo={redoMealChange}
+          onCopyFullPlan={handleCopyFullPlan}
+          onDownloadFullPlan={handleDownloadFullPlan}
+          onCopyShoppingList={handleCopyToClipboard}
+          onShareToReminders={handleShareToReminders}
+          onExportCSV={handleExportCSV}
+          onCopyCSV={handleCopyCSV}
+          onExportShoppingListCSV={handleExportShoppingListCSV}
+          onExportForMyFitnessPal={handleExportForMyFitnessPal}
+          onSharePlan={handleOpenSharePlanDialog}
+        />
         <Divider sx={{ my: 2 }} />
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: { xs: 1.5, sm: 2 },
-                borderRadius: 2,
-                backgroundColor: (theme) =>
-                  theme.palette.mode === "dark" ? "rgba(37,99,235,0.08)" : "rgba(226,235,255,0.6)",
-              }}
-            >
-              <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Macro budget
-                  </Typography>
-                  {!editingTarget && (
-                    <IconButton size="small" onClick={() => setEditingTarget(true)} aria-label="Edit target">
-                      <EditIcon sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  )}
-                </Stack>
-                {editingTarget ? (
-                  <Stack spacing={1}>
-                    <TextField
-                      type="number"
-                      size="small"
-                      value={tempTarget}
-                      onChange={(e) => handleTargetChange(e.target.value)}
-                      inputProps={{ min: 500, max: 10000 }}
-                      label="kcal/day target"
-                    />
-                    {targetWarning && (
-                      <Typography variant="caption" color="warning.main">
-                        {targetWarning}
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={1}>
-                      <Button size="small" variant="contained" color="success" onClick={handleTargetEdit}>
-                        Save
-                      </Button>
-                      <Button size="small" color="inherit" onClick={handleTargetCancel}>
-                        Cancel
-                      </Button>
-                    </Stack>
-                  </Stack>
-                ) : (
-                  <Stack spacing={0.5}>
-                    <Typography variant="h6" fontWeight={800} color="primary.main" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
-                      {calorieTarget} kcal
-                    </Typography>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      justifyContent="space-between"
-                      flexWrap="wrap"
-                    >
-                      <Typography variant="body2" color="text.secondary">
-                        {targetMacros.protein}g P · {targetMacros.carbs}g C · {targetMacros.fat}g F
-                      </Typography>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={(e) => setMacroAnchor(e.currentTarget)}
-                      >
-                        Edit macros
-                      </Button>
-                    </Stack>
-                  </Stack>
-                )}
-              </Stack>
-            </Paper>
+            <MacroTargetEditor
+              calorieTarget={calorieTarget}
+              targetPercentages={targetPercentages}
+              editingTarget={editingTarget}
+              tempTarget={tempTarget}
+              targetWarning={targetWarning}
+              macroAnchor={macroAnchor}
+              onStartEdit={() => setEditingTarget(true)}
+              onCancelEdit={handleTargetCancel}
+              onConfirmEdit={handleTargetEdit}
+              onTempTargetChange={handleTargetChange}
+              onMacroAnchorClick={(e) => setMacroAnchor(e.currentTarget)}
+              onMacroAnchorClose={() => setMacroAnchor(null)}
+              onPercentagesChange={setTargetPercentages}
+            />
           </Grid>
           <Grid size={{ xs: 12, md: 4 }}>
             <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2 }}>
@@ -1890,13 +1794,6 @@ const MealPrepCalculator = memo(
         </Grid>
       </Paper>
 
-      <MacroTargetPopover
-        anchorEl={macroAnchor}
-        onClose={() => setMacroAnchor(null)}
-        targetPercentages={targetPercentages}
-        onPercentagesChange={setTargetPercentages}
-      />
-
       {/* Macro Validation Warnings */}
       {macroValidation && (macroValidation.hasWarnings || macroValidation.hasCritical) && (
         <Box sx={{ mt: 2 }}>
@@ -1913,9 +1810,59 @@ const MealPrepCalculator = memo(
         </Alert>
       )}
 
+      {/* Show success alert when targets are just applied */}
+      {currentPlanId === null && calorieTarget > 0 && !isLoadingData && (
+        <Alert severity="success" sx={{ mt: 2 }} icon="🎯">
+          <Stack spacing={0.5}>
+            <Typography variant="body2" fontWeight={600}>
+              Targets set! Ready to build your meal plan.
+            </Typography>
+            <Typography variant="caption" color="inherit">
+              {calorieTarget} kcal • {targetPercentages.protein}% Protein • {targetPercentages.carbs}% Carbs • {targetPercentages.fat}% Fat
+            </Typography>
+          </Stack>
+        </Alert>
+      )}
+
       <Grid container spacing={{ xs: 2, md: 2.5 }}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Stack spacing={{ xs: 2, md: 2.5 }}>
+            {/* Weekly Plan View - Optional 7-day overview */}
+            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 1.5,
+                  bgcolor: 'action.hover',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  '&:hover': {
+                    bgcolor: 'action.selected',
+                  },
+                }}
+                onClick={() => setShowWeeklyView(!showWeeklyView)}
+              >
+                <Typography variant="subtitle2" fontWeight={700}>
+                  📅 7-Day Overview
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {showWeeklyView ? '▲' : '▼'}
+                </Typography>
+              </Box>
+              {showWeeklyView && (
+                <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+                  <WeeklyPlanView
+                    weeklyMealData={weeklyMealData}
+                    calorieTarget={calorieTarget}
+                    targetPercentages={targetPercentages}
+                    onSelectDay={() => {}}
+                  />
+                </Box>
+              )}
+            </Paper>
+
             {/* Meal sections */}
             <Stack spacing={1.5}>
               {MEALS.map((meal, idx) => {
@@ -1923,668 +1870,98 @@ const MealPrepCalculator = memo(
                 const disabled = matchDinner && meal === "dinner";
                 const currentMealTotals = mealTotals[meal]; // Use memoized totals
                 return (
-                  <Accordion key={meal} defaultExpanded={idx === 1} disableGutters>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Stack spacing={0.5} sx={{ width: "100%" }}>
-                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={0.5}>
-                          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" rowGap={0.5}>
-                            <Typography variant="subtitle1" fontWeight={800} textTransform="capitalize">
-                              {meal}
-                            </Typography>
-                            {meal === "dinner" && matchDinner && (
-                              <Chip size="small" icon={<LinkIcon sx={{ fontSize: 14 }} />} label="Mirroring Lunch" />
-                            )}
-                            <Box
-                              component="span"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!disabled) {
-                                  setTemplateMealType(meal);
-                                  setTemplateModalOpen(true);
-                                }
-                              }}
-                              sx={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                                px: 1.5,
-                                py: 0.5,
-                                border: "1px solid",
-                                borderColor: disabled ? "action.disabled" : "primary.main",
-                                borderRadius: 2,
-                                color: disabled ? "text.disabled" : "primary.main",
-                                fontSize: "0.875rem",
-                                fontWeight: 600,
-                                textTransform: "none",
-                                cursor: disabled ? "default" : "pointer",
-                                opacity: disabled ? 0.6 : 1,
-                                transition: "all 0.2s",
-                                "&:hover": disabled ? {} : {
-                                  bgcolor: "primary.main",
-                                  color: "primary.contrastText",
-                                },
-                              }}
-                            >
-                              <BookmarkBorderIcon sx={{ fontSize: 16 }} />
-                              Templates
-                            </Box>
-                          </Stack>
-                          {meal === "dinner" && (
-                            <FormControlLabel
-                              sx={{ ml: "auto" }}
-                              control={
-                                <Checkbox
-                                  checked={matchDinner}
-                                  onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    setMatchDinner(checked);
-                                    if (checked) {
-                                      setMealIngredients((prev) => ({
-                                        ...prev,
-                                        dinner: prev.lunch.map((i) => refreshIngredientData(i)),
-                                      }));
-                                    }
-                                  }}
-                                />
-                              }
-                              label="Mirror lunch"
-                            />
-                          )}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary">
-                          {currentMealTotals.calories} kcal · {currentMealTotals.protein}g P · {currentMealTotals.carbs}g C · {currentMealTotals.fat}g F
-                        </Typography>
-                      </Stack>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Stack spacing={1.5}>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                          <IngredientSearchAutocomplete
-                            options={allIngredients.filter((i) => i.id && i.id !== undefined && i.id !== null && i.name)}
-                            value={selectedId}
-                            onChange={(id) => setSelectedId(id)}
-                            label="Select ingredient"
-                            placeholder="Search ingredients..."
-                            disabled={disabled}
-                            excludeIds={list.map((i) => i.id)}
-                            recentIngredients={recentIngredients}
-                            sx={{ flex: 1, minWidth: { xs: "100%", sm: 220 } }}
-                          />
-                          <Button
-                            variant="contained"
-                            color="success"
-                            onClick={() => handleAddIngredient(meal)}
-                            disabled={!selectedId || disabled}
-                            sx={{ minHeight: { xs: 44, sm: 'auto' } }}
-                          >
-                            Add ingredient
-                          </Button>
-                        </Stack>
-
-                        {/* Recent Ingredients Quick Add */}
-                        {showRecentIngredients && recentIngredients.length > 0 && (
-                          <Paper
-                            variant="outlined"
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 2,
-                              bgcolor: (theme) => theme.palette.mode === 'dark'
-                                ? 'rgba(99,102,241,0.08)'
-                                : 'rgba(226,235,255,0.4)',
-                              borderColor: 'primary.light'
-                            }}
-                          >
-                            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                              <Typography variant="caption" fontWeight={600} color="primary.main">
-                                Recently Used:
-                              </Typography>
-                              <Tooltip title="Quickly add ingredients you've used recently">
-                                <InfoIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
-                              </Tooltip>
-                            </Stack>
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                              {recentIngredients
-                                .filter(ing => !list.some(p => p.id === ing.id))
-                                .slice(0, 5)
-                                .map(ing => (
-                                  <Chip
-                                    key={ing.id}
-                                    label={ing.name}
-                                    onClick={() => {
-                                      addToRecentIngredients(ing.id);
-                                      const ingredientToAdd = normalizeIngredient({
-                                        ...ing,
-                                        gramsPerUnit: ing.gramsPerUnit || ing.grams || 100,
-                                        grams: ing.gramsPerUnit || ing.grams || 100,
-                                        quantity: 1,
-                                      });
-                                      setMealIngredients((prev) => {
-                                        const updated = { ...prev, [meal]: [...prev[meal], ingredientToAdd] };
-                                        if (meal === "lunch" && matchDinner) {
-                                          updated.dinner = updated.lunch.map((i) => refreshIngredientData(i));
-                                        }
-                                        return updated;
-                                      });
-                                    }}
-                                    disabled={disabled}
-                                    size="small"
-                                    clickable
-                                    sx={{
-                                      cursor: 'pointer',
-                                      fontWeight: 600,
-                                      '&:hover': { bgcolor: 'primary.main', color: 'white' }
-                                    }}
-                                  />
-                                ))
-                              }
-                            </Stack>
-                          </Paper>
-                        )}
-
-                        {isDesktop ? (
-                          <Box sx={{ mx: 0, overflowX: 'auto' }}>
-                            <Table size="small" sx={{ width: "100%" }}>
-                              <TableHead>
-                                <TableRow>
-                                  <TableCell width="40px"></TableCell>
-                                  <TableCell>Ingredient</TableCell>
-                                  <TableCell align="center">Serving</TableCell>
-                                  <TableCell align="center">Quantity</TableCell>
-                                  <TableCell align="center">Grams</TableCell>
-                                  <TableCell align="center">Calories</TableCell>
-                                  <TableCell align="center">Protein (g)</TableCell>
-                                  <TableCell align="center">Carbs (g)</TableCell>
-                                  <TableCell align="center">Fat (g)</TableCell>
-                                  <TableCell align="center">-</TableCell>
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {list.map((ingredient) => {
-                                  const nutrition = calculateNutrition(ingredient);
-                                  const disabledRow = matchDinner && meal === "dinner";
-                                  const unit = ingredient.unit || "g";
-
-                                  let displayQuantity, totalGrams, incrementStep, unitLabel;
-
-                                  if (unit === "g") {
-                                    displayQuantity = ingredient.grams || 100;
-                                    totalGrams = Math.round(displayQuantity);
-                                    incrementStep = 5;
-                                    unitLabel = "g";
-                                  } else {
-                                    displayQuantity = ingredient.quantity || 1;
-                                    totalGrams = Math.round(
-                                      displayQuantity * (ingredient.gramsPerUnit || 100)
-                                    );
-                                    incrementStep = 0.5;
-                                    unitLabel = "unit";
-                                  }
-
-                                  // Get available serving sizes for this ingredient
-                                  const servingSizes = getServingSizes(ingredient.id);
-                                  const currentServing = ingredient.selectedServing || servingSizes[0]?.name || '100g';
-
-                                  return (
-                                    <TableRow key={ingredient.id} hover>
-                                      <TableCell width="40px"></TableCell>
-                                      <TableCell sx={{ textTransform: "capitalize", fontWeight: 600 }}>
-                                        {ingredient.name}
-                                      </TableCell>
-                                      <TableCell align="center">
-                                        {servingSizes.length > 1 ? (
-                                          <Select
-                                            size="small"
-                                            value={currentServing}
-                                            onChange={(e) => updateIngredientServing(meal, ingredient.id, e.target.value)}
-                                            disabled={disabledRow}
-                                            sx={{
-                                              minWidth: 100,
-                                              fontSize: '0.75rem',
-                                              '& .MuiSelect-select': { py: 0.5, px: 1 },
-                                            }}
-                                          >
-                                            {servingSizes.map((serving) => (
-                                              <MenuItem key={serving.name} value={serving.name} sx={{ fontSize: '0.75rem' }}>
-                                                {serving.name}
-                                              </MenuItem>
-                                            ))}
-                                          </Select>
-                                        ) : (
-                                          <Typography variant="caption" color="text.secondary">
-                                            {servingSizes[0]?.name || '100g'}
-                                          </Typography>
-                                        )}
-                                      </TableCell>
-                                      <TableCell>
-                                        <Stack
-                                          direction="row"
-                                          spacing={0.5}
-                                          alignItems="center"
-                                          justifyContent="center"
-                                          sx={{
-                                            border: "1px solid",
-                                            borderColor: "divider",
-                                            borderRadius: 999,
-                                            px: 0.5,
-                                            backgroundColor: "background.paper",
-                                          }}
-                                        >
-                                          <IconButton
-                                            size="small"
-                                            color="inherit"
-                                            onClick={() =>
-                                              updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
-                                            }
-                                            disabled={disabledRow}
-                                            sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                            aria-label={`Decrease ${ingredient.name}`}
-                                          >
-                                            <RemoveIcon sx={{ fontSize: 18 }} />
-                                          </IconButton>
-                                          <InputBase
-                                            value={displayQuantity}
-                                            type="number"
-                                            onChange={(e) =>
-                                              updateIngredientAmount(
-                                                meal,
-                                                ingredient.id,
-                                                parseFloat(e.target.value) || 0
-                                              )
-                                            }
-                                            inputProps={{
-                                              min: 0,
-                                              step: unitLabel === "g" ? 1 : 0.1,
-                                              style: { textAlign: "center" },
-                                            }}
-                                            disabled={disabledRow}
-                                            sx={{
-                                              width: 60,
-                                              px: 0.5,
-                                              py: 0.25,
-                                              borderRadius: 999,
-                                              bgcolor: "transparent",
-                                            }}
-                                          />
-                                          <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                            sx={{ minWidth: 24 }}
-                                          >
-                                            {unitLabel}
-                                          </Typography>
-                                          <IconButton
-                                            size="small"
-                                            color="inherit"
-                                            onClick={() =>
-                                              updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
-                                            }
-                                            disabled={disabledRow}
-                                            sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                            aria-label={`Increase ${ingredient.name}`}
-                                          >
-                                            <AddIcon sx={{ fontSize: 18 }} />
-                                          </IconButton>
-                                        </Stack>
-                                      </TableCell>
-                                      <TableCell align="center">{totalGrams}g</TableCell>
-                                      <TableCell align="center">{roundVal(nutrition.calories)}</TableCell>
-                                      <TableCell align="center">{roundVal(nutrition.protein)}</TableCell>
-                                      <TableCell align="center">{roundVal(nutrition.carbs)}</TableCell>
-                                      <TableCell align="center">{roundVal(nutrition.fat)}</TableCell>
-                                      <TableCell align="center">
-                                        <IconButton
-                                          size="small"
-                                          color="error"
-                                          onClick={() => removeIngredient(meal, ingredient.id)}
-                                          disabled={disabledRow}
-                                          sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                          aria-label={`Remove ${ingredient.name}`}
-                                        >
-                                          <CloseIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                                <TableRow sx={{ backgroundColor: (theme) => theme.palette.action.hover }}>
-                                  <TableCell></TableCell>
-                                  <TableCell sx={{ fontWeight: 700 }}>Total/meal</TableCell>
-                                  <TableCell align="center">-</TableCell>
-                                  <TableCell align="center">-</TableCell>
-                                  <TableCell align="center">-</TableCell>
-                                  <TableCell align="center">
-                                    {currentMealTotals.calories}
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    {currentMealTotals.protein}
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    {currentMealTotals.carbs}
-                                  </TableCell>
-                                  <TableCell align="center">
-                                    {currentMealTotals.fat}
-                                  </TableCell>
-                                  <TableCell align="center">-</TableCell>
-                                </TableRow>
-                              </TableBody>
-                            </Table>
-                          </Box>
-                        ) : (
-                          <Stack spacing={1}>
-                            {list.map((ingredient) => {
-                              const nutrition = calculateNutrition(ingredient);
-                              const disabledRow = matchDinner && meal === "dinner";
-                              const unit = ingredient.unit || "g";
-                              let displayQuantity, incrementStep, unitLabel;
-                              if (unit === "g") {
-                                displayQuantity = ingredient.grams || 100;
-                                incrementStep = 5;
-                                unitLabel = "g";
-                              } else {
-                                displayQuantity = ingredient.quantity || 1;
-                                incrementStep = 0.5;
-                                unitLabel = "unit";
-                              }
-
-                              // Get serving sizes for mobile view
-                              const mobileServingSizes = getServingSizes(ingredient.id);
-                              const mobileCurrentServing = ingredient.selectedServing || mobileServingSizes[0]?.name || '100g';
-
-                              return (
-                                <Paper key={ingredient.id} variant="outlined" sx={{ p: 1.25, borderRadius: 2 }}>
-                                  <Box>
-                                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                                        <Box>
-                                          <Typography fontWeight={700} textTransform="capitalize">
-                                            {ingredient.name}
-                                          </Typography>
-                                          <Typography variant="caption" color="text.secondary">
-                                            {roundVal(nutrition.calories)} kcal · {roundVal(nutrition.protein)}g P · {roundVal(nutrition.carbs)}g C · {roundVal(nutrition.fat)}g F
-                                          </Typography>
-                                        </Box>
-                                        <IconButton
-                                          size="small"
-                                          color="error"
-                                          onClick={() => removeIngredient(meal, ingredient.id)}
-                                          disabled={disabledRow}
-                                          sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                          aria-label={`Remove ${ingredient.name}`}
-                                        >
-                                          <CloseIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
-                                      </Stack>
-                                    </Box>
-
-                                  {/* Serving size selector for mobile */}
-                                  {mobileServingSizes.length > 1 && (
-                                    <Select
-                                      size="small"
-                                      value={mobileCurrentServing}
-                                      onChange={(e) => updateIngredientServing(meal, ingredient.id, e.target.value)}
-                                      disabled={disabledRow}
-                                      fullWidth
-                                      sx={{
-                                        mt: 1,
-                                        fontSize: '0.75rem',
-                                        '& .MuiSelect-select': { py: 0.5 },
-                                      }}
-                                    >
-                                      {mobileServingSizes.map((serving) => (
-                                        <MenuItem key={serving.name} value={serving.name} sx={{ fontSize: '0.75rem' }}>
-                                          {serving.name}
-                                        </MenuItem>
-                                      ))}
-                                    </Select>
-                                  )}
-
-                                  <Stack
-                                    direction="row"
-                                    spacing={0.75}
-                                    alignItems="center"
-                                    justifyContent="flex-start"
-                                    mt={1}
-                                    sx={{
-                                      border: "1px solid",
-                                      borderColor: "divider",
-                                      borderRadius: 999,
-                                      px: 0.75,
-                                      backgroundColor: "background.paper",
-                                    }}
-                                  >
-                                    <IconButton
-                                      size="small"
-                                      color="inherit"
-                                      onClick={() =>
-                                        updateIngredientAmount(meal, ingredient.id, displayQuantity - incrementStep)
-                                      }
-                                      disabled={disabledRow}
-                                      sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                      aria-label={`Decrease ${ingredient.name}`}
-                                    >
-                                      <RemoveIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                    <InputBase
-                                      value={displayQuantity}
-                                      type="number"
-                                      onChange={(e) =>
-                                        updateIngredientAmount(
-                                          meal,
-                                          ingredient.id,
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      inputProps={{
-                                        min: 0,
-                                        step: unitLabel === "g" ? 1 : 0.1,
-                                        style: { textAlign: "center" },
-                                      }}
-                                      disabled={disabledRow}
-                                      sx={{
-                                        width: 60,
-                                        px: 0.5,
-                                        py: 0.25,
-                                        borderRadius: 999,
-                                        bgcolor: "transparent",
-                                      }}
-                                    />
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      sx={{ minWidth: 24 }}
-                                    >
-                                      {unitLabel}
-                                    </Typography>
-                                    <IconButton
-                                      size="small"
-                                      color="inherit"
-                                      onClick={() =>
-                                        updateIngredientAmount(meal, ingredient.id, displayQuantity + incrementStep)
-                                      }
-                                      disabled={disabledRow}
-                                      sx={{ minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                      aria-label={`Increase ${ingredient.name}`}
-                                    >
-                                      <AddIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Stack>
-                                </Paper>
-                              );
-                            })}
-                          </Stack>
-                        )}
-                      </Stack>
-                    </AccordionDetails>
-                  </Accordion>
+                  <MealSection
+                    key={meal}
+                    meal={meal}
+                    mealIndex={idx}
+                    ingredients={list}
+                    mealTotals={currentMealTotals}
+                    allIngredients={allIngredients}
+                    selectedId={selectedId}
+                    recentIngredients={recentIngredients}
+                    showRecentIngredients={showRecentIngredients}
+                    matchDinner={matchDinner}
+                    isDesktop={isDesktop}
+                    disabled={disabled}
+                    onSelectedIdChange={setSelectedId}
+                    onAddIngredient={handleAddIngredient}
+                    onRemoveIngredient={removeIngredient}
+                    onUpdateAmount={updateIngredientAmount}
+                    onUpdateServing={updateIngredientServing}
+                    onToggleMatchDinner={(checked) => {
+                      setMatchDinner(checked);
+                      if (checked) {
+                        setMealIngredients((prev) => ({
+                          ...prev,
+                          dinner: prev.lunch.map((i) => refreshIngredientData(i)),
+                        }));
+                      }
+                    }}
+                    onShowTemplateModal={(mealType) => {
+                      setTemplateMealType(mealType);
+                      setTemplateModalOpen(true);
+                    }}
+                    onCopyMeal={handleCopyMeal}
+                    onPasteMeal={handlePasteMeal}
+                    clipboardHasMeal={mealClipboard !== null}
+                    onShowRecipeManager={handleShowRecipeManager}
+                  />
                 );
               })}
             </Stack>
 
-            {/* Shopping List */}
-            <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-              <Stack spacing={2}>
-                <Stack direction={{ xs: "column", md: "row" }} alignItems={{ md: "center" }} justifyContent="space-between" spacing={1.5}>
-                  <Typography variant="h6" fontWeight={800}>
-                    {prepDays}-Day Shopping List
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
-                    <Typography variant="body2" color="text.secondary">
-                      Prep days:
-                    </Typography>
-                    <Select
-                      size="small"
-                      value={prepDays}
-                      onChange={(e) => setPrepDays(Number(e.target.value))}
-                      sx={{ minWidth: { xs: 90, sm: 140 } }}
-                    >
-                      {[3, 5, 6, 7, 10, 14, 21, 30].map((day) => (
-                        <MenuItem key={day} value={day}>
-                          {day === 7 ? "1 week" : day === 30 ? "1 month" : `${day} days`}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <Button size="small" variant="contained" onClick={handleExportPDF} sx={{ fontSize: { xs: '0.7rem', sm: '0.8125rem' }, px: { xs: 1, sm: 2 } }}>
-                      Export PDF
-                    </Button>
-                    <Button size="small" variant="contained" color="success" onClick={handleShareToReminders} sx={{ fontSize: { xs: '0.7rem', sm: '0.8125rem' }, px: { xs: 1, sm: 2 } }}>
-                      Share List
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={handleCopyToClipboard} sx={{ fontSize: { xs: '0.7rem', sm: '0.8125rem' }, px: { xs: 1, sm: 2 } }}>
-                      Copy
-                    </Button>
-                  </Stack>
-                </Stack>
-
-                {prepDays > 7 && (
-                  <Paper
-                    variant="outlined"
-                    sx={{ p: 2, borderRadius: 2, backgroundColor: "success.light", borderColor: "success.main" }}
-                  >
-                    <Typography fontWeight={700} color="success.dark" mb={0.5}>
-                      🏗️ Extended Meal Prep Benefits:
-                    </Typography>
-                    <Typography variant="body2" color="success.dark">
-                      Planning for {prepDays} days saves time and money. Consider freezing portions and buying in bulk for better deals.
-                    </Typography>
-                  </Paper>
-                )}
-
-                <Stack spacing={1.5}>
-                  {Object.entries(categorizedShoppingList).map(([category, ingredients]) => {
-                    const colors = getCategoryColors(category, theme.palette.mode === 'dark');
-                    return (
-                    <Paper key={category} variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
-                      <Box
-                        sx={{
-                          px: 2,
-                          py: 1.5,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          bgcolor: colors.header,
-                          color: "#1f2937",
-                        }}
-                      >
-                        <Typography fontWeight={700}>{category}</Typography>
-                        <Chip
-                          size="small"
-                          label={`${ingredients.length} items`}
-                          sx={{
-                            bgcolor: "background.paper",
-                            fontWeight: 600,
-                          }}
-                        />
-                      </Box>
-                      <Stack spacing={1} sx={{ p: 1.5, bgcolor: colors.bg }}>
-                        {ingredients.map((ingredient) => {
-                          const totalQuantity = (ingredient.quantity || 1) * prepDays;
-                          const totalGrams = ingredient.grams * prepDays;
-                          const pounds = (totalGrams / 453.592).toFixed(2);
-                          const kilos = (totalGrams / 1000).toFixed(2);
-                          const unit = ingredient.unit || "g";
-                          const quantityPerDay = ingredient.quantity || 1;
-                          const isGrams = unit === "g";
-                          const isChecked = checkedShoppingItems[ingredient.id] || false;
-
-                          return (
-                            <Paper
-                              key={ingredient.id}
-                              variant="outlined"
-                              sx={{ 
-                                p: 1.25, 
-                                borderRadius: 2, 
-                                display: "flex", 
-                                justifyContent: "space-between", 
-                                alignItems: "center",
-                                opacity: isChecked ? 0.6 : 1,
-                                transition: 'opacity 0.2s',
-                              }}
-                            >
-                              <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
-                                <Checkbox
-                                  checked={isChecked}
-                                  onChange={(e) => {
-                                    setCheckedShoppingItems(prev => ({
-                                      ...prev,
-                                      [ingredient.id]: e.target.checked
-                                    }));
-                                  }}
-                                  size="small"
-                                  sx={{ flexShrink: 0, minWidth: { xs: 44, sm: 'auto' }, minHeight: { xs: 44, sm: 'auto' } }}
-                                />
-                                <Typography
-                                  fontWeight={600}
-                                  textTransform="capitalize"
-                                  sx={{
-                                    textDecoration: isChecked ? 'line-through' : 'none',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {ingredient.name}
-                                </Typography>
-                              </Stack>
-                              <Box textAlign="right">
-                                {isGrams ? (
-                                  <>
-                                    <Typography color="primary.main" fontWeight={800}>
-                                      {totalGrams.toFixed(0)}g
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      ({pounds} lbs | {kilos} kg)
-                                      {prepDays > 7 && (
-                                        <Box component="span" display="block">
-                                          {(totalGrams / prepDays).toFixed(0)}g per day
-                                        </Box>
-                                      )}
-                                    </Typography>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Typography color="primary.main" fontWeight={800}>
-                                      {totalQuantity.toFixed(1)} {unit}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      ({totalGrams.toFixed(0)}g | {pounds} lbs | {kilos} kg)
-                                      {prepDays > 7 && (
-                                        <Box component="span" display="block">
-                                          {quantityPerDay.toFixed(1)} {unit} per day
-                                        </Box>
-                                      )}
-                                    </Typography>
-                                  </>
-                                )}
-                              </Box>
-                            </Paper>
-                          );
-                        })}
-                      </Stack>
-                    </Paper>
-                  );
-                  })}
-                </Stack>
-              </Stack>
+            {/* Meal Timing Editor - Optional IF/Meal Scheduling */}
+            <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+              <Box
+                sx={{
+                  px: { xs: 2, sm: 3 },
+                  py: 1.5,
+                  bgcolor: 'action.hover',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  '&:hover': {
+                    bgcolor: 'action.selected',
+                  },
+                }}
+                onClick={() => setShowMealTiming(!showMealTiming)}
+              >
+                <Typography variant="subtitle2" fontWeight={700}>
+                  ⏰ Meal Timing (Intermittent Fasting)
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {showMealTiming ? '▲' : '▼'}
+                </Typography>
+              </Box>
+              {typeof showMealTiming !== 'undefined' && (
+                <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+                  {showMealTiming && (
+                    <MealTimingEditor
+                      mealTimes={mealTimes}
+                      onMealTimesChange={setMealTimes}
+                    />
+                  )}
+                </Box>
+              )}
             </Paper>
+
+            {/* Shopping List */}
+            <ShoppingList
+              categorizedShoppingList={categorizedShoppingList}
+              prepDays={prepDays}
+              checkedShoppingItems={checkedShoppingItems}
+              onPrepDaysChange={setPrepDays}
+              onToggleItem={(ingredientId, checked) =>
+                setCheckedShoppingItems((prev) => ({
+                  ...prev,
+                  [ingredientId]: checked,
+                }))
+              }
+              onCopyToClipboard={handleCopyToClipboard}
+              onExportPDF={handleExportPDF}
+              onShareToReminders={handleShareToReminders}
+            />
           </Stack>
         </Grid>
 
@@ -2598,7 +1975,14 @@ const MealPrepCalculator = memo(
               overflowY: { md: "auto" },
             }}
           >
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, borderRadius: 3 }}
+              role="region"
+              aria-live="polite"
+              aria-atomic="true"
+              aria-label="Daily meal totals summary"
+            >
               <Typography variant="subtitle1" fontWeight={800} mb={2}>
                 Plan summary
               </Typography>
@@ -2708,48 +2092,6 @@ const MealPrepCalculator = memo(
         variant="danger"
       />
 
-      {/* Pending targets from Calorie Calculator */}
-      <Snackbar
-        open={showTargetsPrompt && pendingTargets !== null}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        sx={{ mb: { xs: 7, sm: 2 } }}
-      >
-        <Alert
-          severity="info"
-          variant="filled"
-          sx={{ width: "100%", alignItems: "center" }}
-          action={
-            <Stack direction="row" spacing={1}>
-              <Button
-                color="inherit"
-                size="small"
-                onClick={dismissPendingTargets}
-                sx={{ minHeight: { xs: 36, sm: 'auto' } }}
-              >
-                Dismiss
-              </Button>
-              <Button
-                color="inherit"
-                size="small"
-                variant="outlined"
-                onClick={applyPendingTargets}
-                sx={{ fontWeight: 700 }}
-              >
-                Apply
-              </Button>
-            </Stack>
-          }
-        >
-          <Stack spacing={0.5}>
-            <Typography variant="body2" fontWeight={600}>
-              Apply calculated targets to your meal plan?
-            </Typography>
-            <Typography variant="caption">
-              {pendingTargets?.calorieTarget} kcal • {pendingTargets?.targetPercentages?.protein}% Protein • {pendingTargets?.targetPercentages?.carbs}% Carbs • {pendingTargets?.targetPercentages?.fat}% Fat
-            </Typography>
-          </Stack>
-        </Alert>
-      </Snackbar>
 
       {/* Meal Template Selector Modal */}
       <MealTemplateSelector
@@ -2775,6 +2117,38 @@ const MealPrepCalculator = memo(
           setTemplateModalOpen(false);
           setTemplateMealType(null);
           toast.success(`Template applied to ${templateMealType}!`);
+        }}
+      />
+
+      {/* Recipe Manager Modal */}
+      <RecipeManager
+        open={recipeManagerOpen}
+        onClose={() => {
+          setRecipeManagerOpen(false);
+          setRecipeManagerMeal(null);
+        }}
+        recipes={recipes}
+        onRecipesChange={handleRecipesChange}
+        selectedMealIngredients={recipeManagerMeal ? mealIngredients[recipeManagerMeal] : []}
+        onCreateRecipeFromMeal={() => {}}
+        selectedMeal={recipeManagerMeal}
+        onAddRecipeToMeal={handleAddRecipe}
+      />
+
+      {/* Share Plan Dialog */}
+      <SharePlanDialog
+        open={sharePlanDialogOpen}
+        onClose={() => setSharePlanDialogOpen(false)}
+        plan={{
+          name: planName,
+          targetCalories: calorieTarget,
+          targetPercentages,
+          mealIngredients: {
+            breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+            lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+            dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+            snack: mealIngredients.snack.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
+          },
         }}
       />
     </Box>

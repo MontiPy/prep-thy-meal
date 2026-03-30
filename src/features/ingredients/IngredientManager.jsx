@@ -60,6 +60,14 @@ import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ImageUploader from "../../shared/components/ui/ImageUploader";
 import { extractNutritionFromImage } from "../../shared/services/ocrService";
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import DietaryTagFilter from './DietaryTagFilter';
+import {
+  filterByDietaryTags,
+  filterByAllergens,
+  detectDietaryTags,
+  DIETARY_TAGS,
+  ALLERGEN_TAGS,
+} from './dietaryTags';
 
 const CATEGORIES = [
   "Produce - Vegetables",
@@ -85,6 +93,7 @@ const emptyForm = {
   carbs: 0,
   fat: 0,
   notes: "",
+  dietaryTags: [],        // Dietary tags and allergen info
 };
 
 const IngredientManager = ({ onChange }) => {
@@ -132,6 +141,10 @@ const IngredientManager = ({ onChange }) => {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
+  const [dietaryFilters, setDietaryFilters] = useState({
+    selectedTags: [],
+    excludedAllergens: [],
+  });
 
   // USDA FoodData Central API search state
   const [apiResults, setApiResults] = useState([]);
@@ -200,6 +213,7 @@ const IngredientManager = ({ onChange }) => {
       carbs: itemToEdit.carbs || 0,
       fat: itemToEdit.fat || 0,
       notes: itemToEdit.notes || "",
+      dietaryTags: itemToEdit.dietaryTags || [],
     });
   }, [editingId, ingredients]); // Re-run when editingId changes, but ref prevents duplicate syncs
 
@@ -209,6 +223,15 @@ const IngredientManager = ({ onChange }) => {
     if (sourceFilter === "db") list = list.filter((i) => i.id < 1000);
     if (sourceFilter === "custom") list = list.filter((i) => i.id >= 1000);
     if (categoryFilter !== "all") list = list.filter((i) => i.category === categoryFilter);
+
+    // Apply dietary filters
+    if (dietaryFilters.selectedTags.length > 0) {
+      list = filterByDietaryTags(list, dietaryFilters.selectedTags);
+    }
+    if (dietaryFilters.excludedAllergens.length > 0) {
+      list = filterByAllergens(list, dietaryFilters.excludedAllergens);
+    }
+
     list = [...list].sort((a, b) => {
       if (sortBy === "name") return a.name.localeCompare(b.name);
       if (sortBy === "category") return (a.category || "").localeCompare(b.category || "");
@@ -216,7 +239,7 @@ const IngredientManager = ({ onChange }) => {
       return 0;
     });
     return list;
-  }, [ingredients, query, sourceFilter, categoryFilter, sortBy]);
+  }, [ingredients, query, sourceFilter, categoryFilter, sortBy, dietaryFilters]);
 
   const refresh = useCallback(() => {
     const base = getAllBaseIngredients();
@@ -880,6 +903,52 @@ const IngredientManager = ({ onChange }) => {
                 </FormControl>
               </Box>
 
+              {/* Dietary Tags Section */}
+              <Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                  <Typography variant="caption" fontWeight={500} color="text.secondary">
+                    Dietary Tags (Optional)
+                  </Typography>
+                  {form.name && (
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        const detected = detectDietaryTags(form.name);
+                        setForm((f) => ({ ...f, dietaryTags: detected }));
+                      }}
+                      variant="text"
+                      sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                    >
+                      Auto-detect
+                    </Button>
+                  )}
+                </Stack>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {Object.values({ ...DIETARY_TAGS, ...ALLERGEN_TAGS }).map((tag) => (
+                    <Chip
+                      key={tag.id}
+                      label={`${tag.icon} ${tag.label}`}
+                      onClick={() => {
+                        const newTags = form.dietaryTags.includes(tag.id)
+                          ? form.dietaryTags.filter(t => t !== tag.id)
+                          : [...form.dietaryTags, tag.id];
+                        setForm((f) => ({ ...f, dietaryTags: newTags }));
+                      }}
+                      variant={form.dietaryTags.includes(tag.id) ? 'filled' : 'outlined'}
+                      size="small"
+                      sx={{
+                        cursor: 'pointer',
+                        ...(form.dietaryTags.includes(tag.id) && {
+                          bgcolor: tag.color,
+                          color: 'white',
+                          fontWeight: 600,
+                        })
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+
               {/* Serving Size Section */}
               <Paper
                 variant="outlined"
@@ -1461,6 +1530,13 @@ const IngredientManager = ({ onChange }) => {
                   />
                 ))}
               </Stack>
+
+              {/* Dietary Tag Filter */}
+              <Box sx={{ mt: 2 }}>
+                <DietaryTagFilter
+                  onFilterChange={(filters) => setDietaryFilters(filters)}
+                />
+              </Box>
             </Paper>
 
             {/* USDA FoodData Central API Results */}
@@ -1621,6 +1697,7 @@ const IngredientManager = ({ onChange }) => {
                       <TableRow sx={{ bgcolor: "action.hover" }}>
                         <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Ingredient</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Category</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Dietary Tags</TableCell>
                         <TableCell sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>Source</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>kcal</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 600, color: "text.secondary", py: 1.5 }}>P</TableCell>
@@ -1632,7 +1709,7 @@ const IngredientManager = ({ onChange }) => {
                     <TableBody>
                       {filtered.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                          <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
                             <EmptyState
                               title="No ingredients found"
                               description={`No ingredients match "${query}". Try adjusting your search or filters, or look up a new food.`}
@@ -1659,6 +1736,39 @@ const IngredientManager = ({ onChange }) => {
                               <Typography variant="body2" color="text.secondary">
                                 {it.category || "—"}
                               </Typography>
+                            </TableCell>
+                            <TableCell sx={{ py: 1.5 }}>
+                              {it.dietaryTags && it.dietaryTags.length > 0 ? (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                  {it.dietaryTags.slice(0, 3).map(tagId => {
+                                    const tag = Object.values({ ...DIETARY_TAGS, ...ALLERGEN_TAGS }).find(t => t.id === tagId);
+                                    return tag ? (
+                                      <Chip
+                                        key={tagId}
+                                        label={tag.icon}
+                                        size="small"
+                                        title={tag.label}
+                                        sx={{
+                                          height: 24,
+                                          fontWeight: 600,
+                                          fontSize: '0.75rem',
+                                          bgcolor: tag.color,
+                                          color: 'white',
+                                        }}
+                                      />
+                                    ) : null;
+                                  })}
+                                  {it.dietaryTags.length > 3 && (
+                                    <Chip
+                                      label={`+${it.dietaryTags.length - 3}`}
+                                      size="small"
+                                      sx={{ height: 24, fontWeight: 600, fontSize: '0.75rem' }}
+                                    />
+                                  )}
+                                </Box>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">—</Typography>
+                              )}
                             </TableCell>
                             <TableCell sx={{ py: 1.5 }}>
                               <Chip

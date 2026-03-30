@@ -7,6 +7,7 @@ const GUEST_INGREDIENTS_KEY = 'customIngredients';
 const GUEST_PREFERENCES_KEY = 'guestPreferences';
 const GUEST_FAVORITES_KEY = 'favoriteIngredients';
 const GUEST_RECENTS_KEY = 'recentIngredients';
+const GUEST_RECIPES_KEY = 'guestRecipes';
 
 /**
  * Load all guest plans from localStorage
@@ -118,6 +119,7 @@ export const clearGuestData = () => {
     localStorage.removeItem(GUEST_PREFERENCES_KEY);
     localStorage.removeItem(GUEST_FAVORITES_KEY);
     localStorage.removeItem(GUEST_RECENTS_KEY);
+    localStorage.removeItem(GUEST_RECIPES_KEY);
   } catch (error) {
     console.error('Failed to clear guest data:', error);
   }
@@ -282,6 +284,33 @@ export const saveGuestRecents = (recents) => {
     localStorage.setItem(GUEST_RECENTS_KEY, JSON.stringify(recents));
   } catch (error) {
     console.error('Failed to save guest recents:', error);
+    throw error;
+  }
+};
+
+/**
+ * Load guest recipes from localStorage
+ * @returns {Array} Array of recipe objects
+ */
+export const loadGuestRecipes = () => {
+  try {
+    const raw = localStorage.getItem(GUEST_RECIPES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (error) {
+    console.error('Failed to load guest recipes:', error);
+    return [];
+  }
+};
+
+/**
+ * Save all guest recipes (bulk operation)
+ * @param {Array} recipes - Array of recipe objects
+ */
+export const saveAllGuestRecipes = (recipes) => {
+  try {
+    localStorage.setItem(GUEST_RECIPES_KEY, JSON.stringify(recipes));
+  } catch (error) {
+    console.error('Failed to save guest recipes:', error);
     throw error;
   }
 };

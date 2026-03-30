@@ -4,10 +4,11 @@ import {
   loadGuestBaseline,
   loadGuestIngredients,
   loadGuestPreferences,
+  loadGuestRecipes,
   clearGuestData,
   hasGuestData
 } from './guestStorage';
-import { loadPlans as loadFirebasePlans, addPlan, saveBaseline } from './firestore';
+import { loadPlans as loadFirebasePlans, addPlan, saveBaseline, saveRecipes } from './firestore';
 import { saveCustomIngredients } from './firestore';
 import { saveUserPreferences } from './userPreferences';
 
@@ -45,6 +46,7 @@ export const migrateGuestData = async (uid) => {
     const guestBaseline = loadGuestBaseline();
     const guestIngredients = loadGuestIngredients();
     const guestPreferences = loadGuestPreferences();
+    const guestRecipes = loadGuestRecipes();
 
     // Check if user already has cloud data
     const existingPlans = await loadFirebasePlans(uid);
@@ -100,9 +102,20 @@ export const migrateGuestData = async (uid) => {
       }
     }
 
+    // Migrate recipes
+    let migratedRecipes = 0;
+    if (guestRecipes.length > 0) {
+      try {
+        await saveRecipes(uid, guestRecipes);
+        migratedRecipes = guestRecipes.length;
+      } catch (error) {
+        console.error('Failed to migrate recipes:', error);
+      }
+    }
+
     // Clear guest storage after successful migration
     // Only clear if at least some data was migrated successfully
-    const somethingMigrated = migratedCount > 0 || migratedBaseline || migratedIngredientsCount > 0 || migratedPreferences;
+    const somethingMigrated = migratedCount > 0 || migratedBaseline || migratedIngredientsCount > 0 || migratedPreferences || migratedRecipes > 0;
     if (somethingMigrated) {
       clearGuestData();
     }
@@ -112,6 +125,7 @@ export const migrateGuestData = async (uid) => {
       migratedBaseline,
       migratedIngredients: migratedIngredientsCount,
       migratedPreferences,
+      migratedRecipes,
       hadConflicts,
       totalGuestPlans: guestPlans.length,
       totalGuestIngredients: guestIngredients.length
