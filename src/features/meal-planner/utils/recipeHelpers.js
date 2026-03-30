@@ -89,9 +89,12 @@ export const getRecipe = (recipes, recipeId) => {
  * @returns {Array} Array of ingredient objects ready to add to meal
  */
 export const expandRecipe = (recipe, servings = 1) => {
-  return recipe.ingredients.map(ing => ({
+  return recipe.ingredients.map((ing, index) => ({
     ...ing,
-    id: `${ing.id}_${Date.now()}`, // Generate unique ID for this instance
+    // Preserve original id so nutritionHelpers cache lookup works
+    id: ing.id,
+    // Unique key for React list rendering — separate from data identity
+    instanceId: `${ing.id}_${recipe.id}_${Date.now()}_${index}`,
     recipeSourceId: recipe.id, // Track where ingredient came from
     quantity: (ing.quantity || 1) * servings,
     grams: (ing.grams || 0) * servings,

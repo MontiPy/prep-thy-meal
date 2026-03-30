@@ -19,7 +19,7 @@ import {
 import ContentCopyIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckCircleIcon from '@mui/icons-material/CheckCircleRounded';
 import LinkIcon from '@mui/icons-material/LinkRounded';
-import { generateShareLink, copyShareLinkToClipboard, getPlanShareDescription } from './utils/planSharing';
+import { generateShareableUrl, copyToClipboard } from '../../shared/utils/planSharing';
 import toast from 'react-hot-toast';
 
 /**
@@ -33,13 +33,12 @@ const SharePlanDialog = ({ open, onClose, plan }) => {
   const [error, setError] = useState(null);
 
   // Generate share link (will be recreated each time dialog opens to ensure freshness)
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareLink = open && plan ? generateShareLink(baseUrl, plan) : '';
+  const shareLink = open && plan ? (generateShareableUrl(plan) || '') : '';
 
   const handleCopyLink = async () => {
     try {
       setError(null);
-      const success = await copyShareLinkToClipboard(shareLink);
+      const success = await copyToClipboard(shareLink);
       if (success) {
         setCopied(true);
         toast.success('Share link copied!');
@@ -53,7 +52,7 @@ const SharePlanDialog = ({ open, onClose, plan }) => {
     }
   };
 
-  const planDescription = plan ? getPlanShareDescription(plan) : '';
+  const planDescription = plan ? `${plan.name || 'Meal Plan'} (${plan.targetCalories || plan.calorieTarget || 0} kcal target)` : '';
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth fullScreen={isMobile}>

@@ -119,7 +119,7 @@ import {
   downloadCSV,
   copyCSVToClipboard,
 } from './utils/csvExport';
-import { parsePlanFromLink } from './utils/planSharing';
+import { createWeeklyPlan } from './utils/weeklyPlanHelpers';
 
 
 const MealPrepCalculator = memo(
@@ -1340,6 +1340,21 @@ const MealPrepCalculator = memo(
     return totals;
   }, [mealIngredients]);
 
+  // Weekly meal data for 7-day overview — today's meals, other days empty
+  const weeklyMealData = useMemo(() => {
+    const data = createWeeklyPlan();
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    if (data[today]) {
+      data[today] = {
+        breakfast: mealIngredients.breakfast || [],
+        lunch: mealIngredients.lunch || [],
+        dinner: mealIngredients.dinner || [],
+        snack: mealIngredients.snack || [],
+      };
+    }
+    return data;
+  }, [mealIngredients]);
+
   // Daily totals across all meals (memoized)
   const dailyTotals = useMemo(() => {
     const totals = MEALS.reduce(
@@ -1839,7 +1854,7 @@ const MealPrepCalculator = memo(
               {showWeeklyView && (
                 <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
                   <WeeklyPlanView
-                    weeklyMealData={{}}
+                    weeklyMealData={weeklyMealData}
                     calorieTarget={calorieTarget}
                     targetPercentages={targetPercentages}
                     onSelectDay={() => {}}
@@ -2126,9 +2141,9 @@ const MealPrepCalculator = memo(
         onClose={() => setSharePlanDialogOpen(false)}
         plan={{
           name: planName,
-          calorieTarget,
+          targetCalories: calorieTarget,
           targetPercentages,
-          meals: {
+          mealIngredients: {
             breakfast: mealIngredients.breakfast.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
             lunch: mealIngredients.lunch.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
             dinner: mealIngredients.dinner.map(({ id, grams, quantity }) => ({ id, grams, quantity })),
