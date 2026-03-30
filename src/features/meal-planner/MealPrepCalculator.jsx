@@ -1685,7 +1685,7 @@ const MealPrepCalculator = memo(
           currentPlan={{
             name: planName,
             mealIngredients,
-            mealTotals: mealTotals,
+            mealTotals: dayTotals,
             targetCalories: calorieTarget,
             targetPercentages,
             mealTimes,
